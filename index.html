@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Technical PM</title>
-<script>
-try{const s=JSON.parse(localStorage.getItem('tpm.v1.session')||'{}');if(s.theme)document.documentElement.dataset.theme=s.theme}catch(e){}
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link id="fontLink" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
@@ -26,6 +24,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font),system-ui,-ap
 .nav-item:hover{background:rgba(127,127,127,.18)}
 .nav-item.active{background:var(--brand);color:var(--brandtx)}
 .theme-btn.on,.seg.on{background:var(--brand);color:var(--brandtx)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;flex:none}
+.ldg-inline{display:flex;align-items:center;justify-content:center;gap:.75rem;padding:4rem 1rem;color:var(--mute);font-size:.9rem}
+#ldg{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}
+#ldg.on{display:flex}
+#ldg .box{display:flex;align-items:center;gap:.75rem;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:.75rem;padding:.9rem 1.2rem;box-shadow:0 10px 30px -8px rgba(0,0,0,.4)}
+#saveInd{position:fixed;left:12px;bottom:12px;z-index:75;display:none;padding:.3rem .7rem;border-radius:999px;font-size:.75rem;background:var(--surface);color:var(--mute);border:1px solid var(--line);box-shadow:0 4px 14px -6px rgba(0,0,0,.3)}
+#saveInd.on{display:block}#saveInd.ok{color:#059669}
 @keyframes pulseRed{0%,100%{opacity:1}50%{opacity:.5}}
 .overdue{color:#dc2626;font-weight:600;animation:pulseRed 1.6s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.overdue{animation:none}}
@@ -202,6 +208,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 </head>
 <body class="min-h-screen">
 
+<div id="ldg"><div class="box"><span class="spin"></span><span id="ldgMsg">Đang tải dữ liệu...</span></div></div><div id="saveInd"></div>
 <div id="gate" class="hidden fixed inset-0 z-50 bg-bg flex items-center justify-center p-4 overflow-auto">
   <div class="w-full max-w-md bg-surface border border-line rounded-2xl shadow-2xl p-8">
     <div class="flex items-center gap-3 mb-6"><span class="logo-sq" style="width:2.6rem;height:2.6rem"><i class="fa-solid fa-gears"></i></span><div><div class="text-xl font-extrabold leading-tight">Tech<span style="color:var(--brand)">PM</span></div><div class="text-xs text-mute">Quản lý dự án kỹ thuật</div></div></div>
@@ -211,7 +218,6 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
       <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Đăng nhập bằng Google</button>
     <div id="gMsg" class="text-xs mt-3 text-mute"></div>
-    <div id="gDemo" class="hidden mt-5 pt-4 border-t border-line"><div class="text-xs text-mute mb-2">Chế độ demo (chưa điền khóa Supabase): chọn tài khoản giả lập</div><div id="gateList" class="space-y-2"></div></div>
   </div>
 </div>
 
@@ -245,7 +251,6 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
         <span id="roleBadge" class="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full"></span></button>
       <div id="userMenu" class="hidden absolute right-0 mt-2 w-60 bg-surface border border-line rounded-xl shadow-lg p-2 z-40">
         <div id="userInfo" class="px-2 py-1.5 text-sm border-b border-line mb-1"></div>
-        <div id="demoHdr" class="text-xs text-mute px-2 py-1">Đổi người dùng (demo)</div>
         <div id="userList"></div>
       </div>
     </div>
@@ -340,36 +345,185 @@ function hydrateIcons(root){
 new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches&&n.matches('i.fa-solid,i.fa-regular'))hydrateIcons({querySelectorAll:()=>[n]});else hydrateIcons(n)}}))).observe(document.documentElement,{childList:true,subtree:true});
 hydrateIcons(document);
 
-const LS='tpm.v1.';
-const store={
-  get(k,d){try{const v=localStorage.getItem(LS+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
-  set(k,v){localStorage.setItem(LS+k,JSON.stringify(v))}
-};
-const db={
-  list:t=>store.get(t,[]),
-  save:(t,rows)=>store.set(t,rows)
-};
-/* ================= CẤU HÌNH ĐĂNG NHẬP GOOGLE (SUPABASE) =================
-   1) ADMIN_EMAIL: email Google của Admin (người duy nhất thấy tab Chi phí và duyệt dự án).
-   2) SUPABASE_URL và SUPABASE_ANON_KEY: lấy ở Supabase > Project Settings > API.
-   Để trống 2 dòng Supabase thì app chạy chế độ DEMO (chọn tài khoản giả lập).      */
-const ADMIN_EMAIL='hoangson1231997@gmail.com';
-const SUPABASE_URL='';       // ví dụ: 'https://abcdxyz.supabase.co'
-const SUPABASE_ANON_KEY='';  // khóa 'anon public' (không dùng service_role)
-const AUTH_ON=!!(SUPABASE_URL&&SUPABASE_ANON_KEY);
+/* ================= SUPABASE: KẾT NỐI + DATA LAYER =================
+   - ADMIN_EMAIL: email Google của Admin (thấy mọi dự án, tab Chi phí, nút duyệt). PHẢI trùng với hàm is_admin() trong supabase_setup.sql.
+   - Không còn localStorage cho dữ liệu: mọi thứ đọc/ghi qua Supabase. (Riêng token đăng nhập do chính thư viện Supabase tự giữ.)
+   - Toàn bộ code cũ gọi db.list()/db.save() vẫn chạy: db.list đọc từ bộ nhớ (đã tải từ Supabase),
+     db.save so sánh với bản đã tải rồi gửi ĐÚNG phần thay đổi (upsert / delete) lên Supabase ngay lập tức, theo hàng đợi tuần tự. */
+const SUPABASE_URL='https://fqapbzaxmghweyucfivp.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxYXBiemF4bWdod2V5dWNmaXZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NjE1ODAsImV4cCI6MjEwNzUzNzU4MH0.6fduQsUue2uhXDIQ1L-wywpdJO1lQtXx_BeH5l0CZtQ';
+const ADMIN_EMAIL='hoangson1231997@gmail.com';   // đổi thành email Admin của bạn (và đổi cả trong file SQL)
+const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{flowType:'pkce',persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 const lc=x=>String(x||'').trim().toLowerCase();
-const SEED_USERS=[
-  {id:'00000000-0000-4000-8000-0000000000a1',full_name:'Nguyen Van An',email:ADMIN_EMAIL,avatar_color:'#2563eb'},
-  {id:'00000000-0000-4000-8000-0000000000a2',full_name:'Tran Minh Khoa',email:'khoa.tran@example.com',avatar_color:'#059669'},
-  {id:'00000000-0000-4000-8000-0000000000a3',full_name:'Le Thu Ha',email:'ha.le@example.com',avatar_color:'#d97706'}
-];
-if(!db.list('users').length)db.save('users',SEED_USERS);
-(function(){const us=db.list('users');if(us.length&&!us.some(u=>lc(u.email)===lc(ADMIN_EMAIL))){us[0]={...us[0],email:ADMIN_EMAIL};db.save('users',us)}})();
-
 const $=s=>document.querySelector(s);
-const session=()=>store.get('session',{});
-const patchSession=p=>store.set('session',{...session(),...p});
 const initials=n=>n.split(' ').map(w=>w[0]).slice(-2).join('').toUpperCase();
+const uid=()=>crypto.randomUUID();
+
+/* ---- Bản đồ bảng: tên bảng trong app -> bảng Supabase + cột ---- */
+const TB={
+  users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
+  projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
+  project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ord:['project_id']},
+  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
+  budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','quote_status','note','sort_order'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note']},
+  attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
+  notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
+  extra_tasks:{t:'extra_tasks',pk:['id'],cols:['id','project_id','title','note','done','created_by','created_at'],ord:['created_at','id'],txt:['title','note']},
+  master_gantt:{t:'master_gantt',pk:['id'],wrap:true,ord:['id']}
+};
+const DATEC=new Set(['start_date','end_date','due_date','actual_start','actual_end','approved_at','created_at','updated_at','imported_at']);
+const CACHE={},SNAP={};Object.keys(TB).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});
+const pkOf=(c,r)=>c.pk.map(f=>r[f]).join('|');
+function toDB(k,r){
+  const c=TB[k];
+  if(c.wrap){const {id,project_id,...rest}=r;return{id,project_id,data:rest}}
+  const o={};c.cols.forEach(f=>{let v=r[f];if(v===undefined||(v===''&&DATEC.has(f)))v=null;o[f]=v});return o;
+}
+function fromDB(k,r){
+  const c=TB[k];
+  if(c.wrap)return{...(r.data||{}),id:r.id,project_id:r.project_id};
+  const o={};c.cols.forEach(f=>{o[f]=r[f]});
+  (c.txt||[]).forEach(f=>{if(o[f]==null)o[f]=''});(c.arr||[]).forEach(f=>{if(o[f]==null)o[f]=[]});(c.obj||[]).forEach(f=>{if(o[f]==null)o[f]={}});
+  return o;
+}
+const db={
+  list:t=>structuredClone(CACHE[t]||[]),
+  /* so sánh với bản đã tải, chỉ gửi phần thay đổi; trả về Promise<boolean> */
+  save(k,rows){
+    const c=TB[k],old=SNAP[k],next=new Map(),ups=[];
+    rows.forEach(r=>{const key=pkOf(c,r),o=toDB(k,r),j=JSON.stringify(o);next.set(key,j);if(old.get(key)!==j)ups.push(o)});
+    const dels=[...old.keys()].filter(x=>!next.has(x));
+    CACHE[k]=structuredClone(rows);SNAP[k]=next;
+    if(!ups.length&&!dels.length)return Promise.resolve(true);
+    return enqueue(()=>pushRows(k,ups,dels));
+  }
+};
+/* ---- Hàng đợi ghi tuần tự + chỉ báo "Đang lưu..." ---- */
+let Q=Promise.resolve(),SAVING=0,saveTm;
+function setSave(s){
+  const el=$('#saveInd');if(!el)return;clearTimeout(saveTm);
+  el.className=s==='saving'?'on':s==='saved'?'on ok':'';
+  el.textContent=s==='saving'?'Đang lưu...':s==='saved'?'Đã lưu':'';
+  if(s==='saved')saveTm=setTimeout(()=>setSave(''),1400);
+}
+function enqueue(fn){
+  SAVING++;setSave('saving');
+  const p=Q.then(fn).then(()=>true,async e=>{
+    console.error(e);toast('Lưu lên Supabase thất bại: '+(e&&e.message||e)+'. Đang tải lại dữ liệu...',true);
+    try{await resync()}catch(x){console.error(x)}return false;
+  }).finally(()=>{SAVING--;if(!SAVING)setSave('saved')});
+  Q=p;return p;
+}
+async function pushRows(k,ups,dels){
+  const c=TB[k];
+  for(let i=0;i<ups.length;i+=300){
+    const {error}=await sb.from(c.t).upsert(ups.slice(i,i+300),{onConflict:c.pk.join(',')});if(error)throw error;
+  }
+  if(!dels.length)return;
+  if(c.pk.length===1){
+    for(let i=0;i<dels.length;i+=100){const {error}=await sb.from(c.t).delete().in(c.pk[0],dels.slice(i,i+100));if(error)throw error}
+  }else for(const key of dels){
+    const parts=key.split('|');let q=sb.from(c.t).delete();c.pk.forEach((f,i)=>q=q.eq(f,parts[i]));const {error}=await q;if(error)throw error;
+  }
+}
+/* ---- Tải dữ liệu (có phân trang + chia nhỏ mệnh đề IN) ---- */
+async function fetchTable(k,col,vals){
+  const c=TB[k],all=[];
+  const chunks=col?(vals.length?Array.from({length:Math.ceil(vals.length/80)},(_,i)=>vals.slice(i*80,i*80+80)):[]):[null];
+  for(const ch of chunks){
+    for(let from=0;;from+=1000){
+      let q=sb.from(c.t).select('*');if(ch)q=q.in(col,ch);
+      (c.ord||[]).forEach(o=>q=q.order(o,{ascending:true}));
+      const {data,error}=await q.range(from,from+999);if(error)throw error;
+      all.push(...data);if(data.length<1000)break;
+    }
+  }
+  const rows=all.map(r=>fromDB(k,r)),vs=col?new Set(vals):null;
+  CACHE[k]=CACHE[k].filter(r=>vs&&!vs.has(r[col])).concat(rows);
+  SNAP[k]=new Map(CACHE[k].map(r=>[pkOf(c,r),JSON.stringify(toDB(k,r))]));
+  return rows;
+}
+async function fetchAll(){
+  const admin=isAdmin();
+  await Promise.all([fetchTable('users'),fetchTable('project_members')]);
+  if(admin)await fetchTable('projects');
+  else await fetchTable('projects','id',CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id));
+  const pids=CACHE.projects.map(p=>p.id);
+  await Promise.all([fetchTable('tasks','project_id',pids),admin?fetchTable('budget_items','project_id',pids):null,fetchTable('extra_tasks','project_id',pids)]);
+  if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
+}
+async function fetchProject(pid){
+  const admin=isAdmin();
+  await Promise.all([fetchTable('tasks','project_id',[pid]),admin?fetchTable('budget_items','project_id',[pid]):null,fetchTable('extra_tasks','project_id',[pid]),
+    fetchTable('notes','project_id',[pid]),fetchTable('master_gantt','project_id',[pid]),fetchTable('project_members','project_id',[pid])]);
+  await fetchTable('attachments','task_id',CACHE.tasks.filter(t=>t.project_id===pid).map(t=>t.id));
+}
+async function resync(){await fetchAll();if(curPid)await fetchProject(curPid);route(true)}
+
+/* ---- Hiệu ứng loading ---- */
+let LD=0;
+function loading(on,msg){LD=Math.max(0,LD+(on?1:-1));if(msg&&$('#ldgMsg'))$('#ldgMsg').textContent=msg;const e=$('#ldg');if(e)e.classList.toggle('on',LD>0)}
+async function withLoad(msg,fn){loading(true,msg);try{return await fn()}finally{loading(false)}}
+const SPIN_HTML='<div class="ldg-inline"><span class="spin"></span><span>Đang tải dữ liệu...</span></div>';
+
+/* ---- Cây (tree) từ parent_id ---- */
+function buildTree(rows){
+  const by=new Map(rows.map(r=>[r.id,{...r,children:[]}])),roots=[];
+  by.forEach(n=>{const p=n.parent_id&&by.get(n.parent_id);(p?p.children:roots).push(n)});
+  const srt=a=>{a.sort((x,y)=>(x.sort_order||0)-(y.sort_order||0));a.forEach(n=>srt(n.children))};srt(roots);return roots;
+}
+const descOf=(rows,id)=>{const out=new Set([id]);let ch=true;while(ch){ch=false;rows.forEach(r=>{if(r.parent_id&&out.has(r.parent_id)&&!out.has(r.id)){out.add(r.id);ch=true}})}return out};
+
+/* ---- API CRUD (async/await) ---- */
+async function loadProjects(){await Q;return withLoad('Đang tải dữ liệu...',async()=>{await fetchAll();return myProjects()})}
+async function addProject(row){
+  const now=new Date().toISOString(),p={id:uid(),currency:'VND',...row,created_by:CUR.id,created_at:now,updated_at:now};
+  await db.save('projects',[...db.list('projects'),p]);
+  await db.save('project_members',[...db.list('project_members'),{project_id:p.id,user_id:CUR.id,role:'owner'}]);
+  return p;
+}
+async function updateProject(id,patch){return db.save('projects',db.list('projects').map(x=>x.id===id?{...x,...patch,updated_at:new Date().toISOString()}:x))}
+async function deleteProject(id){
+  const tk=new Set(db.list('tasks').filter(t=>t.project_id===id).map(t=>t.id));
+  await db.save('projects',db.list('projects').filter(x=>x.id!==id));   // DB tự xóa dây chuyền (ON DELETE CASCADE)
+  ['project_members','tasks','budget_items','notes','extra_tasks','master_gantt'].forEach(k=>db.save(k,db.list(k).filter(r=>r.project_id!==id)));
+  await db.save('attachments',db.list('attachments').filter(a=>!tk.has(a.task_id)));
+}
+async function approveProject(pid){
+  if(!isAdmin())return false;const p=db.list('projects').find(x=>x.id===pid);if(!p)return false;
+  const now=new Date().toISOString(),ap=!p.approved;
+  await updateProject(pid,{approved:ap,approved_by:ap?CUR.id:null,approved_at:ap?now:null});return ap;
+}
+async function loadTasks(pid){await Q;await fetchTable('tasks','project_id',[pid]);return buildTree(CACHE.tasks.filter(t=>t.project_id===pid))}
+async function saveTask(t,patch){   // saveTask(obj) hoặc saveTask(id,{thay đổi})
+  const id=typeof t==='string'?t:t.id,all=db.list('tasks'),now=new Date().toISOString();
+  const has=all.some(x=>x.id===id);
+  return db.save('tasks',has?all.map(x=>x.id===id?{...x,...(typeof t==='string'?{}:t),...(patch||{}),updated_at:now}:x):[...all,{...t,updated_at:now}]);
+}
+async function deleteTask(id){
+  const all=db.list('tasks'),t=all.find(x=>x.id===id);if(!t)return;
+  const ids=descOf(all.filter(x=>x.project_id===t.project_id),id);
+  await db.save('tasks',all.filter(x=>!ids.has(x.id)));
+  await db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));
+}
+async function loadBudgets(pid){await Q;if(!isAdmin())return[];await fetchTable('budget_items','project_id',[pid]);return buildTree(CACHE.budget_items.filter(b=>b.project_id===pid))}
+async function saveBudget(b,patch){
+  const id=typeof b==='string'?b:b.id,all=db.list('budget_items'),has=all.some(x=>x.id===id);
+  return db.save('budget_items',has?all.map(x=>x.id===id?{...x,...(typeof b==='string'?{}:b),...(patch||{})}:x):[...all,b]);
+}
+async function deleteBudget(id){
+  const all=db.list('budget_items'),b=all.find(x=>x.id===id);if(!b)return;
+  const ids=descOf(all.filter(x=>x.project_id===b.project_id),id);
+  return db.save('budget_items',all.filter(x=>!ids.has(x.id)));
+}
+
+/* ---- Cài đặt giao diện (theme/phông/màu/chế độ xem Todo) lưu trong users.prefs ---- */
+let CUR=null,SESS={},prefT;
+const session=()=>SESS;
+function patchSession(p){
+  SESS={...SESS,...p};clearTimeout(prefT);
+  prefT=setTimeout(()=>{if(CUR)db.save('users',db.list('users').map(u=>u.id===CUR.id?{...u,prefs:SESS}:u))},700);
+}
 
 function setTheme(t,keep){
   document.documentElement.dataset.theme=t;
@@ -379,61 +533,67 @@ function setTheme(t,keep){
 }
 document.querySelectorAll('.theme-btn').forEach(b=>b.onclick=()=>setTheme(b.dataset.themeSet));
 
-function currentUser(){return db.list('users').find(u=>u.id===session().current_user_id)}
+function currentUser(){return CUR}
 
 const isAdmin=u=>{u=u||currentUser();return !!u&&lc(u.email)===lc(ADMIN_EMAIL)};
 const canBudget=()=>isAdmin();
 const roleBadge=u=>isAdmin(u)?['Admin','background:#fef3c7;color:#92400e']:['Staff','background:#dbeafe;color:#1d4ed8'];
 const avatarHTML=u=>u.avatar_url?`<img src="${esc(u.avatar_url)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover">`:esc(initials(u.full_name||u.email||'?'));
-function renderGate(){
+function renderGate(msg){
   $('#app').classList.add('hidden');$('#gate').classList.remove('hidden');
-  $('#gDemo').classList.toggle('hidden',AUTH_ON);
-  $('#gMsg').innerHTML=AUTH_ON?'':'Chưa điền <b>SUPABASE_URL</b> và <b>SUPABASE_ANON_KEY</b> trong mã nguồn nên nút Google chưa hoạt động. Hãy dùng chế độ demo bên dưới.';
-  $('#gBtn').onclick=()=>{if(AUTH_ON)googleLogin();else{$('#gDemo').classList.remove('hidden');$('#gMsg').innerHTML='<span class="text-red-600">Chưa cấu hình Supabase.</span> Xem hướng dẫn điền khóa ở đầu phần &lt;script&gt;. Tạm thời chọn tài khoản demo bên dưới.'}};
-  $('#gateList').innerHTML=db.list('users').map(u=>{const r=roleBadge(u);return `
-    <button data-uid="${u.id}" class="w-full flex items-center gap-3 p-3 rounded-lg border border-line hover:border-brand text-left">
-      <span class="w-9 h-9 rounded-full text-white grid place-items-center font-bold overflow-hidden" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span>
-      <span class="flex-1 min-w-0"><div class="font-medium truncate">${esc(u.full_name)}</div><div class="text-xs text-mute truncate">${esc(u.email)}</div></span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="${r[1]}">${r[0]}</span>
-    </button>`}).join('');
-  $('#gateList').querySelectorAll('button').forEach(b=>b.onclick=()=>login(b.dataset.uid));
+  $('#gMsg').innerHTML=msg||(sb?'':'<span class="text-red-600">Không tải được thư viện Supabase (CDN). Kiểm tra mạng rồi tải lại trang.</span>');
+  $('#gBtn').onclick=googleLogin;
 }
-function login(uid){patchSession({current_user_id:uid});boot()}
 
 /* ---- Supabase Auth (Google OAuth) ---- */
-let SB=null;
-async function sbClient(){
-  if(SB)return SB;
-  if(!window.supabase)await loadJS('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
-  SB=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{flowType:'pkce',persistSession:true,detectSessionInUrl:true}});
-  return SB;
-}
 async function googleLogin(){
-  try{const c=await sbClient();$('#gMsg').textContent='Đang chuyển sang Google...';
-    const {error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)throw error}
-  catch(e){$('#gMsg').innerHTML='<span class="text-red-600">'+esc(e.message||e)+'</span>'}
+  if(!sb)return renderGate();
+  $('#gMsg').textContent='Đang chuyển sang Google...';
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+  if(error)renderGate('<span class="text-red-600">'+esc(error.message)+'</span>');
 }
-/* đồng bộ tài khoản Google vào bảng users cục bộ (khớp theo email) */
-function adoptGoogleUser(su){
+/* tạo hàng trong bảng users nếu chưa có (khớp theo email; nếu Admin đã thêm email trước thì nhận lại hàng đó) */
+async function ensureUser(su){
   const email=lc(su.email),md=su.user_metadata||{},name=md.full_name||md.name||email.split('@')[0],av=md.avatar_url||md.picture||'';
-  const us=db.list('users');let u=us.find(x=>lc(x.email)===email);
-  if(u){u={...u,full_name:name||u.full_name,avatar_url:av,pending:false};db.save('users',us.map(x=>x.id===u.id?u:x))}
-  else{u={id:uid(),full_name:name,email,avatar_url:av,avatar_color:'#64748b'};db.save('users',[...us,u])}
-  patchSession({current_user_id:u.id});
+  let {data,error}=await sb.from('users').select('*').ilike('email',email.replace(/[\\_%]/g,'\\$&')).limit(1);
+  if(error)throw error;
+  let row=data&&data[0];
+  if(row){
+    ({error}=await sb.from('users').update({full_name:name,avatar_url:av,pending:false}).eq('id',row.id));
+    row={...row,full_name:name,avatar_url:av,pending:false};
+  }else{
+    row={id:uid(),email,full_name:name,avatar_url:av,avatar_color:'#64748b',pending:false,prefs:{}};
+    ({error}=await sb.from('users').insert(row));
+  }
+  if(error)throw error;
+  return row;
 }
-async function initAuth(){
-  if(!AUTH_ON){boot();return}
+let SIGNING=false,LISTOK=false;const LOADED=new Set();
+async function onSignedIn(su){
+  if(SIGNING)return;SIGNING=true;loading(true,'Đang đăng nhập và tải dữ liệu...');
   try{
-    const c=await sbClient();
-    const {data}=await c.auth.getSession();
-    if(data&&data.session)adoptGoogleUser(data.session.user);else patchSession({current_user_id:null});
+    CUR=await ensureUser(su);SESS=(CUR.prefs&&typeof CUR.prefs==='object')?CUR.prefs:{};
+    await fetchAll();LISTOK=true;LOADED.clear();
     if(location.search.includes('code=')){try{history.replaceState(null,'',location.pathname+(location.hash||''))}catch(e){}}
-    c.auth.onAuthStateChange((ev,ss)=>{if(ev==='SIGNED_IN'&&ss&&!(currentUser()&&lc(currentUser().email)===lc(ss.user.email))){adoptGoogleUser(ss.user);boot()}});
-  }catch(e){console.error(e)}
-  boot();
+    boot();
+  }catch(e){
+    console.error(e);CUR=null;
+    renderGate('<span class="text-red-600">Lỗi: '+esc(e.message||e)+'</span><br>Kiểm tra đã chạy file <b>supabase_setup.sql</b> chưa. <button id="gOut" class="underline">Đăng xuất</button>');
+    const o=$('#gOut');if(o)o.onclick=()=>sb.auth.signOut();
+  }finally{SIGNING=false;loading(false)}
+}
+/* chạy khi load trang: đã đăng nhập chưa? */
+async function checkSession(){
+  if(!sb)return renderGate();
+  loading(true,'Đang kiểm tra đăng nhập...');
+  let s=null;
+  try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){console.error(e)}
+  loading(false);
+  if(s)await onSignedIn(s.user);else renderGate();
 }
 async function logout(){
-  patchSession({current_user_id:null});
-  if(AUTH_ON){try{await (await sbClient()).auth.signOut()}catch(e){}}
+  CUR=null;SESS={};Object.keys(CACHE).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});LOADED.clear();LISTOK=false;
+  try{await sb.auth.signOut()}catch(e){}
   renderGate();
 }
 
@@ -443,15 +603,10 @@ function renderUser(){
   $('#userName').textContent=u.email;$('#userName').title=u.email;
   const rb=$('#roleBadge');rb.textContent=r[0];rb.style.cssText=r[1];
   $('#userInfo').innerHTML=`<div class="font-semibold truncate">${esc(u.full_name)}</div><div class="text-xs text-mute truncate">${esc(u.email)}</div><span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style="${r[1]}">${r[0]}</span>`;
-  $('#demoHdr').classList.toggle('hidden',AUTH_ON);
-  $('#userList').innerHTML=(AUTH_ON?'':db.list('users').map(x=>`
-    <button data-uid="${x.id}" class="w-full text-left px-2 py-1.5 rounded hover:bg-black/5 text-sm flex justify-between ${x.id===u.id?'font-semibold':''}"><span class="truncate">${esc(x.full_name)}</span><span class="text-[10px] opacity-70">${roleBadge(x)[0]}</span></button>`).join(''))
-    +`<button id="logoutBtn" class="w-full text-left px-2 py-1.5 mt-1 border-t border-line text-sm text-mute"><i class="fa-solid fa-right-from-bracket mr-2"></i>Đăng xuất</button>`;
-  $('#userList').querySelectorAll('[data-uid]').forEach(b=>b.onclick=()=>login(b.dataset.uid));
+  $('#userList').innerHTML=`<button id="logoutBtn" class="w-full text-left px-2 py-1.5 mt-1 border-t border-line text-sm text-mute"><i class="fa-solid fa-right-from-bracket mr-2"></i>Đăng xuất</button>`;
   $('#logoutBtn').onclick=logout;
 }
 
-const uid=()=>crypto.randomUUID();
 const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
 const today=()=>iso(new Date());
 const addDays=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
@@ -460,31 +615,6 @@ const fmtVND=n=>n>=1e9?(n/1e9).toFixed(2).replace('.',',')+' tỷ':n>=1e6?(n/1e6
 const fmtD=d=>d?d.split('-').reverse().join('/'):'—';
 const STATUS={planning:['Kế hoạch','bg-sky-100 text-sky-700'],active:['Đang triển khai','bg-orange-100 text-orange-700'],on_hold:['Tạm dừng','bg-yellow-100 text-yellow-700'],completed:['Hoàn thành','bg-green-100 text-green-700']};
 const bar=(v,c='var(--brand)')=>`<div class="h-2 rounded bg-black/10 mt-1"><div class="h-2 rounded" style="width:${Math.min(100,v)}%;background:${c}"></div></div>`;
-
-function seedDemo(){
-  const U=db.list('users'),me=U[0].id,P1=uid(),P2=uid(),now=new Date().toISOString();
-  db.save('projects',[
-    {id:P1,code:'PRJ-2026-01',name:'Máy dập định hình Thermoforming',description:'Đầu tư máy chính, thiết bị phụ, hạ tầng và lắp đặt.',status:'active',start_date:addDays(-40),end_date:addDays(90),currency:'VND',exchange_rate:26400,created_by:me,created_at:now,updated_at:now},
-    {id:P2,code:'PRJ-2026-02',name:'Mở rộng kệ kho nguyên liệu',description:'',status:'planning',start_date:addDays(20),end_date:addDays(120),currency:'VND',exchange_rate:26400,created_by:me,created_at:now,updated_at:now}]);
-  db.save('project_members',[[P1,0,'owner'],[P1,1,'member'],[P1,2,'viewer'],[P2,0,'owner']].map(([p,i,role])=>({project_id:p,user_id:U[i].id,role})));
-  const idc={},T=[];
-  [['1','Đề xuất đầu tư'],['1.1','Hỏi báo giá máy','1',-40,-33,100,'done','high','QLDA',-40,-34],['1.2','So sánh báo giá','1',-32,-31,100,'done','medium','QLDA',-32,-31],['1.3','TGĐ duyệt đề xuất đầu tư','1',-30,-26,100,'done','high','TGĐ',-30,-23],
-   ['2','Hợp đồng mua bán'],['2.1','Pháp chế kiểm tra hợp đồng','2',-25,-23,100,'done','medium','Pháp chế',-25,-23],['2.2','Ký duyệt hợp đồng','2',-22,-10,100,'done','high','TGĐ',-22,-6],
-   ['3','Đặt hàng và chế tạo'],['3.1','Chuyển tiền đợt 1 (tạm ứng)','3',-9,-3,60,'in_progress','high','KTQT',-8,null],['3.2','NCC chế tạo máy','3',-2,30,10,'in_progress','high','NCC',-1,null],['3.3','Nghiệm thu FAT tại NCC','3',31,40,0,'todo','medium','QLDA',null,null],['3.4','Gửi lịch trình cho NCC','3',-3,2,30,'in_progress','medium','QLDA',-3,null],
-   ['4','Hạ tầng, lắp đặt, chạy thử'],['4.1','Thi công hạ tầng điện nước','4',-5,-1,50,'in_progress','urgent','Phòng mua',-5,null],['4.2','Lắp đặt máy','4',45,60,0,'todo','high','QLDA',null,null],['4.3','Chạy thử và nghiệm thu','4',61,75,0,'todo','medium','QLDA',null,null]
-  ].forEach((r,i)=>{const g=!r[2],id=uid();if(g)idc[r[0]]=id;
-    T.push({id,project_id:P1,parent_id:g?null:idc[r[2]],wbs_code:r[0],name:r[1],owner_depts:r[8]?[r[8]]:[],collab_depts:[],duration_days:g?null:r[4]-r[3]+1,start_date:g?null:addDays(r[3]),due_date:g?null:addDays(r[4]),actual_start:r[9]!=null?addDays(r[9]):null,actual_end:r[10]!=null?addDays(r[10]):null,status:g?'in_progress':r[6],priority:r[7]||'medium',progress:g?0:r[5],notes:'',depends_on:[],checklist:[],sort_order:i+1,created_at:now,updated_at:now})});
-  db.save('tasks',T);
-  let cur=null;const B=[];
-  [['G','I','CHI PHÍ MÁY CHÍNH'],['1','Máy dập định hình Thermoforming','Chuyền',1,9217560000,2765268000,'Shantou Rayburn / Trung Quốc','quoted'],
-   ['G','II','THIẾT BỊ PHỤ'],['1','Hệ chiller nội bộ giải nhiệt','Hệ',1,270840000,270840000,'Kuen Ling / Việt Nam','quoted'],['2','Máy băm viền online','Máy',1,316800000,0,'Trung Quốc / Việt Nam','not_quoted'],['3','Khuôn tạo sản phẩm định hình','Bộ',2,1125960000,0,'Shantou Rayburn / Trung Quốc','quoted'],
-   ['G','III','HẠ TẦNG VÀ LẮP ĐẶT'],['1','Vật tư đường ống hơi, nước','Hệ',1,342796088,150000000,'Gia Tín','not_quoted'],['2','Nhân công lắp đặt đường ống','Hệ',1,330594590,0,'Khang Thành','not_quoted'],['3','Gia cố nền sàn','Hệ',1,150000000,172000000,'Gia Tín','not_quoted'],['4','Cáp điện và máng cáp','Hệ',1,403466854,380000000,'Cadivi / Tân Phước Thịnh','quoted']
-  ].forEach((r,i)=>{const id=uid();
-    if(r[0]==='G'){cur=id;B.push({id,project_id:P1,parent_id:null,code:r[1],name:r[2],unit:'',quantity:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',quote_status:null,note:'',sort_order:i+1})}
-    else B.push({id,project_id:P1,parent_id:cur,code:r[0],name:r[1],unit:r[2],quantity:r[3],unit_price:r[4],planned_amount:r[3]*r[4],actual_amount:r[5],vendor:r[6],quote_status:r[7],note:'',sort_order:i+1})});
-  db.save('budget_items',B);
-}
-function resetDemo(){ask('Xóa toàn bộ dữ liệu dự án hiện tại và nạp lại dữ liệu demo?',()=>{['projects','project_members','tasks','budget_items','attachments','notes','extra_tasks'].forEach(k=>localStorage.removeItem(LS+k));seedDemo();route()},'Đặt lại')}
 
 const myProjects=()=>{const u=currentUser();if(!u)return[];if(isAdmin(u))return db.list('projects');const ids=new Set(db.list('project_members').filter(m=>m.user_id===u.id).map(m=>m.project_id));return db.list('projects').filter(p=>ids.has(p.id))};
 const roleOf=pid=>isAdmin()?'owner':db.list('project_members').find(m=>m.project_id===pid&&m.user_id===currentUser().id)?.role;
@@ -578,10 +708,9 @@ function permModal(pid){
   $('#modal').querySelectorAll('[data-prole]').forEach(sel=>sel.onchange=()=>{db.save('project_members',db.list('project_members').map(m=>m.project_id===pid&&m.user_id===sel.dataset.prole?{...m,role:sel.value}:m));toast('Đã đổi quyền',false)});
   $('#modal').querySelectorAll('[data-prm]').forEach(b=>b.onclick=()=>{db.save('project_members',db.list('project_members').filter(m=>!(m.project_id===pid&&m.user_id===b.dataset.prm)));permModal(pid)});
 }
-function toggleApprove(pid){
-  if(!isAdmin())return;const p=db.list('projects').find(x=>x.id===pid);if(!p)return;
-  const now=new Date().toISOString(),ap=!p.approved;
-  db.save('projects',db.list('projects').map(x=>x.id===pid?{...x,approved:ap,approved_by:ap?currentUser().id:null,approved_at:ap?now:null,updated_at:now}:x));
+async function toggleApprove(pid){
+  if(!isAdmin())return;
+  const ap=await approveProject(pid);
   toast(ap?'Đã duyệt dự án':'Đã bỏ duyệt',false);route(true);
 }
 
@@ -598,7 +727,7 @@ function viewProjects(){
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
   const shown=PJF==='all'?ps:ps.filter(p=>p.status===PJF);
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
-   ${adm?'<div class="flex gap-2"><button id="resetBtn" class="btn-ghost">Đặt lại dữ liệu demo</button><button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button></div>':''}</div>
+   ${adm?'<div class="flex gap-2"><button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button></div>':''}</div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
     ${adm?kpi('Tổng ngân sách quản lý',fmtVND(totB),'Đã chi '+fmtVND(totA)+(totB?' ('+Math.round(totA/totB*100)+'%)':''),'fa-wallet','#2563eb'):kpi('Dự án của tôi',ps.length,'Được Admin gán','fa-folder-open','#2563eb')}
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
@@ -615,7 +744,7 @@ function viewProjects(){
   v.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();delProject(b.dataset.del)});
   v.querySelectorAll('[data-perm]').forEach(b=>b.onclick=e=>{e.stopPropagation();permModal(b.dataset.perm)});
   v.querySelectorAll('[data-appr]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleApprove(b.dataset.appr)});
-  if(adm){$('#newBtn').onclick=()=>projectForm();$('#resetBtn').onclick=resetDemo}
+  if(adm){$('#newBtn').onclick=()=>projectForm()}
   charts.forEach(c=>c.destroy());charts=[];
   if(typeof Chart==='undefined'||!st.length)return;
   const css=getComputedStyle(document.documentElement),cv=n=>css.getPropertyValue(n).trim();
@@ -626,12 +755,9 @@ function viewProjects(){
 }
 function delProject(id){
   const p=db.list('projects').find(x=>x.id===id);
-  ask(`Xóa dự án "${p.name}" cùng toàn bộ công việc và ngân sách?`,()=>{
-  const tk=db.list('tasks').filter(t=>t.project_id===id).map(t=>t.id);
-  db.save('projects',db.list('projects').filter(x=>x.id!==id));
-  ['project_members','tasks','budget_items','notes','extra_tasks','master_gantt'].forEach(k=>db.save(k,db.list(k).filter(r=>r.project_id!==id)));
-  db.save('attachments',db.list('attachments').filter(a=>!tk.includes(a.task_id)));
-  route();
+  ask(`Xóa dự án "${p.name}" cùng toàn bộ công việc và ngân sách?`,async()=>{
+    await withLoad('Đang xóa...',()=>deleteProject(id));
+    route();
   });
 }
 function projectForm(id){
@@ -649,10 +775,7 @@ function projectForm(id){
     const row={code:v('code'),name:v('name'),client:v('client'),description:v('description'),status:v('status'),start_date:v('start_date'),end_date:v('end_date'),exchange_rate:+v('exchange_rate')};
     const err=!row.name?'Vui lòng nhập tên dự án':!row.start_date||!row.end_date?'Vui lòng chọn ngày bắt đầu và kết thúc':row.end_date<row.start_date?'Ngày kết thúc phải sau ngày bắt đầu':!(row.exchange_rate>0)?'Tỷ giá phải lớn hơn 0':'';
     if(err){$('#formErr').textContent=err;return}
-    const now=new Date().toISOString(),all=db.list('projects');
-    if(id)db.save('projects',all.map(x=>x.id===id?{...x,...row,updated_at:now}:x));
-    else{const nid=uid();db.save('projects',[...all,{id:nid,...row,currency:'VND',created_by:currentUser().id,created_at:now,updated_at:now}]);
-      db.save('project_members',[...db.list('project_members'),{project_id:nid,user_id:currentUser().id,role:'owner'}])}
+    (id?updateProject(id,row):addProject(row));
     closeModal();route();
   };
 }
@@ -751,6 +874,7 @@ function renderSide(pid){
     ||'<div class="text-xs px-3 opacity-60" style="color:var(--sidetx)">Chưa có dự án</div>';
 }
 
+let LOADING_R=false;
 function route(keep){
   flushNotes();
   const parts=(curHash.replace(/^#\/?/,'')||'projects').split('/');
@@ -759,6 +883,15 @@ function route(keep){
   if(pid&&(!TABS.some(t=>t[0]===name)||(name==='budget'&&!canBudget())))name='overview';
   const target=parts[3],pr=pid?myProjects().find(x=>x.id===pid):null;
   if(pid&&!pr){go('#/projects');return}
+  const need=pid?!LOADED.has(pid):!LISTOK;
+  if(need){
+    if(!LOADING_R){LOADING_R=true;$('#view').innerHTML=SPIN_HTML;
+      (pid?withLoad('Đang tải dữ liệu...',()=>Q.then(()=>fetchProject(pid))):withLoad('Đang tải dữ liệu...',()=>Q.then(fetchAll)))
+        .catch(e=>{console.error(e);toast('Không tải được dữ liệu: '+(e.message||e),true)})
+        .finally(()=>{LOADING_R=false;if(pid)LOADED.add(pid);else{LISTOK=true;LOADED.clear()}route(keep)})}
+    return;
+  }
+  if(pid)LISTOK=false;
   if(curTab!==name||curPid!==pid){EDIT=null;PADD=null;curTab=name;curPid=pid;keep=false}
   renderSide(pid);
   const inP=!!pr;
@@ -1177,7 +1310,7 @@ function delTaskTree(id){
   db.save('tasks',rest);db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));
   ids.forEach(i=>delete PEND[i]);
 }
-const patchTask=(id,pt)=>db.save('tasks',db.list('tasks').map(t=>t.id===id?{...t,...pt,updated_at:new Date().toISOString()}:t));
+const patchTask=(id,pt)=>saveTask(id,pt);   // inline-edit: gọi update lên Supabase ngay
 
 /* Đồng bộ trạng thái / % / ngày thực tế */
 function spSync(t,ch){
@@ -1705,7 +1838,6 @@ function renderView(name,pid,target){
 }
 
 
-if(!localStorage.getItem(LS+'projects'))seedDemo();
 
 
 const openSide=()=>{$('#side').classList.remove('-translate-x-full');$('#overlay').classList.remove('hidden')};
@@ -1728,7 +1860,11 @@ function boot(){
   setTheme(session().theme||'light',true);applyCustom(session().custom);applyFont(session().font||FONTS[0]);
   renderUser();route();
 }
-initAuth();
+if(sb)sb.auth.onAuthStateChange((ev,ss)=>{
+  if(ev==='SIGNED_OUT'&&CUR){CUR=null;renderGate()}
+  else if(ev==='SIGNED_IN'&&ss&&ss.user&&!(CUR&&lc(CUR.email)===lc(ss.user.email)))setTimeout(()=>onSignedIn(ss.user),0);
+});
+checkSession();
 </script>
 </body>
 </html>
