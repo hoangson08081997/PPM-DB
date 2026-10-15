@@ -218,6 +218,9 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
       <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Đăng nhập bằng Google</button>
     <div class="flex items-center gap-3 my-5 text-xs text-mute"><span class="flex-1 h-px bg-line"></span>hoặc dùng email<span class="flex-1 h-px bg-line"></span></div>
+    <div id="aTabs" role="tablist" class="grid grid-cols-2 gap-1 p-1 rounded-xl mb-4" style="background:rgba(127,127,127,.14)">
+      <button type="button" role="tab" data-amode="login" class="py-2 rounded-lg text-sm font-semibold transition">Đăng nhập</button>
+      <button type="button" role="tab" data-amode="signup" class="py-2 rounded-lg text-sm font-semibold transition">Đăng ký</button></div>
     <form id="aForm" novalidate class="space-y-3">
       <label class="block"><span class="text-xs font-medium text-mute">Email</span>
         <input id="aEmail" type="email" inputmode="email" autocomplete="email" class="inp" style="padding:.65rem .8rem;border-radius:.75rem" placeholder="ten@congty.com"></label>
@@ -229,7 +232,6 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
       <div id="aErr" role="alert" class="text-xs min-h-[1rem]"></div>
       <button id="aSubmit" type="submit" class="btn btn-big w-full justify-center py-3 rounded-xl">Đăng nhập</button>
     </form>
-    <p class="text-center text-sm text-mute mt-4"><span id="aAsk">Chưa có tài khoản?</span> <button type="button" id="aSwitch" class="font-semibold underline" style="color:var(--brand)">Đăng ký tài khoản mới</button></p>
     <div id="gMsg" class="text-xs mt-3 text-mute"></div>
   </div>
 </div>
@@ -376,7 +378,7 @@ const uid=()=>crypto.randomUUID();
 const TB={
   users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','role','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
-  project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ord:['project_id']},
+  project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ren:{role:'access_level'},ord:['project_id']},
   tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
   budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','quote_status','note','sort_order'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note']},
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
@@ -384,18 +386,21 @@ const TB={
   extra_tasks:{t:'extra_tasks',pk:['id'],cols:['id','project_id','title','note','done','created_by','created_at'],ord:['created_at','id'],txt:['title','note']},
   master_gantt:{t:'master_gantt',pk:['id'],wrap:true,ord:['id']}
 };
+/* quyền trong dự án: viewer (chỉ xem) | editor (sửa task) | manager (quản lý dự án). 'owner' = người tạo dự án (Admin); 'member' là giá trị cũ = editor */
+const normRole=r=>({member:'editor',manager:'manager',owner:'owner',viewer:'viewer',editor:'editor'})[String(r||'').toLowerCase()]||'viewer';
 const DATEC=new Set(['start_date','end_date','due_date','actual_start','actual_end','approved_at','created_at','updated_at','imported_at']);
 const CACHE={},SNAP={};Object.keys(TB).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});
 const pkOf=(c,r)=>c.pk.map(f=>r[f]).join('|');
 function toDB(k,r){
   const c=TB[k];
   if(c.wrap){const {id,project_id,...rest}=r;return{id,project_id,data:rest}}
-  const o={};c.cols.forEach(f=>{let v=r[f];if(v===undefined||(v===''&&DATEC.has(f)))v=null;o[f]=v});return o;
+  const o={};c.cols.forEach(f=>{let v=r[f];if(v===undefined||(v===''&&DATEC.has(f)))v=null;o[(c.ren&&c.ren[f])||f]=v});return o;
 }
 function fromDB(k,r){
   const c=TB[k];
   if(c.wrap)return{...(r.data||{}),id:r.id,project_id:r.project_id};
-  const o={};c.cols.forEach(f=>{o[f]=r[f]});
+  const o={};c.cols.forEach(f=>{o[f]=r[(c.ren&&c.ren[f])||f]});
+  if(k==='project_members')o.role=normRole(o.role);
   (c.txt||[]).forEach(f=>{if(o[f]==null)o[f]=''});(c.arr||[]).forEach(f=>{if(o[f]==null)o[f]=[]});(c.obj||[]).forEach(f=>{if(o[f]==null)o[f]={}});
   return o;
 }
@@ -466,12 +471,13 @@ async function fetchAll(){
   if(admin)await fetchTable('projects');
   else await fetchTable('projects','id',CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id));
   const pids=CACHE.projects.map(p=>p.id);
-  await Promise.all([fetchTable('tasks','project_id',pids),admin?fetchTable('budget_items','project_id',pids):null,fetchTable('extra_tasks','project_id',pids)]);
+  const bp=admin?pids:pids.filter(id=>roleOf(id)==='manager');
+  await Promise.all([fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids)]);
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
 }
 async function fetchProject(pid){
   const admin=isAdmin();
-  await Promise.all([fetchTable('tasks','project_id',[pid]),admin?fetchTable('budget_items','project_id',[pid]):null,fetchTable('extra_tasks','project_id',[pid]),
+  await Promise.all([fetchTable('tasks','project_id',[pid]),canBudget(pid)?fetchTable('budget_items','project_id',[pid]):null,fetchTable('extra_tasks','project_id',[pid]),
     fetchTable('notes','project_id',[pid]),fetchTable('master_gantt','project_id',[pid]),fetchTable('project_members','project_id',[pid])]);
   await fetchTable('attachments','task_id',CACHE.tasks.filter(t=>t.project_id===pid).map(t=>t.id));
 }
@@ -523,7 +529,7 @@ async function deleteTask(id){
   await db.save('tasks',all.filter(x=>!ids.has(x.id)));
   await db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));
 }
-async function loadBudgets(pid){await Q;if(!isAdmin())return[];await fetchTable('budget_items','project_id',[pid]);return buildTree(CACHE.budget_items.filter(b=>b.project_id===pid))}
+async function loadBudgets(pid){await Q;if(!canBudget(pid))return[];await fetchTable('budget_items','project_id',[pid]);return buildTree(CACHE.budget_items.filter(b=>b.project_id===pid))}
 async function saveBudget(b,patch){
   const id=typeof b==='string'?b:b.id,all=db.list('budget_items'),has=all.some(x=>x.id===id);
   return db.save('budget_items',has?all.map(x=>x.id===id?{...x,...(typeof b==='string'?{}:b),...(patch||{})}:x):[...all,b]);
@@ -553,7 +559,8 @@ document.querySelectorAll('.theme-btn').forEach(b=>b.onclick=()=>setTheme(b.data
 function currentUser(){return CUR}
 
 const isAdmin=u=>{u=u||currentUser();return !!u&&lc(u.email)===lc(ADMIN_EMAIL)};
-const canBudget=()=>isAdmin();
+const isMgr=pid=>isAdmin()||roleOf(pid)==='manager';          // Manager = quản lý trong phạm vi 1 dự án
+const canBudget=pid=>isAdmin()||(!!pid&&roleOf(pid)==='manager');
 const roleBadge=u=>isAdmin(u)?['Admin','background:#fef3c7;color:#92400e']:['Staff','background:#dbeafe;color:#1d4ed8'];
 const avatarHTML=u=>u.avatar_url?`<img src="${esc(u.avatar_url)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover">`:esc(initials(u.full_name||u.email||'?'));
 function renderGate(msg){
@@ -570,11 +577,10 @@ function authErr(t,ok){const e=$('#aErr');e.textContent=t||'';e.className='text-
 function setAuthMode(m){
   AMODE=m;const su=m==='signup';
   $('#aTitle').textContent=su?'Đăng ký tài khoản mới':'Đăng nhập';
-  $('#aSub').textContent=su?'Tạo tài khoản để Admin phân bổ dự án cho bạn. Tài khoản mới có quyền Staff.':'Đăng nhập bằng Google hoặc email để vào các dự án được Admin cấp quyền.';
+  $('#aSub').textContent=su?'Tạo tài khoản để Admin phân quyền dự án cho bạn. Tài khoản mới có quyền Staff.':'Đăng nhập bằng Google hoặc email để vào các dự án được Admin cấp quyền.';
   $('#aPass2Box').classList.toggle('hidden',!su);
   $('#aSubmit').textContent=su?'Đăng ký':'Đăng nhập';
-  $('#aAsk').textContent=su?'Đã có tài khoản?':'Chưa có tài khoản?';
-  $('#aSwitch').textContent=su?'Quay lại đăng nhập':'Đăng ký tài khoản mới';
+  document.querySelectorAll('#aTabs [data-amode]').forEach(b=>{const on=b.dataset.amode===m;b.setAttribute('aria-selected',on);b.style.background=on?'var(--surface)':'transparent';b.style.color=on?'var(--brand)':'var(--mute)';b.style.boxShadow=on?'0 1px 4px rgba(0,0,0,.12)':'none'});
   $('#aPass').autocomplete=su?'new-password':'current-password';
   authErr('');
 }
@@ -603,7 +609,7 @@ async function signUpEmail(email,password){
   authErr('Đăng ký thành công! Hãy mở email để xác nhận tài khoản, sau đó đăng nhập.',true);   // bật xác nhận email
 }
 $('#aForm').onsubmit=emailAuth;
-$('#aSwitch').onclick=()=>setAuthMode(AMODE==='login'?'signup':'login');
+document.querySelectorAll('#aTabs [data-amode]').forEach(b=>b.onclick=()=>setAuthMode(b.dataset.amode));
 $('#aEye').onclick=()=>{const h=$('#aPass').type==='password';$('#aPass').type=h?'text':'password';$('#aPass2').type=h?'text':'password';$('#aEye').textContent=h?'Ẩn':'Hiện'};
 
 /* ---- Supabase Auth (Google OAuth) ---- */
@@ -680,7 +686,7 @@ const bar=(v,c='var(--brand)')=>`<div class="h-2 rounded bg-black/10 mt-1"><div 
 
 const myProjects=()=>{const u=currentUser();if(!u)return[];if(isAdmin(u))return db.list('projects');const ids=new Set(db.list('project_members').filter(m=>m.user_id===u.id).map(m=>m.project_id));return db.list('projects').filter(p=>ids.has(p.id))};
 const roleOf=pid=>isAdmin()?'owner':db.list('project_members').find(m=>m.project_id===pid&&m.user_id===currentUser().id)?.role;
-const canEdit=pid=>isAdmin();
+const canEdit=pid=>isMgr(pid);
 
 function rollBudget(rows){
   const k={},out={};rows.forEach(r=>(k[r.parent_id||'root']??=[]).push(r));
@@ -710,7 +716,7 @@ function toast(msg,bad=true){
 }
 
 function card(p){
-  const st=STATUS[p.status],adm=isAdmin(),s=projStats(p.id),mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
+  const st=STATUS[p.status],adm=canBudget(p.id),mg=isMgr(p.id),root=isAdmin(),s=projStats(p.id),mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
   const done=s.leaf.filter(t=>t.status==='done').length,us=db.list('users');
   const own=us.find(u=>u.id===p.created_by)||us.find(u=>u.id===(mem.find(m=>m.role==='owner')||{}).user_id)||us.find(u=>isAdmin(u));
   const mv=n=>n>=1e6?[Math.round(n/1e6).toLocaleString('vi-VN'),'tr']:[Math.round(n||0).toLocaleString('vi-VN'),n?'đ':''];
@@ -735,66 +741,81 @@ function card(p){
    <div class="border-t border-line pt-3 flex flex-wrap items-center justify-between gap-2">
     <span class="flex items-center gap-2 min-w-0 text-sm text-mute"><span class="w-7 h-7 rounded-full text-white grid place-items-center text-[10px] font-bold overflow-hidden shrink-0" style="background:${(own&&own.avatar_color)||'#64748b'}">${own?avatarHTML(own):''}</span><span class="truncate">${esc(own?own.full_name:'')}</span></span>
     <span class="flex items-center gap-1 shrink-0">
-     ${adm?`<button type="button" data-perm="${p.id}" class="text-xs font-semibold rounded-lg px-2 py-1 flex items-center gap-1" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)" title="Phân bổ / phân quyền chuyên viên"><i class="fa-solid fa-user-group"></i>Phân bổ<span class="rounded-full px-1.5 text-[10px]" style="background:rgba(249,115,22,.25)">${mem.length}</span></button>
-     <button type="button" data-appr="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-brand" title="${p.approved?'Bỏ duyệt':'Duyệt dự án'}" aria-label="Duyệt dự án"><i class="fa-solid fa-circle-check"></i></button>
-     <button type="button" data-edit="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-brand" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button>
-     <button type="button" data-del="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-red-600" aria-label="Xóa dự án"><i class="fa-solid fa-trash"></i></button>`:''}
+     ${mg?`<button type="button" data-perm="${p.id}" class="text-xs font-semibold rounded-lg px-2 py-1 flex items-center gap-1" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)" title="Phân bổ / phân quyền chuyên viên"><i class="fa-solid fa-user-group"></i>Phân bổ<span class="rounded-full px-1.5 text-[10px]" style="background:rgba(249,115,22,.25)">${mem.length}</span></button>
+     ${root?`<button type="button" data-appr="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-brand" title="${p.approved?'Bỏ duyệt':'Duyệt dự án'}" aria-label="Duyệt dự án"><i class="fa-solid fa-circle-check"></i></button>`:''}
+     ${mg?`<button type="button" data-edit="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-brand" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button>`:''}
+     ${root?`<button type="button" data-del="${p.id}" class="p-1.5 rounded-lg text-mute hover:text-red-600" aria-label="Xóa dự án"><i class="fa-solid fa-trash"></i></button>`:''}`:''}
      <span class="text-sm font-semibold rounded-lg px-3 py-1 ml-1" style="background:rgba(127,127,127,.14)">Vào →</span></span></div></div>`}
 
 /* ---- Phân quyền (chỉ Admin): thêm / bỏ email chuyên viên vào dự án ---- */
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PERM_ROLE={member:'Chuyên viên (sửa tiến độ)',viewer:'Chỉ xem'};
-/* Tải danh sách người dùng + phân bổ của dự án bằng 1 truy vấn JOIN (users LEFT JOIN project_members theo project_id) */
+const PERM_ROLE={viewer:['Viewer','Chỉ xem dự án'],editor:['Editor','Chỉnh sửa dự án, thêm/xóa task'],manager:['Manager','Quản lý dự án (như Admin trong dự án này)']};
+const roleLbl=r=>(PERM_ROLE[r]||['Viewer'])[0];
+/* Tải TOÀN BỘ user + phân bổ của dự án bằng 1 truy vấn JOIN (users + project_members theo project_id) */
 async function loadAssignees(pid){
-  const {data,error}=await sb.from('users').select('*,project_members(project_id,role)').eq('project_members.project_id',pid).order('email',{ascending:true});
+  const {data,error}=await sb.from('users').select('*,project_members(project_id,access_level)').eq('project_members.project_id',pid).order('email',{ascending:true});
   if(error)throw error;
   const users=data.map(u=>{const {project_members:pm,...rest}=u;return{...fromDB('users',rest),_pm:(pm||[]).find(m=>m.project_id===pid)||null}});
   ingest('users',users.map(({_pm,...u})=>u));                                   // đồng bộ cache để db.save không coi là thay đổi
-  ingest('project_members',users.filter(u=>u._pm).map(u=>({project_id:pid,user_id:u.id,role:u._pm.role||'member'})),'project_id',[pid]);
+  ingest('project_members',users.filter(u=>u._pm).map(u=>({project_id:pid,user_id:u.id,role:normRole(u._pm.access_level)})),'project_id',[pid]);
   return users;
 }
 const isAdminRow=u=>lc(u.email)===lc(ADMIN_EMAIL)||String(u.role||'').toUpperCase()==='ADMIN';
+/* Modal "Phân quyền dự án": [chọn user] [chọn quyền] [Thêm] + danh sách đã cấp quyền (đổi quyền / Xóa) */
 async function permModal(pid){
-  if(!isAdmin())return;
+  if(!isMgr(pid))return;
   const p=db.list('projects').find(x=>x.id===pid);if(!p)return;
-  modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân bổ dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>${SPIN_HTML}`);
-  $('#pmX').onclick=closeModal;
-  let users;
-  try{await Q;users=(await loadAssignees(pid)).filter(u=>!isAdminRow(u))}
-  catch(e){console.error(e);$('#modal .ldg-inline').outerHTML='<div class="text-sm text-red-600 py-3">Không tải được danh sách người dùng: '+esc(e.message||e)+'</div>';return}
-  const sel=new Map(users.filter(u=>u._pm).map(u=>[u.id,u._pm.role||'member'])),orig=new Map(sel);
-  const roleSel=(id,r)=>`<select data-prole="${id}" class="cell q" style="width:auto;font-size:.72rem" ${sel.has(id)?'':'disabled'} aria-label="Quyền">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${r===k||(k==='member'&&!['member','viewer'].includes(r))?'selected':''}>${v}</option>`).join('')}</select>`;
-  modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân bổ dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
-   <div class="text-xs text-mute mb-3">${esc(p.code)} · ${esc(p.name)}<br>Tick để cho chuyên viên vào dự án, bỏ tick để gỡ. Staff chỉ thấy dự án được gán và không thấy tab Chi phí.</div>
-   <div class="flex items-center gap-2 mb-2"><input id="pmFind" class="inp" style="margin:0" placeholder="Tìm tên hoặc email..." autocomplete="off" aria-label="Tìm người dùng"><span id="pmCnt" class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap" style="background:rgba(37,99,235,.12);color:var(--brand)"></span></div>
-   <div id="pmList" class="rounded-xl border border-line overflow-auto" style="max-height:min(46vh,22rem)">${users.length?users.map(u=>`
-     <label data-uid="${u.id}" data-q="${esc((u.full_name+' '+u.email).toLowerCase())}" class="flex items-center gap-3 px-3 py-2.5 border-b border-line last:border-0 cursor-pointer hover:bg-black/5 transition">
-       <input type="checkbox" data-pck="${u.id}" class="w-4 h-4 shrink-0" style="accent-color:var(--brand)" ${sel.has(u.id)?'checked':''}>
-       <span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span>
-       <span class="flex-1 min-w-0"><span class="block text-sm font-medium truncate">${esc(u.full_name||u.email)}</span><span class="block text-xs text-mute truncate">${esc(u.email)}</span></span>
-       ${roleSel(u.id,sel.get(u.id))}</label>`).join(''):'<div class="text-sm text-mute p-4 text-center">Chưa có tài khoản nào ngoài Admin.<br>Nhờ chuyên viên bấm <b>Đăng ký tài khoản mới</b> (hoặc đăng nhập Google) trước, rồi quay lại đây.</div>'}
-     <div id="pmNone" class="hidden text-sm text-mute p-4 text-center">Không có người dùng khớp.</div></div>
-   <div class="flex items-center justify-between gap-2 mt-4"><span id="pmChg" class="text-xs text-mute"></span><div class="flex gap-2"><button class="btn-ghost" id="pmCancel">Hủy</button><button class="btn btn-big" id="pmSave">Lưu</button></div></div>`);
-  const L=$('#pmList'),upd=()=>{
-    $('#pmCnt').textContent=sel.size+' / '+users.length+' đã chọn';
-    const add=[...sel.keys()].filter(k=>!orig.has(k)).length,del=[...orig.keys()].filter(k=>!sel.has(k)).length,rc=[...sel].filter(([k,v])=>orig.has(k)&&orig.get(k)!==v).length;
-    $('#pmChg').textContent=add||del||rc?`Thay đổi: +${add} thêm, −${del} gỡ${rc?`, ${rc} đổi quyền`:''}`:'Chưa có thay đổi';
-  };upd();
-  $('#pmX').onclick=$('#pmCancel').onclick=closeModal;
-  L.onchange=e=>{
-    const id=e.target.dataset.pck,rs=e.target.dataset.prole;
-    if(id){e.target.checked?sel.set(id,L.querySelector(`[data-prole="${id}"]`).value):sel.delete(id);L.querySelector(`[data-prole="${id}"]`).disabled=!e.target.checked}
-    else if(rs)sel.set(rs,e.target.value);
-    upd();
+  const shell=b=>modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân quyền dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="text-xs text-mute mb-4">${esc(p.code)} · ${esc(p.name)}</div>${b}`);
+  const fail=e=>{console.error(e);shell('<div class="text-sm text-red-600 py-3">Không tải được danh sách người dùng: '+esc(e.message||e)+'</div>');$('#pmX').onclick=closeModal};
+  shell(SPIN_HTML);$('#pmX').onclick=closeModal;
+  try{await Q;await loadAssignees(pid)}catch(e){return fail(e)}
+  const me=()=>CUR&&CUR.id;
+  const lvlOpts=(cur)=>Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${k===cur?'selected':''}>${v[0]} — ${v[1]}</option>`).join('');
+  const draw=()=>{                      // luôn vẽ lại từ state (cache) mới nhất
+    const us=db.list('users').filter(u=>!isAdminRow(u)),mem=db.list('project_members').filter(m=>m.project_id===pid);
+    const inP=new Set(mem.map(m=>m.user_id)),avail=us.filter(u=>!inP.has(u.id)&&u.id!==me());
+    const granted=mem.map(m=>({m,u:db.list('users').find(x=>x.id===m.user_id)})).filter(x=>x.u&&!isAdminRow(x.u));
+    shell(`
+     <div class="rounded-xl border border-line p-3 mb-4" style="background:rgba(127,127,127,.06)">
+       <div class="text-xs font-semibold text-mute mb-2 uppercase tracking-wide">Thêm người vào dự án</div>
+       <div class="grid gap-2 sm:grid-cols-[1fr_auto_auto] items-center">
+         <select id="pmUser" class="inp" style="margin:0" aria-label="Chọn người dùng" ${avail.length?'':'disabled'}>
+           <option value="">${avail.length?'— Chọn email người dùng —':'Không còn người dùng để thêm'}</option>${avail.map(u=>`<option value="${u.id}">${esc(u.email)}</option>`).join('')}</select>
+         <select id="pmLvl" class="inp" style="margin:0;min-width:9rem" aria-label="Mức độ quyền hạn">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${k==='viewer'?'selected':''}>${v[0]}</option>`).join('')}</select>
+         <button id="pmAdd" class="btn btn-big justify-center" ${avail.length?'':'disabled'}><i class="fa-solid fa-plus"></i>Thêm</button>
+       </div>
+       <div id="pmHint" class="text-xs text-mute mt-2 min-h-[1rem]">${Object.values(PERM_ROLE).map(v=>`<b>${v[0]}</b>: ${v[1]}`).join(' · ')}</div>
+       ${us.length?'':'<div class="text-xs mt-2" style="color:#b45309">Chưa có tài khoản nào ngoài Admin. Nhờ chuyên viên bấm Đăng ký (hoặc đăng nhập Google) trước.</div>'}
+     </div>
+     <div class="flex items-center justify-between mb-2"><div class="text-xs font-semibold text-mute uppercase tracking-wide">Đã được cấp quyền</div><span class="text-xs font-semibold px-2.5 py-0.5 rounded-full" style="background:rgba(37,99,235,.12);color:var(--brand)">${granted.length}</span></div>
+     <div class="rounded-xl border border-line overflow-auto" style="max-height:min(40vh,18rem)">${granted.length?granted.map(({m,u})=>`
+       <div class="flex items-center gap-3 px-3 py-2.5 border-b border-line last:border-0" data-mrow="${u.id}">
+         <span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span>
+         <span class="flex-1 min-w-0 text-sm truncate" title="${esc(u.email)}">${esc(u.email)}</span>
+         <select data-plvl="${u.id}" class="cell q" style="width:auto;font-size:.75rem" aria-label="Quyền của ${esc(u.email)}">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${normRole(m.role)===k?'selected':''}>${v[0]}</option>`).join('')}</select>
+         <button data-prm="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1 flex items-center gap-1 text-red-600 hover:bg-red-50" style="border:1px solid rgba(220,38,38,.3)" aria-label="Gỡ quyền ${esc(u.email)}"><i class="fa-solid fa-trash"></i>Xóa</button>
+       </div>`).join(''):'<div class="text-sm text-mute p-4 text-center">Chưa có ai được cấp quyền vào dự án này.</div>'}</div>
+     <div class="flex justify-end mt-4"><button class="btn-ghost" id="pmDone">Đóng</button></div>`);
+    const hint=t=>{$('#pmHint').textContent=t};
+    $('#pmX').onclick=$('#pmDone').onclick=()=>{closeModal();route(true)};
+    const sync=async ok=>{if(!ok){try{await loadAssignees(pid)}catch(e){console.error(e)}}draw()};
+    $('#pmAdd').onclick=async()=>{
+      const uid_=$('#pmUser').value;if(!uid_){hint('Hãy chọn một email người dùng trước.');$('#pmUser').focus();return}
+      const lvl=$('#pmLvl').value;$('#pmAdd').disabled=true;
+      const ok=await db.save('project_members',[...db.list('project_members'),{project_id:pid,user_id:uid_,role:lvl}]);
+      if(ok)toast('Đã thêm quyền '+roleLbl(lvl),false);await sync(ok);
+    };
+    $('#modal').querySelectorAll('[data-plvl]').forEach(sel=>sel.onchange=async()=>{
+      const ok=await db.save('project_members',db.list('project_members').map(m=>m.project_id===pid&&m.user_id===sel.dataset.plvl?{...m,role:sel.value}:m));
+      if(ok)toast('Đã đổi quyền thành '+roleLbl(sel.value),false);await sync(ok);
+    });
+    $('#modal').querySelectorAll('[data-prm]').forEach(b=>b.onclick=async()=>{
+      b.disabled=true;const ok=await db.save('project_members',db.list('project_members').filter(m=>!(m.project_id===pid&&m.user_id===b.dataset.prm)));
+      if(ok)toast('Đã gỡ quyền',false);await sync(ok);
+    });
   };
-  $('#pmFind').oninput=e=>{const q=lc(e.target.value);let n=0;L.querySelectorAll('[data-q]').forEach(r=>{const ok=!q||r.dataset.q.includes(q);r.classList.toggle('hidden',!ok);if(ok)n++});$('#pmNone').classList.toggle('hidden',n>0||!users.length)};
-  $('#pmSave').onclick=async()=>{
-    const b=$('#pmSave');b.disabled=true;b.textContent='Đang lưu...';
-    const keep=db.list('project_members').filter(m=>m.project_id!==pid||(!users.some(u=>u.id===m.user_id)));   // giữ thành viên khác (vd. Admin)
-    const next=[...keep,...[...sel].map(([user_id,role])=>({project_id:pid,user_id,role}))];
-    const ok=await db.save('project_members',next);
-    if(ok){closeModal();toast('Đã lưu phân bổ dự án',false);route(true)}else{b.disabled=false;b.textContent='Lưu'}
-  };
+  draw();
 }
 async function toggleApprove(pid){
   if(!isAdmin())return;
@@ -869,7 +890,7 @@ function projectForm(id){
 }
 
 function viewDashboard(p){
-  const adm=canBudget(),s=projStats(p.id),st=STATUS[p.status],over=s.planned&&s.actual>s.planned,ob=adm?overBudget(s):[],isL=leafFn(s.tk);
+  const adm=canBudget(p.id),s=projStats(p.id),st=STATUS[p.status],over=s.planned&&s.actual>s.planned,ob=adm?overBudget(s):[],isL=leafFn(s.tk);
   const kpi=(l,v,sub,ic,bg,fg,cls='')=>`<div class="card p-4"><div class="kpi"><div class="min-w-0"><div class="lbl">${l}</div><div class="text-2xl font-bold mt-1 mono ${cls}">${v}</div></div><span class="kpi-ic" style="background:${bg};color:${fg}"><i class="fa-solid ${ic}"></i></span></div>${sub}</div>`;
   const PC={urgent:'#dc2626',high:'#dc2626',medium:'#eab308',low:'#16a34a'};
   const imp=s.tk.filter(t=>isL(t)&&t.status!=='done'&&(['high','urgent'].includes(t.priority)||['over','soon'].includes(dlClass(t))))
@@ -885,7 +906,7 @@ function viewDashboard(p){
   const bcard=b=>`<a href="#/p/${p.id}/budget/${b.id}" class="imp" style="--ac:#dc2626"><span class="kpi-ic" style="background:rgba(220,38,38,.12);color:#dc2626"><i class="fa-solid fa-wallet"></i></span><div class="flex-1 min-w-0"><div class="font-semibold truncate" style="color:#dc2626">Vượt ngân sách: ${esc(b.name)}</div><div class="text-xs text-mute">Dự kiến ${nfmt(b.planned_amount)} · Thực tế ${nfmt(b.actual_amount)}</div></div><b class="mono" style="color:#dc2626">+${fmtVND(b.actual_amount-b.planned_amount)}</b><i class="fa-solid fa-arrow-right text-mute"></i></a>`;
   const xo=db.list('extra_tasks').filter(x=>x.project_id===p.id&&!x.done).length;
   $('#view').innerHTML=`<div class="flex flex-wrap items-center gap-2 mb-4"><h2 class="text-2xl font-bold">${esc(p.name)}</h2><span class="pill ${st[1]}">${st[0]}</span><span class="pill ${p.approved?'bg-green-100 text-green-800':'bg-amber-100 text-amber-800'}">${p.approved?'✓ Đã duyệt':'Chờ duyệt'}</span><span class="text-xs text-mute mono">${esc(p.code)} · ${fmtD(p.start_date)} → ${fmtD(p.end_date)}</span>
-   ${adm?`<span class="ml-auto flex gap-2"><button id="dApr" class="btn-ghost"><i class="fa-solid fa-circle-check mr-1"></i>${p.approved?'Bỏ duyệt':'Duyệt dự án'}</button><button id="dPerm" class="btn"><i class="fa-solid fa-user-shield mr-1"></i>Phân quyền</button></span>`:''}</div>
+   ${isMgr(p.id)?`<span class="ml-auto flex gap-2">${isAdmin()?`<button id="dApr" class="btn-ghost"><i class="fa-solid fa-circle-check mr-1"></i>${p.approved?'Bỏ duyệt':'Duyệt dự án'}</button>`:''}<button id="dPerm" class="btn"><i class="fa-solid fa-user-shield mr-1"></i>Phân quyền</button></span>`:''}</div>
    ${p.description?`<p class="text-sm text-mute mb-4">${esc(p.description)}</p>`:''}
    <div class="grid grid-cols-2 ${adm?'lg:grid-cols-4':'lg:grid-cols-2'} gap-3 mb-4">
     ${kpi('Tiến độ tổng thể',s.pct+'%',bar(s.pct)+`<div class="text-xs text-mute mt-1">Đã xong ${s.leaf.filter(t=>t.status==='done').length}/${s.leaf.length} việc</div>`,'fa-bars-progress','rgba(37,99,235,.12)','#2563eb')}
@@ -899,7 +920,7 @@ function viewDashboard(p){
    <div class="flex items-center justify-between mb-2"><div class="zone-h" style="margin:0"><i class="fa-solid fa-flag" style="color:#dc2626"></i>Danh mục công việc quan trọng cần lưu ý</div><a href="#/p/${p.id}/todo" class="text-xs" style="color:var(--brand)">Xem tất cả →</a></div>
    <div class="flex flex-wrap gap-3 text-xs text-mute mb-2"><span><span class="sw" style="background:#dc2626"></span>Ưu tiên cao</span><span><span class="sw" style="background:#eab308"></span>Trung bình</span><span><span class="sw" style="background:#16a34a"></span>Thấp</span></div>
    <div class="space-y-2">${imp.map(card).join('')+ob.map(bcard).join('')||'<div class="card p-5 text-sm text-mute">Mọi thứ đang ổn: không có việc ưu tiên cao, quá hạn hay vượt ngân sách.</div>'}</div>`;
-  if(adm){$('#dApr').onclick=()=>toggleApprove(p.id);$('#dPerm').onclick=()=>permModal(p.id)}
+  if($('#dApr'))$('#dApr').onclick=()=>toggleApprove(p.id);if($('#dPerm'))$('#dPerm').onclick=()=>permModal(p.id)
   drawCharts(s);
 }
 
@@ -925,7 +946,7 @@ function renderBell(){updateBadges();
   myProjects().forEach(p=>{const s=projStats(p.id);
     s.overdue.forEach(t=>A.push({k:'over',o:0,pid:p.id,pn:p.name,title:t.name,sub:'Hạn: '+t.due_date,h:`#/p/${p.id}/todo/${t.id}`}));
     s.leaf.filter(t=>t.status!=='done'&&dlClass(t)==='soon').forEach(t=>A.push({k:'soon',o:1,pid:p.id,pn:p.name,title:t.name,sub:'Hạn: '+t.due_date,h:`#/p/${p.id}/todo/${t.id}`}));
-    (canBudget()?overBudget(s):[]).forEach(b=>A.push({k:'bud',o:2,pid:p.id,pn:p.name,title:`${b.code?b.code+': ':''}${b.name}`,sub:'Chi vượt dự kiến '+fmtVND((b.actual_amount||0)-(b.planned_amount||0)),h:`#/p/${p.id}/budget/${b.id}`}))});
+    (canBudget(p.id)?overBudget(s):[]).forEach(b=>A.push({k:'bud',o:2,pid:p.id,pn:p.name,title:`${b.code?b.code+': ':''}${b.name}`,sub:'Chi vượt dự kiến '+fmtVND((b.actual_amount||0)-(b.planned_amount||0)),h:`#/p/${p.id}/budget/${b.id}`}))});
   A.sort((x,y)=>x.o-y.o);
   const V={over:['TRỄ HẠN','bg-red-100 text-red-700','#dc2626','rgba(220,38,38,.09)','clock'],soon:['SẮP TRỄ','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','clock'],bud:['VƯỢT','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','coins']};
   $('#bellBadge').textContent=A.length;$('#bellBadge').classList.toggle('hidden',!A.length);
@@ -968,7 +989,7 @@ function route(keep){
   const parts=(curHash.replace(/^#\/?/,'')||'projects').split('/');
   const pid=parts[0]==='p'?parts[1]:null;
   let name=pid?(parts[2]||'overview'):'projects';name=TAB_ALIAS[name]||name;
-  if(pid&&(!TABS.some(t=>t[0]===name)||(name==='budget'&&!canBudget())))name='overview';
+  if(pid&&(!TABS.some(t=>t[0]===name)||(name==='budget'&&!canBudget(pid))))name='overview';
   const target=parts[3],pr=pid?myProjects().find(x=>x.id===pid):null;
   if(pid&&!pr){go('#/projects');return}
   const need=pid?!LOADED.has(pid):!LISTOK;
@@ -984,7 +1005,7 @@ function route(keep){
   renderSide(pid);
   const inP=!!pr;
   $('#sideProj').innerHTML=inP?`<div class="side-proj"><div class="flex justify-between text-[10px] font-bold tracking-wide opacity-80"><span>ĐANG XEM DỰ ÁN</span><span style="color:#fbbf24">${esc(pr.code)}</span></div><div class="font-semibold text-white my-1 truncate">${esc(pr.name)}</div><a href="#/projects">← Về danh sách tất cả</a></div>`:'';
-  const bb=document.querySelector('#bnav [data-tab=budget]');if(bb)bb.style.display=canBudget()?'':'none';
+  const bb=document.querySelector('#bnav [data-tab=budget]');if(bb)bb.style.display=canBudget(pid)?'':'none';
   $('#bnav').classList.toggle('off',!inP);$('#view').classList.toggle('has-bnav',inP);
   if(inP)document.querySelectorAll('#bnav .bn-tab').forEach(a=>{a.href=`#/p/${pid}/${a.dataset.tab}`;a.classList.toggle('active',a.dataset.tab===name)});
   const tl=Object.fromEntries(TABS);
@@ -1270,7 +1291,7 @@ async function exportBudget(p){
 }
 
 const addTo=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return iso(d)};
-const canTask=pid=>isAdmin()||['owner','manager','member'].includes(roleOf(pid));
+const canTask=pid=>isAdmin()||['owner','manager','editor'].includes(roleOf(pid));
 const TST={todo:['Chưa làm','bg-slate-200 text-slate-800'],in_progress:['Đang làm','bg-blue-100 text-blue-800'],review:['Chờ duyệt','bg-purple-100 text-purple-800'],done:['Hoàn thành','bg-green-100 text-green-800']};
 const PRI={low:['Thấp','text-mute'],medium:['Trung cấp',''],high:['Cao','text-amber-600 font-semibold'],urgent:['Nguy cấp','text-red-600 font-semibold']};
 const dOver=t=>Math.round((Date.parse(today())-Date.parse(t.due_date))/864e5);
