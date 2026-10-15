@@ -212,11 +212,24 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 <div id="gate" class="hidden fixed inset-0 z-50 bg-bg flex items-center justify-center p-4 overflow-auto">
   <div class="w-full max-w-md bg-surface border border-line rounded-2xl shadow-2xl p-8">
     <div class="flex items-center gap-3 mb-6"><span class="logo-sq" style="width:2.6rem;height:2.6rem"><i class="fa-solid fa-gears"></i></span><div><div class="text-xl font-extrabold leading-tight">Tech<span style="color:var(--brand)">PM</span></div><div class="text-xs text-mute">Quản lý dự án kỹ thuật</div></div></div>
-    <h1 class="text-lg font-bold">Đăng nhập</h1>
-    <p class="text-mute text-sm mb-5">Dùng tài khoản Google đã được Admin cấp quyền vào dự án.</p>
+    <h1 id="aTitle" class="text-lg font-bold">Đăng nhập</h1>
+    <p id="aSub" class="text-mute text-sm mb-5">Đăng nhập bằng Google hoặc email để vào các dự án được Admin cấp quyền.</p>
     <button id="gBtn" class="w-full flex items-center justify-center gap-3 rounded-xl py-3 font-semibold border hover:shadow-md transition" style="background:#fff;color:#1f2937;border-color:#dadce0">
       <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Đăng nhập bằng Google</button>
+    <div class="flex items-center gap-3 my-5 text-xs text-mute"><span class="flex-1 h-px bg-line"></span>hoặc dùng email<span class="flex-1 h-px bg-line"></span></div>
+    <form id="aForm" novalidate class="space-y-3">
+      <label class="block"><span class="text-xs font-medium text-mute">Email</span>
+        <input id="aEmail" type="email" inputmode="email" autocomplete="email" class="inp" style="padding:.65rem .8rem;border-radius:.75rem" placeholder="ten@congty.com"></label>
+      <label class="block"><span class="text-xs font-medium text-mute">Mật khẩu</span>
+        <span class="relative block"><input id="aPass" type="password" autocomplete="current-password" class="inp" style="padding:.65rem 3.6rem .65rem .8rem;border-radius:.75rem" placeholder="Tối thiểu 6 ký tự">
+        <button type="button" id="aEye" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-mute px-2 py-1 rounded-lg hover:bg-black/5" style="margin-top:1px">Hiện</button></span></label>
+      <label id="aPass2Box" class="block hidden"><span class="text-xs font-medium text-mute">Nhập lại mật khẩu</span>
+        <input id="aPass2" type="password" autocomplete="new-password" class="inp" style="padding:.65rem .8rem;border-radius:.75rem" placeholder="Nhập lại mật khẩu"></label>
+      <div id="aErr" role="alert" class="text-xs min-h-[1rem]"></div>
+      <button id="aSubmit" type="submit" class="btn btn-big w-full justify-center py-3 rounded-xl">Đăng nhập</button>
+    </form>
+    <p class="text-center text-sm text-mute mt-4"><span id="aAsk">Chưa có tài khoản?</span> <button type="button" id="aSwitch" class="font-semibold underline" style="color:var(--brand)">Đăng ký tài khoản mới</button></p>
     <div id="gMsg" class="text-xs mt-3 text-mute"></div>
   </div>
 </div>
@@ -361,7 +374,7 @@ const uid=()=>crypto.randomUUID();
 
 /* ---- Bản đồ bảng: tên bảng trong app -> bảng Supabase + cột ---- */
 const TB={
-  users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
+  users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','role','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
   project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ord:['project_id']},
   tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
@@ -438,7 +451,11 @@ async function fetchTable(k,col,vals){
       all.push(...data);if(data.length<1000)break;
     }
   }
-  const rows=all.map(r=>fromDB(k,r)),vs=col?new Set(vals):null;
+  return ingest(k,all.map(r=>fromDB(k,r)),col,vals);
+}
+/* nạp hàng vừa tải vào cache (thay các hàng cùng bộ lọc) và cập nhật bản chụp để db.save chỉ gửi phần thay đổi */
+function ingest(k,rows,col,vals){
+  const c=TB[k],vs=col?new Set(vals):null;
   CACHE[k]=CACHE[k].filter(r=>vs&&!vs.has(r[col])).concat(rows);
   SNAP[k]=new Map(CACHE[k].map(r=>[pkOf(c,r),JSON.stringify(toDB(k,r))]));
   return rows;
@@ -543,7 +560,51 @@ function renderGate(msg){
   $('#app').classList.add('hidden');$('#gate').classList.remove('hidden');
   $('#gMsg').innerHTML=msg||(sb?'':'<span class="text-red-600">Không tải được thư viện Supabase (CDN). Kiểm tra mạng rồi tải lại trang.</span>');
   $('#gBtn').onclick=googleLogin;
+  setAuthMode(AMODE);
 }
+/* ---- Đăng nhập / Đăng ký bằng Email + Mật khẩu ---- */
+let AMODE='login',ABUSY=false;
+const AUTH_ERR={'Invalid login credentials':'Sai email hoặc mật khẩu.','Email not confirmed':'Email chưa được xác nhận. Hãy mở hộp thư và bấm vào link xác nhận.','User already registered':'Email này đã được đăng ký. Hãy đăng nhập.','Signup requires a valid password':'Mật khẩu không hợp lệ.','Email rate limit exceeded':'Gửi quá nhiều lần, thử lại sau ít phút.'};
+const authMsg=e=>{const m=(e&&e.message)||String(e),h=Object.keys(AUTH_ERR).find(k=>m.includes(k));if(h)return AUTH_ERR[h];if(/password should be at least/i.test(m))return 'Mật khẩu phải có ít nhất 6 ký tự.';if(/Failed to fetch|NetworkError/i.test(m))return 'Không kết nối được máy chủ. Kiểm tra mạng.';return m};
+function authErr(t,ok){const e=$('#aErr');e.textContent=t||'';e.className='text-xs min-h-[1rem] '+(ok?'text-green-600':'text-red-600')}
+function setAuthMode(m){
+  AMODE=m;const su=m==='signup';
+  $('#aTitle').textContent=su?'Đăng ký tài khoản mới':'Đăng nhập';
+  $('#aSub').textContent=su?'Tạo tài khoản để Admin phân bổ dự án cho bạn. Tài khoản mới có quyền Staff.':'Đăng nhập bằng Google hoặc email để vào các dự án được Admin cấp quyền.';
+  $('#aPass2Box').classList.toggle('hidden',!su);
+  $('#aSubmit').textContent=su?'Đăng ký':'Đăng nhập';
+  $('#aAsk').textContent=su?'Đã có tài khoản?':'Chưa có tài khoản?';
+  $('#aSwitch').textContent=su?'Quay lại đăng nhập':'Đăng ký tài khoản mới';
+  $('#aPass').autocomplete=su?'new-password':'current-password';
+  authErr('');
+}
+async function emailAuth(e){
+  if(e)e.preventDefault();if(ABUSY||!sb)return;
+  const email=lc($('#aEmail').value),pw=$('#aPass').value,su=AMODE==='signup';
+  if(!EMAIL_RE.test(email))return authErr('Email không hợp lệ.');
+  if(pw.length<6)return authErr('Mật khẩu phải có ít nhất 6 ký tự.');
+  if(su&&pw!==$('#aPass2').value)return authErr('Hai mật khẩu nhập không khớp.');
+  ABUSY=true;$('#aSubmit').disabled=true;$('#aSubmit').textContent=su?'Đang đăng ký...':'Đang đăng nhập...';authErr('');
+  try{
+    if(su)await signUpEmail(email,pw);else await signInEmail(email,pw);
+  }catch(x){authErr(authMsg(x))}
+  finally{ABUSY=false;$('#aSubmit').disabled=false;$('#aSubmit').textContent=AMODE==='signup'?'Đăng ký':'Đăng nhập'}
+}
+async function signInEmail(email,password){
+  const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;
+  if(data&&data.user)await onSignedIn(data.user);
+}
+async function signUpEmail(email,password){
+  const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw error;
+  /* Email đã tồn tại và bật xác nhận email: Supabase trả về user nhưng identities rỗng (không báo lỗi) */
+  if(data&&data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length)throw new Error('User already registered');
+  if(data&&data.session){await onSignedIn(data.user);return}     // tắt xác nhận email: vào app luôn, hàng users được tạo (role STAFF)
+  AMODE='login';setAuthMode('login');
+  authErr('Đăng ký thành công! Hãy mở email để xác nhận tài khoản, sau đó đăng nhập.',true);   // bật xác nhận email
+}
+$('#aForm').onsubmit=emailAuth;
+$('#aSwitch').onclick=()=>setAuthMode(AMODE==='login'?'signup':'login');
+$('#aEye').onclick=()=>{const h=$('#aPass').type==='password';$('#aPass').type=h?'text':'password';$('#aPass2').type=h?'text':'password';$('#aEye').textContent=h?'Ẩn':'Hiện'};
 
 /* ---- Supabase Auth (Google OAuth) ---- */
 async function googleLogin(){
@@ -559,10 +620,11 @@ async function ensureUser(su){
   if(error)throw error;
   let row=data&&data[0];
   if(row){
-    ({error}=await sb.from('users').update({full_name:name,avatar_url:av,pending:false}).eq('id',row.id));
-    row={...row,full_name:name,avatar_url:av,pending:false};
+    const upd={full_name:(md.full_name||md.name)?name:(row.full_name||name),avatar_url:av||row.avatar_url||'',pending:false,role:row.role||(email===lc(ADMIN_EMAIL)?'ADMIN':'STAFF')};
+    ({error}=await sb.from('users').update(upd).eq('id',row.id));
+    row={...row,...upd};
   }else{
-    row={id:uid(),email,full_name:name,avatar_url:av,avatar_color:'#64748b',pending:false,prefs:{}};
+    row={id:uid(),email,full_name:name,avatar_url:av,avatar_color:'#'+((Math.abs([...email].reduce((a,c)=>a*31+c.charCodeAt(0)|0,7))%0xAAAAAA)+0x333333).toString(16).padStart(6,'0'),pending:false,role:email===lc(ADMIN_EMAIL)?'ADMIN':'STAFF',prefs:{}};
     ({error}=await sb.from('users').insert(row));
   }
   if(error)throw error;
@@ -682,31 +744,57 @@ function card(p){
 /* ---- Phân quyền (chỉ Admin): thêm / bỏ email chuyên viên vào dự án ---- */
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PERM_ROLE={member:'Chuyên viên (sửa tiến độ)',viewer:'Chỉ xem'};
-function permModal(pid){
+/* Tải danh sách người dùng + phân bổ của dự án bằng 1 truy vấn JOIN (users LEFT JOIN project_members theo project_id) */
+async function loadAssignees(pid){
+  const {data,error}=await sb.from('users').select('*,project_members(project_id,role)').eq('project_members.project_id',pid).order('email',{ascending:true});
+  if(error)throw error;
+  const users=data.map(u=>{const {project_members:pm,...rest}=u;return{...fromDB('users',rest),_pm:(pm||[]).find(m=>m.project_id===pid)||null}});
+  ingest('users',users.map(({_pm,...u})=>u));                                   // đồng bộ cache để db.save không coi là thay đổi
+  ingest('project_members',users.filter(u=>u._pm).map(u=>({project_id:pid,user_id:u.id,role:u._pm.role||'member'})),'project_id',[pid]);
+  return users;
+}
+const isAdminRow=u=>lc(u.email)===lc(ADMIN_EMAIL)||String(u.role||'').toUpperCase()==='ADMIN';
+async function permModal(pid){
   if(!isAdmin())return;
   const p=db.list('projects').find(x=>x.id===pid);if(!p)return;
-  const rows=db.list('project_members').filter(m=>m.project_id===pid),us=db.list('users');
-  const list=rows.map(m=>{const u=us.find(x=>x.id===m.user_id);if(!u)return'';const adm=isAdmin(u);
-    return `<div class="flex items-center gap-2 py-1.5 border-b border-line text-sm"><span class="w-7 h-7 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span>
-     <div class="flex-1 min-w-0"><div class="truncate">${esc(u.full_name)}${u.pending?' <span class="text-[10px] text-mute">(chưa đăng nhập)</span>':''}</div><div class="text-xs text-mute truncate">${esc(u.email)}</div></div>
-     ${adm?'<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#fef3c7;color:#92400e">Admin</span>':`<select data-prole="${m.user_id}" class="cell q" style="width:auto;font-size:.72rem">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${m.role===k||(k==='member'&&!['member','viewer'].includes(m.role))?'selected':''}>${v}</option>`).join('')}</select>
-     <button data-prm="${m.user_id}" class="ibtn del" aria-label="Gỡ quyền"><i class="fa-solid fa-xmark"></i></button>`}</div>`}).join('')||'<div class="text-xs text-mute py-2">Chưa gán chuyên viên nào.</div>';
-  modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân quyền dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
-   <div class="text-xs text-mute mb-3">${esc(p.code)} · ${esc(p.name)}<br>Chuyên viên (Staff) chỉ thấy dự án được gán, không thấy tab Chi phí.</div>
-   <div class="mb-3">${list}</div>
-   <div class="flex gap-2"><input id="pmEmail" type="email" class="inp" style="margin:0" placeholder="email.chuyenvien@gmail.com" autocomplete="off"><select id="pmRole" class="inp" style="margin:0;width:auto">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><button id="pmAdd" class="btn">Thêm</button></div>
-   <div id="pmErr" class="text-xs text-red-600 h-4 mt-1"></div>`);
-  $('#pmX').onclick=()=>{closeModal();route(true)};
-  const add=()=>{const em=lc($('#pmEmail').value);
-    if(!EMAIL_RE.test(em)){$('#pmErr').textContent='Email không hợp lệ';return}
-    if(em===lc(ADMIN_EMAIL)){$('#pmErr').textContent='Đây là Admin, luôn có toàn quyền';return}
-    let all=db.list('users'),u=all.find(x=>lc(x.email)===em);
-    if(!u){u={id:uid(),full_name:em.split('@')[0],email:em,avatar_color:'#'+((Math.abs([...em].reduce((a,c)=>a*31+c.charCodeAt(0)|0,7))%0xAAAAAA)+0x333333).toString(16).padStart(6,'0'),pending:true};db.save('users',[...all,u])}
-    if(db.list('project_members').some(m=>m.project_id===pid&&m.user_id===u.id)){$('#pmErr').textContent='Email này đã có trong dự án';return}
-    db.save('project_members',[...db.list('project_members'),{project_id:pid,user_id:u.id,role:$('#pmRole').value}]);permModal(pid)};
-  $('#pmAdd').onclick=add;$('#pmEmail').onkeydown=e=>{if(e.key==='Enter')add()};
-  $('#modal').querySelectorAll('[data-prole]').forEach(sel=>sel.onchange=()=>{db.save('project_members',db.list('project_members').map(m=>m.project_id===pid&&m.user_id===sel.dataset.prole?{...m,role:sel.value}:m));toast('Đã đổi quyền',false)});
-  $('#modal').querySelectorAll('[data-prm]').forEach(b=>b.onclick=()=>{db.save('project_members',db.list('project_members').filter(m=>!(m.project_id===pid&&m.user_id===b.dataset.prm)));permModal(pid)});
+  modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân bổ dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>${SPIN_HTML}`);
+  $('#pmX').onclick=closeModal;
+  let users;
+  try{await Q;users=(await loadAssignees(pid)).filter(u=>!isAdminRow(u))}
+  catch(e){console.error(e);$('#modal .ldg-inline').outerHTML='<div class="text-sm text-red-600 py-3">Không tải được danh sách người dùng: '+esc(e.message||e)+'</div>';return}
+  const sel=new Map(users.filter(u=>u._pm).map(u=>[u.id,u._pm.role||'member'])),orig=new Map(sel);
+  const roleSel=(id,r)=>`<select data-prole="${id}" class="cell q" style="width:auto;font-size:.72rem" ${sel.has(id)?'':'disabled'} aria-label="Quyền">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${r===k||(k==='member'&&!['member','viewer'].includes(r))?'selected':''}>${v}</option>`).join('')}</select>`;
+  modal(`<div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">Phân bổ dự án</h3><button id="pmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+   <div class="text-xs text-mute mb-3">${esc(p.code)} · ${esc(p.name)}<br>Tick để cho chuyên viên vào dự án, bỏ tick để gỡ. Staff chỉ thấy dự án được gán và không thấy tab Chi phí.</div>
+   <div class="flex items-center gap-2 mb-2"><input id="pmFind" class="inp" style="margin:0" placeholder="Tìm tên hoặc email..." autocomplete="off" aria-label="Tìm người dùng"><span id="pmCnt" class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap" style="background:rgba(37,99,235,.12);color:var(--brand)"></span></div>
+   <div id="pmList" class="rounded-xl border border-line overflow-auto" style="max-height:min(46vh,22rem)">${users.length?users.map(u=>`
+     <label data-uid="${u.id}" data-q="${esc((u.full_name+' '+u.email).toLowerCase())}" class="flex items-center gap-3 px-3 py-2.5 border-b border-line last:border-0 cursor-pointer hover:bg-black/5 transition">
+       <input type="checkbox" data-pck="${u.id}" class="w-4 h-4 shrink-0" style="accent-color:var(--brand)" ${sel.has(u.id)?'checked':''}>
+       <span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span>
+       <span class="flex-1 min-w-0"><span class="block text-sm font-medium truncate">${esc(u.full_name||u.email)}</span><span class="block text-xs text-mute truncate">${esc(u.email)}</span></span>
+       ${roleSel(u.id,sel.get(u.id))}</label>`).join(''):'<div class="text-sm text-mute p-4 text-center">Chưa có tài khoản nào ngoài Admin.<br>Nhờ chuyên viên bấm <b>Đăng ký tài khoản mới</b> (hoặc đăng nhập Google) trước, rồi quay lại đây.</div>'}
+     <div id="pmNone" class="hidden text-sm text-mute p-4 text-center">Không có người dùng khớp.</div></div>
+   <div class="flex items-center justify-between gap-2 mt-4"><span id="pmChg" class="text-xs text-mute"></span><div class="flex gap-2"><button class="btn-ghost" id="pmCancel">Hủy</button><button class="btn btn-big" id="pmSave">Lưu</button></div></div>`);
+  const L=$('#pmList'),upd=()=>{
+    $('#pmCnt').textContent=sel.size+' / '+users.length+' đã chọn';
+    const add=[...sel.keys()].filter(k=>!orig.has(k)).length,del=[...orig.keys()].filter(k=>!sel.has(k)).length,rc=[...sel].filter(([k,v])=>orig.has(k)&&orig.get(k)!==v).length;
+    $('#pmChg').textContent=add||del||rc?`Thay đổi: +${add} thêm, −${del} gỡ${rc?`, ${rc} đổi quyền`:''}`:'Chưa có thay đổi';
+  };upd();
+  $('#pmX').onclick=$('#pmCancel').onclick=closeModal;
+  L.onchange=e=>{
+    const id=e.target.dataset.pck,rs=e.target.dataset.prole;
+    if(id){e.target.checked?sel.set(id,L.querySelector(`[data-prole="${id}"]`).value):sel.delete(id);L.querySelector(`[data-prole="${id}"]`).disabled=!e.target.checked}
+    else if(rs)sel.set(rs,e.target.value);
+    upd();
+  };
+  $('#pmFind').oninput=e=>{const q=lc(e.target.value);let n=0;L.querySelectorAll('[data-q]').forEach(r=>{const ok=!q||r.dataset.q.includes(q);r.classList.toggle('hidden',!ok);if(ok)n++});$('#pmNone').classList.toggle('hidden',n>0||!users.length)};
+  $('#pmSave').onclick=async()=>{
+    const b=$('#pmSave');b.disabled=true;b.textContent='Đang lưu...';
+    const keep=db.list('project_members').filter(m=>m.project_id!==pid||(!users.some(u=>u.id===m.user_id)));   // giữ thành viên khác (vd. Admin)
+    const next=[...keep,...[...sel].map(([user_id,role])=>({project_id:pid,user_id,role}))];
+    const ok=await db.save('project_members',next);
+    if(ok){closeModal();toast('Đã lưu phân bổ dự án',false);route(true)}else{b.disabled=false;b.textContent='Lưu'}
+  };
 }
 async function toggleApprove(pid){
   if(!isAdmin())return;
