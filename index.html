@@ -43,7 +43,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font),system-ui,-ap
 #toast{position:fixed;left:50%;bottom:6.5rem;transform:translateX(-50%);z-index:90;background:#0f172a;color:#fff;padding:.55rem 1rem;border-radius:.7rem;font-size:.85rem;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
 #toast.show{opacity:1}#toast.bad{background:#b91c1c}
 @keyframes flash{0%,100%{background:transparent}50%{background:rgba(250,204,21,.5)}}
-.flash{animation:flash 1.2s ease 3}
+.flash{animation:flash 1s ease 3}   /* nhấp nháy đúng 3 giây */
 .tbl{font-variant-numeric:tabular-nums}
 .pjwrap{container-type:inline-size}
 .pjgrid{display:grid;gap:1.25rem;grid-template-columns:minmax(0,1fr)}
@@ -379,7 +379,7 @@ const TB={
   users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','role','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
   project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ren:{role:'access_level'},ord:['project_id']},
-  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
+  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
   budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','quote_status','note','sort_order'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note']},
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
@@ -401,6 +401,7 @@ function fromDB(k,r){
   if(c.wrap)return{...(r.data||{}),id:r.id,project_id:r.project_id};
   const o={};c.cols.forEach(f=>{o[f]=r[(c.ren&&c.ren[f])||f]});
   if(k==='project_members')o.role=normRole(o.role);
+  if(k==='tasks')o.task_source=o.task_source==='BECOS'?'BECOS':'PMP';       // dòng cũ chưa có task_source = Check list (PMP)
   (c.txt||[]).forEach(f=>{if(o[f]==null)o[f]=''});(c.arr||[]).forEach(f=>{if(o[f]==null)o[f]=[]});(c.obj||[]).forEach(f=>{if(o[f]==null)o[f]={}});
   return o;
 }
@@ -942,19 +943,25 @@ function drawCharts(s){
 }
 
 function renderBell(){updateBadges();
-  const A=[];
+  /* Quét CẢ 2 nguồn công việc (Check list = PMP, Becos): đã hoàn thành, sắp đến hạn, trễ hạn + vượt chi phí. Nhãn nguồn ở mỗi dòng. */
+  const A=[],D=[];
+  const isDone=t=>t.status==='done'||(t.progress||0)>=100;
   myProjects().forEach(p=>{const s=projStats(p.id);
-    s.overdue.forEach(t=>A.push({k:'over',o:0,pid:p.id,pn:p.name,title:t.name,sub:'Hạn: '+t.due_date,h:`#/p/${p.id}/todo/${t.id}`}));
-    s.leaf.filter(t=>t.status!=='done'&&dlClass(t)==='soon').forEach(t=>A.push({k:'soon',o:1,pid:p.id,pn:p.name,title:t.name,sub:'Hạn: '+t.due_date,h:`#/p/${p.id}/todo/${t.id}`}));
+    s.leaf.forEach(t=>{
+      const base={pid:p.id,pn:p.name,title:t.name,src:srcOf(t),h:`#/p/${p.id}/progress/${t.id}`};
+      if(isDone(t))D.push({...base,k:'done',o:3,sub:'Hoàn thành'+(t.actual_end?' ngày '+fmtD(t.actual_end):''),ts:t.actual_end||t.updated_at||''});
+      else if(t.due_date&&t.due_date<today())A.push({...base,k:'over',o:0,sub:'Hạn: '+fmtD(t.due_date)+' · '+dlText(t)});
+      else if(dlClass(t)==='soon')A.push({...base,k:'soon',o:1,sub:'Hạn: '+fmtD(t.due_date)+' · '+dlText(t)})});
     (canBudget(p.id)?overBudget(s):[]).forEach(b=>A.push({k:'bud',o:2,pid:p.id,pn:p.name,title:`${b.code?b.code+': ':''}${b.name}`,sub:'Chi vượt dự kiến '+fmtVND((b.actual_amount||0)-(b.planned_amount||0)),h:`#/p/${p.id}/budget/${b.id}`}))});
-  A.sort((x,y)=>x.o-y.o);
-  const V={over:['TRỄ HẠN','bg-red-100 text-red-700','#dc2626','rgba(220,38,38,.09)','clock'],soon:['SẮP TRỄ','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','clock'],bud:['VƯỢT','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','coins']};
+  A.sort((x,y)=>x.o-y.o);D.sort((x,y)=>String(y.ts).localeCompare(String(x.ts)));
+  const DSHOW=15,all=[...A,...D.slice(0,DSHOW)];
+  const V={over:['TRỄ HẠN','bg-red-100 text-red-700','#dc2626','rgba(220,38,38,.09)','clock'],soon:['SẮP ĐẾN HẠN','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','clock'],bud:['VƯỢT','bg-orange-100 text-orange-700','#ea580c','rgba(234,88,12,.09)','coins'],done:['HOÀN THÀNH','bg-green-100 text-green-700','#16a34a','rgba(22,163,74,.09)','circle-check']};
   $('#bellBadge').textContent=A.length;$('#bellBadge').classList.toggle('hidden',!A.length);
-  $('#bellCount').textContent=A.length+' cảnh báo';
-  $('#bellList').innerHTML=A.length?A.map(a=>{const v=V[a.k];return `<a href="${a.h}" class="flex items-center gap-2.5 p-2.5 mb-1.5 rounded-lg" style="border-left:4px solid ${v[2]};background:${v[3]}">
+  $('#bellCount').textContent=A.length+' cảnh báo · '+D.length+' hoàn thành';
+  $('#bellList').innerHTML=all.length?all.map(a=>{const v=V[a.k];return `<a href="${a.h}" data-bell="${a.k}" class="flex items-center gap-2.5 p-2.5 mb-1.5 rounded-lg" style="border-left:4px solid ${v[2]};background:${v[3]}">
     <span class="w-8 h-8 rounded-full grid place-items-center shrink-0" style="background:${v[3].replace('.09','.18')};color:${v[2]}"><i class="fa-solid fa-${v[4]}"></i></span>
-    <span class="flex-1 min-w-0"><span class="block text-[13px] font-bold truncate" style="color:${v[2]}" title="${esc(a.title)}">${esc(a.title)}</span><span class="block text-xs text-mute truncate">Dự án: ${esc(a.pn)}</span><span class="block mono text-[11px] text-mute">${esc(a.sub)}</span></span>
-    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${v[1]}">${v[0]}</span></a>`}).join(''):'<div class="py-3 text-center">Không có cảnh báo.</div>';
+    <span class="flex-1 min-w-0"><span class="block text-[13px] font-bold truncate" style="color:${v[2]}" title="${esc(a.title)}">${a.src?`<span class="text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-middle" style="${SRC_CHIP[a.src]}">[${SRC_NAME[a.src]}]</span>`:''}${esc(a.title)}</span><span class="block text-xs text-mute truncate">Dự án: ${esc(a.pn)}</span><span class="block mono text-[11px] text-mute">${esc(a.sub)}</span></span>
+    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${v[1]}">${v[0]}</span></a>`}).join('')+(D.length>DSHOW?`<div class="text-center text-xs text-mute py-1">… và ${D.length-DSHOW} việc đã hoàn thành khác</div>`:''):'<div class="py-3 text-center">Không có thông báo.</div>';
 }
 
 let curHash=location.hash||'#/projects';
@@ -1124,7 +1131,7 @@ function viewBudget(p,target){
   if(target){const bd=db.list('budget_items').filter(b=>b.project_id===p.id);let t=bd.find(x=>x.id===target);while(t&&t.parent_id){collapsed.delete(t.parent_id);t=bd.find(x=>x.id===t.parent_id)}}
   const sc=(l,k,x='')=>`<div class="card bg-surface border border-line rounded-xl p-3"><div class="text-xs text-mute">${l}</div><div class="text-xl font-bold mt-1 mono" data-s="${k}">0</div>${x}</div>`;
   $('#view').innerHTML=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold">Chi phí · ${esc(p.name)}</h2><p class="text-mute text-xs">Đơn vị: VND · Tỷ giá 1 USD = ${(+p.exchange_rate).toLocaleString('vi-VN')} VND${ed?' · Bấm vào ô để sửa, Enter để xuống dòng dưới':' · Chỉ chủ dự án / quản lý được sửa'}</p></div>
-   <div class="flex flex-wrap gap-2">${ed?'<button id="bGrpBtn" class="btn btn-big"><i class="fa-solid fa-plus"></i>Tạo Hạng Mục Lớn</button><button id="bImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel</button>':''}<button id="bExp" class="btn-ghost"><i class="fa-solid fa-file-export mr-1"></i>Export Excel</button></div></div>
+   <div class="flex flex-wrap gap-2">${ed?'<button id="bGrpBtn" class="btn btn-big"><i class="fa-solid fa-plus"></i>Tạo Hạng Mục Lớn</button><button id="bImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel</button>':''}<button id="bExp" class="btn-ghost"><i class="fa-solid fa-file-export mr-1"></i>Export Excel</button><button id="bExpDT" class="btn"><i class="fa-solid fa-file-export mr-1"></i>Export Dự toán (Form Duy Tân)</button></div></div>
    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${sc('Dự kiến','planned')}${sc('Thực tế','actual')}${sc('Chênh lệch (dự kiến − thực tế)','diff')}${sc('Đã chi / dự kiến','pct','<div id="sBar"></div>')}</div>
    <div class="card bg-surface border border-line rounded-xl bwrap"><table class="tbl table-fixed w-full" style="font-size:12.5px"><colgroup><col style="width:6%"><col style="width:22%"><col class="c-unit" style="width:4%"><col class="c-qty" style="width:4%"><col class="c-price" style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:11%"><col class="c-ven" style="width:7%"><col class="c-quo" style="width:5%"><col style="width:7%"></colgroup><thead><tr class="text-left text-mute text-xs"><th>Mã</th><th>Hạng mục</th><th class="c-unit">ĐVT</th><th class="text-right c-qty">SL</th><th class="text-right c-price">Đơn giá</th><th class="text-right">Dự kiến</th><th class="text-right">Thực tế</th><th class="text-right">Chênh lệch</th><th class="c-ven">NCC</th><th class="c-quo">Báo giá</th><th></th></tr></thead>
    ${ed?`<tbody id="bQuickBody"><tr class="bg-black/5"><td><select id="bqParent" class="cell q" style="max-width:9rem" aria-label="Thuộc nhóm"></select></td>
@@ -1144,6 +1151,7 @@ function viewBudget(p,target){
     const n=$('[data-badd]');if(n){n.focus();n.scrollIntoView({block:'nearest'})}};
   if(ed){$('#bImp').onclick=()=>$('#bFile').click();$('#bFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importBudget(p,f)}}
   $('#bExp').onclick=()=>exportBudget(p);
+  $('#bExpDT').onclick=()=>exportDuyTanBudget(p,db.list('budget_items').filter(b=>b.project_id===p.id));
 
   body.addEventListener('focusin',e=>{if(e.target.matches('.cell.num'))e.target.select()});
   body.onclick=e=>{
@@ -1362,11 +1370,11 @@ async function importChecklist(p,file){
      ${st.fix.length?`<li>Đã sửa mã bị Excel cắt số 0: ${esc(st.fix.join('; '))}</li>`:''}${st.dup.length?`<li class="text-amber-600">Mã STT trùng trong file (vẫn nhập, giữ nguyên mã): ${esc(st.dup.join('; '))}. Bạn nên kiểm tra lại đánh số.</li>`:''}</ul>
      <label class="block text-sm"><span class="text-mute text-xs">Ngày bắt đầu dự án (tính theo ngày lịch)</span><input type="date" id="iStart" value="${p.start_date}" class="inp"></label>
      <div class="text-sm mt-2">Dự kiến kết thúc: <b id="iEnd">${endTxt(p.start_date)}</b></div>
-     <div class="flex flex-wrap justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn-ghost" id="iAdd">Thêm vào cuối</button><button class="btn" id="iRep">Thay thế công việc hiện tại</button></div>`);
+     <div class="flex flex-wrap justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn-ghost" id="iAdd">Thêm vào cuối</button><button class="btn" id="iRep">Thay thế Check list hiện tại</button></div>`);
     $('#iStart').onchange=e=>{if(e.target.value)$('#iEnd').innerHTML=endTxt(e.target.value)};
-    const save=rep=>{const s=$('#iStart').value||p.start_date,rows=buildTasks(nodes,by,s,p.id),all=db.list('tasks'),mine=all.filter(t=>t.project_id===p.id),ids=new Set(mine.map(t=>t.id)),base=rep?0:Math.max(0,...mine.map(t=>t.sort_order));
-      db.save('tasks',[...(rep?all.filter(t=>t.project_id!==p.id):all),...rows.map(r=>({...r,sort_order:r.sort_order+base}))]);
-      if(rep)db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));PINIT.delete(p.id);GINIT.delete(p.id);closeModal();route()};
+    const save=rep=>{const s=$('#iStart').value||p.start_date,rows=buildTasks(nodes,by,s,p.id),all=db.list('tasks'),mine=all.filter(t=>t.project_id===p.id&&srcOf(t)==='PMP'),ids=new Set(mine.map(t=>t.id)),base=rep?0:Math.max(0,...mine.map(t=>t.sort_order));
+      db.save('tasks',[...(rep?all.filter(t=>!ids.has(t.id)):all),...rows.map(r=>({...r,task_source:'PMP',sort_order:r.sort_order+base}))]);   // chỉ động tới công việc Check list (PMP), không đụng Becos
+      if(rep)db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));PINIT.delete(p.id+'|pmp');GINIT.delete(p.id+'project');PSUB='pmp';closeModal();route()};
     $('#iNo').onclick=closeModal;$('#iAdd').onclick=()=>save(false);$('#iRep').onclick=()=>save(true);
   }catch(e){toast(e.message)}
 }
@@ -1387,6 +1395,13 @@ const PEXP=new Set(),PINIT=new Set(),GOPEN=new Set(),GINIT=new Set(),PEND={};
 const leafFn=tk=>{const ps=new Set(tk.map(t=>t.parent_id));return t=>!ps.has(t.id)};
 const noDur=t=>(t.duration_days||0)<=0&&t.status!=='done';
 const taskRows=pid=>db.list('tasks').filter(t=>t.project_id===pid);
+/* Nguồn công việc: 'PMP' = thẻ "Check list" · 'BECOS' = thẻ "Becos" (đồng bộ từ Master Gantt) */
+const srcOf=t=>t&&t.task_source==='BECOS'?'BECOS':'PMP';
+const SRC_NAME={PMP:'Check list',BECOS:'Becos'},SRC_CHIP={PMP:'background:#dbeafe;color:#1d4ed8',BECOS:'background:#ede9fe;color:#6d28d9'};
+const taskRowsSrc=(pid,src)=>taskRows(pid).filter(t=>srcOf(t)===src);
+let PSUB='pmp';                                    // thẻ con đang mở ở tab Tiến độ: 'pmp' | 'becos'
+const PSRC=()=>PSUB==='becos'?'BECOS':'PMP';
+const pRows=p=>taskRowsSrc(p.id,PSRC());
 const daysBetween=(a,b)=>Math.round((Date.parse(b)-Date.parse(a))/864e5);
 const dlDays=t=>t.due_date?daysBetween(today(),t.due_date):null;
 function dlClass(t){if(t.status==='done')return'done';const d=dlDays(t);return d==null?'none':d<0?'over':d<=SOON?'soon':'ok'}
@@ -1401,12 +1416,13 @@ function nextWbs(tk,parentId){
   let mx=sib.length;sib.forEach(t=>{const m=String(t.wbs_code||'').match(/(\d+)\s*$/);if(m)mx=Math.max(mx,+m[1])});
   return(par&&par.wbs_code?par.wbs_code+'.':'')+(mx+1);
 }
-function addTask(pid,name,parentId,due){
-  const all=db.list('tasks'),tk=all.filter(t=>t.project_id===pid),now=new Date().toISOString(),par=parentId?tk.find(t=>t.id===parentId):null;
+function addTask(pid,name,parentId,due,srcArg){
+  const all=db.list('tasks'),tk0=all.filter(t=>t.project_id===pid),now=new Date().toISOString(),par=parentId?tk0.find(t=>t.id===parentId):null;
+  const src=par?srcOf(par):(srcArg||'PMP'),tk=tk0.filter(t=>srcOf(t)===src);   // WBS và thứ tự tính riêng cho từng nguồn
   let sd=today(),dd=due||addDays(7);
   if(par&&!due&&!tk.some(t=>t.parent_id===par.id)&&par.start_date&&par.due_date){sd=par.start_date;dd=par.due_date}
   if(dd<sd)sd=dd;
-  const t={id:uid(),project_id:pid,parent_id:parentId||null,wbs_code:nextWbs(tk,parentId),name,owner_depts:[],collab_depts:[],duration_days:daysBetween(sd,dd)+1,start_date:sd,due_date:dd,actual_start:null,actual_end:null,status:'todo',priority:'medium',progress:0,notes:'',depends_on:[],checklist:[],sort_order:Math.max(0,...tk.map(x=>x.sort_order||0))+1,created_at:now,updated_at:now};
+  const t={id:uid(),project_id:pid,parent_id:parentId||null,wbs_code:nextWbs(tk,parentId),task_source:src,name,owner_depts:[],collab_depts:[],duration_days:daysBetween(sd,dd)+1,start_date:sd,due_date:dd,actual_start:null,actual_end:null,status:'todo',priority:'medium',progress:0,notes:'',depends_on:[],checklist:[],sort_order:Math.max(0,...tk.map(x=>x.sort_order||0))+1,created_at:now,updated_at:now};
   db.save('tasks',[...all.map(x=>x.id===parentId?{...x,duration_days:null,updated_at:now}:x),t]);
   return t;
 }
@@ -1494,24 +1510,29 @@ function flashEl(root,id){const el=root.querySelector(`[data-id="${id}"]`);if(el
 
 /* ===== Tab TIẾN ĐỘ: thẻ nhiều cấp ===== */
 function viewProgress(p,target){
-  const ed=canTask(p.id),adm=canEdit(p.id),tk=taskRows(p.id),isL=leafFn(tk),nd=tk.filter(t=>isL(t)&&noDur(t)).length;
-  if(!PINIT.has(p.id)){PINIT.add(p.id);if(tk.length<=40)tk.forEach(t=>PEXP.add(t.id))}
+  if(target){const tt=db.list('tasks').find(x=>x.id===target&&x.project_id===p.id);if(tt){PSUB=srcOf(tt)==='BECOS'?'becos':'pmp';pq='';pnd=false}}   // nhảy từ chuông: tự mở đúng thẻ con + bỏ bộ lọc để thấy dòng
+  const ed=canTask(p.id),adm=canEdit(p.id),tk=pRows(p),isL=leafFn(tk),nd=tk.filter(t=>isL(t)&&noDur(t)).length,becos=PSUB==='becos';
+  const cntPMP=taskRowsSrc(p.id,'PMP').length,cntBec=taskRowsSrc(p.id,'BECOS').length,mgN=MG(p.id).length;
+  if(!PINIT.has(p.id+'|'+PSUB)){PINIT.add(p.id+'|'+PSUB);if(tk.length<=40)tk.forEach(t=>PEXP.add(t.id))}
   if(target){let t=tk.find(x=>x.id===target);while(t&&t.parent_id){PEXP.add(t.parent_id);t=tk.find(x=>x.id===t.parent_id)}}
-  $('#view').innerHTML=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-bars-progress" style="color:var(--brand)"></i>Tiến độ &amp; phân cấp công việc</h2>
-    <p class="text-mute text-xs">Bấm <b>+</b> trên thẻ để thêm việc con (không giới hạn cấp). Kéo thanh trượt để cập nhật % hoàn thành.</p></div>
-   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button>${adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import checklist</button>':''}</div></div>
+  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-3" role="tablist" aria-label="Nguồn công việc">${[['pmp','Check list',cntPMP],['becos','Becos',cntBec]].map(([k,l,n])=>`<button role="tab" data-psub="${k}" aria-selected="${PSUB===k}" class="seg px-4 py-1.5 ${PSUB===k?'on':''}">${l} <span class="text-[11px] opacity-70">${n}</span></button>`).join('')}</div>
+   <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-bars-progress" style="color:var(--brand)"></i>${becos?'Becos · hạng mục từ Master Gantt':'Check list · tiến độ &amp; phân cấp công việc'}</h2>
+    <p class="text-mute text-xs">${becos?'Các hạng mục lấy từ Master Gantt (task_source = BECOS). Bấm <b>Đồng bộ từ Master Gantt</b> để cập nhật ngày / % mới nhất.':'Bấm <b>+</b> trên thẻ để thêm việc con (không giới hạn cấp). Kéo thanh trượt để cập nhật % hoàn thành. Dữ liệu ở thẻ này vẽ ra sơ đồ <b>Check list PMP</b> bên tab Gantt.'}</p></div>
+   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Master Gantt${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
    ${ed?`<div class="card p-3 mb-3"><div class="flex flex-wrap gap-2 items-center"><span class="lbl" style="color:#f59e0b"><i class="fa-solid fa-plus"></i> Khởi tạo nhanh</span><input id="pqName" class="inp" style="margin:0;flex:1;min-width:11rem" placeholder="Thêm đầu mục lớn: gõ tên rồi nhấn Enter" aria-label="Tên đầu mục mới"><input id="pqDue" type="date" class="inp" style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button id="pqAdd" class="btn" aria-label="Thêm đầu mục"><i class="fa-solid fa-plus"></i> Thêm việc</button></div><div id="pqErr" class="text-red-600 text-xs h-4 mt-1"></div></div>`:''}
    <div class="flex flex-wrap items-center gap-2 mb-3"><input id="pqSearch" class="inp" style="max-width:17rem;margin:0" placeholder="Tìm tên, mã WBS, bộ phận..." value="${esc(pq)}">${nd?`<button id="ndChip" class="text-xs px-2 py-1 rounded-full" style="background:${pnd?'#f59e0b':'#fef3c7'};color:#92400e">⚠ ${nd} việc thiếu thời lượng${pnd?' (đang lọc)':''}</button>`:''}</div>
-   <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>Bắt đầu</div><div>Kết thúc</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls" class="hidden">`;
+   <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>Bắt đầu</div><div>Kết thúc</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
+  document.querySelectorAll('#view [data-psub]').forEach(b=>b.onclick=()=>{PSUB=b.dataset.psub;EDIT=null;PADD=null;viewProgress(p)});
+  if($('#bsSync'))$('#bsSync').onclick=()=>{const r=syncMasterToBecos(p);if(r)viewProgress(p)};
   const tree=$('#pTree'),redraw=()=>drawProgress(p);
   const addRoot=()=>{const nm=$('#pqName').value.trim();if(!nm){$('#pqErr').textContent='Nhập tên đầu mục trước khi thêm';return}
-    $('#pqErr').textContent='';const t=addTask(p.id,nm,null,$('#pqDue').value||null);$('#pqName').value='';$('#pqDue').value='';PEXP.add(t.id);redraw();flashEl(tree,t.id);renderBell();$('#pqName').focus()};
+    $('#pqErr').textContent='';const t=addTask(p.id,nm,null,$('#pqDue').value||null,PSRC());$('#pqName').value='';$('#pqDue').value='';PEXP.add(t.id);redraw();flashEl(tree,t.id);renderBell();$('#pqName').focus()};
   if(ed){$('#pqAdd').onclick=addRoot;$('#pqName').onkeydown=e=>{if(e.key==='Enter')addRoot()}}
   $('#pqSearch').oninput=e=>{pq=e.target.value;redraw()};
   const chip=$('#ndChip');if(chip)chip.onclick=()=>{pnd=!pnd;viewProgress(p)};
-  $('#pAll').onclick=()=>{taskRows(p.id).forEach(t=>PEXP.add(t.id));redraw()};
-  $('#pNone').onclick=()=>{taskRows(p.id).forEach(t=>PEXP.delete(t.id));redraw()};
-  if(adm){$('#tImp').onclick=()=>$('#tFile').click();$('#tFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importChecklist(p,f)}}
+  $('#pAll').onclick=()=>{pRows(p).forEach(t=>PEXP.add(t.id));redraw()};
+  $('#pNone').onclick=()=>{pRows(p).forEach(t=>PEXP.delete(t.id));redraw()};
+  if(adm&&$('#tImp')){$('#tImp').onclick=()=>$('#tFile').click();$('#tFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importChecklist(p,f)}}
 
   const doAdd=(row)=>{const pid=row.dataset.addrow,nm=row.querySelector('[data-addname]').value.trim(),er=row.querySelector('[data-adderr]');
     if(!nm){er.textContent='Nhập tên việc con';return}
@@ -1552,7 +1573,7 @@ function viewProgress(p,target){
 }
 
 function drawProgress(p){
-  const tk=taskRows(p.id),{k,R}=rollTasks(tk),ed=canTask(p.id),q=pq.trim().toLowerCase(),flat=!!(q||pnd);
+  const tk=pRows(p),{k,R}=rollTasks(tk),ed=canTask(p.id),q=pq.trim().toLowerCase(),flat=!!(q||pnd);
   const sorted=id=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
   const card=(t,d)=>{
     const r=R[t.id],kids=sorted(t.id),leaf=!kids.length,open=PEXP.has(t.id),editing=EDIT&&EDIT.id===t.id,cls=leaf?dlClass(t):'';
@@ -1582,7 +1603,7 @@ function drawProgress(p){
     const walk=(id,d)=>sorted(id).forEach(t=>{const c=card(t,d);out.push(c.h);if(c.kids.length&&c.open)walk(t.id,d+1)});
     walk('root',0);
   }
-  const _h=out.join('');$('#pTree').innerHTML=_h||`<div class="text-mute p-4">${flat?'Không có việc phù hợp.':ed?'Chưa có công việc. Gõ tên ở ô phía trên rồi Enter để tạo đầu mục đầu tiên.':'Chưa có công việc.'}</div>`;
+  const _h=out.join('');$('#pTree').innerHTML=_h||`<div class="text-mute p-4">${flat?'Không có việc phù hợp.':ed?(PSUB==='becos'?'Chưa có hạng mục Becos. Import Master Gantt ở tab Gantt (tự đồng bộ) hoặc bấm “Đồng bộ từ Master Gantt”.':'Chưa có công việc. Gõ tên ở ô phía trên rồi Enter để tạo đầu mục đầu tiên.'):'Chưa có công việc.'}</div>`;
   growNotes($('#pTree'));
 }
 function growNotes(root){root.querySelectorAll('textarea.note-in').forEach(a=>{a.style.height='auto';a.style.height=Math.max(a.scrollHeight,27)+'px'})}
@@ -1728,14 +1749,14 @@ const actColor=({a,r})=>a.over?'#dc2626':a.all?((a.e||'')>(r.e||'9999')?'#f59e0b
 
 let GSUB='project';
 const MG=pid=>db.list('master_gantt').filter(r=>r.project_id===pid);
-const GSRC=p=>GSUB==='master'?MG(p.id):taskRows(p.id);
+const GSRC=p=>GSUB==='master'?MG(p.id):taskRowsSrc(p.id,'PMP');   // Gantt "Check list PMP" chỉ lấy công việc PMP
 function viewGantt(p){
   const tk=GSRC(p),gk=p.id+GSUB,master=GSUB==='master',ed=canTask(p.id);
   if(!GINIT.has(gk)){GINIT.add(gk);if(tk.length<=40)tk.forEach(t=>GOPEN.add(t.id))}
   const sw=(c,l)=>`<span class="whitespace-nowrap"><span class="sw" style="background:${c}"></span>${l}</span>`;
-  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-2" role="group" aria-label="Loại Gantt">${[['project','Gantt dự án'],['master','Master Gantt']].map(([k,l])=>`<button data-gsub="${k}" class="seg px-3 py-1.5 ${GSUB===k?'on':''}">${l}</button>`).join('')}</div>
-   <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div><h2 class="text-xl font-bold">${master?'Master Gantt':'Sơ đồ Gantt'} · ${esc(p.name)}</h2>
-    <p class="text-mute text-xs">${master?'Biểu đồ tham chiếu tải từ file Excel mẫu. <b>Độc lập</b>: không cộng vào Tổng quan, Tiến độ hay Chi phí của dự án.':'Tự cập nhật theo tab Tiến độ / Việc cần làm. Bấm tên việc để mở trong tab Tiến độ.'}</p></div>
+  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-2" role="group" aria-label="Loại Gantt">${[['project','Check list PMP'],['master','Master Gantt']].map(([k,l])=>`<button data-gsub="${k}" class="seg px-3 py-1.5 ${GSUB===k?'on':''}">${l}</button>`).join('')}</div>
+   <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div><h2 class="text-xl font-bold">${master?'Master Gantt':'Check list PMP'} · ${esc(p.name)}</h2>
+    <p class="text-mute text-xs">${master?'Biểu đồ tải từ file Excel mẫu. Sau khi import, các hạng mục tự đồng bộ sang thẻ <b>Becos</b> (tab Tiến độ).':'Vẽ từ các công việc ở thẻ <b>Check list</b> (tab Tiến độ, task_source = PMP). Bấm tên việc để mở đúng dòng trong tab Tiến độ.'}</p></div>
    <div class="flex flex-wrap gap-2"><button id="gOpen" class="btn-ghost">Mở tất cả</button><button id="gClose" class="btn-ghost">Thu gọn</button>${master?`${ed?'<button id="mImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel mẫu</button>':''}${tk.length?'<button id="mExp" class="btn"><i class="fa-solid fa-file-export mr-1"></i>Export Master Gantt ra Excel (A3)</button>':''}${ed&&tk.length?'<button id="mDel" class="btn-ghost" style="color:#dc2626"><i class="fa-solid fa-trash mr-1"></i>Xóa Master</button>':''}`:''}</div></div>${master?'<input type="file" id="mFile" accept=".xlsx,.xls" class="hidden">':''}
    ${master?`<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">${sw('#FFC000','KH · Thời gian kế hoạch')}${sw('#00B0F0','TT · Thời gian thực tế')}${sw('#f87171','Trễ kế hoạch')}<span class="whitespace-nowrap"><span class="inline-block align-middle mr-1" style="width:2px;height:.8rem;background:#ef4444"></span>Hôm nay</span><span class="text-mute">· % hoàn thành là ước tính (thực tế / kế hoạch)</span></div>`:`
    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">${sw('#64748b','Kế hoạch (phần đậm = % hoàn thành)')}${sw('#f59e0b','Kế hoạch thiếu thời lượng')}
@@ -1765,7 +1786,7 @@ function drawGantt(p){
   const box=$('#gtBox');if(!box)return;
   const rows=ganttRows(GSRC(p)),ds=[];
   rows.forEach(({r,a})=>{[r.s,r.e,a.s,a.e].forEach(x=>{if(x)ds.push(DN(x))})});
-  if(!rows.length||!ds.length){box.innerHTML=GSUB==='master'?'<div class="p-8 text-center text-mute"><i class="fa-solid fa-file-excel text-3xl mb-2" style="color:#16a34a"></i><div class="font-semibold text-ink mb-1">Chưa có Master Gantt</div>Bấm <b>Import Excel mẫu</b> để tải file kế hoạch tổng thể (định dạng checklist PMP hoặc bảng có cột Tên, Bắt đầu, Kết thúc, %).</div>':'<div class="p-6 text-mute">Chưa có công việc nào có ngày. Hãy tạo việc ở tab Tiến độ.</div>';return}
+  if(!rows.length||!ds.length){box.innerHTML=GSUB==='master'?'<div class="p-8 text-center text-mute"><i class="fa-solid fa-file-excel text-3xl mb-2" style="color:#16a34a"></i><div class="font-semibold text-ink mb-1">Chưa có Master Gantt</div>Bấm <b>Import Excel mẫu</b> để tải file kế hoạch tổng thể (định dạng checklist PMP hoặc bảng có cột Tên, Bắt đầu, Kết thúc, %).</div>':'<div class="p-6 text-mute">Chưa có công việc Check list nào có ngày. Hãy tạo hoặc import ở thẻ Check list (tab Tiến độ).</div>';return}
   let lo=Math.min(...ds),hi=Math.max(...ds)+1;const td=DN(today());
   if(td>=lo-30&&td<=hi+30){lo=Math.min(lo,td);hi=Math.max(hi,td+1)}
   if(hi-lo<7)hi=lo+7;
@@ -1835,6 +1856,29 @@ function parseMasterGeneric(rows,pid){
   const par=new Set(out.map(t=>t.parent_id));out.forEach(t=>{if(par.has(t.id)){t.duration_days=null;t.start_date=null;t.due_date=null;t.progress=0;t.status='in_progress'}});
   return out;
 }
+/* ===== Đồng bộ Master Gantt -> thẻ "Becos" (tasks.task_source = 'BECOS') =====
+   Chống trùng: so khớp theo TÊN hạng mục (không phân biệt hoa/thường, gộp khoảng trắng; trùng tên thì ưu tiên cùng mã STT).
+   Có rồi -> cập nhật ngày / % / trạng thái. Chưa có -> thêm mới. Không bao giờ xóa việc Becos có sẵn. */
+function syncMasterToBecos(p,rows,silent){
+  rows=rows||MG(p.id);
+  if(!rows.length){if(!silent)toast('Chưa có Master Gantt. Vào tab Gantt > Master Gantt > Import Excel mẫu trước.');return null}
+  const all=db.list('tasks'),becos=all.filter(t=>t.project_id===p.id&&srcOf(t)==='BECOS'),now=new Date().toISOString();
+  const nk=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase(),byName=new Map();
+  becos.forEach(t=>{const k=nk(t.name);if(!byName.has(k))byName.set(k,[]);byName.get(k).push(t)});
+  const src=[...rows].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)),used=new Set(),idMap={},hit={};
+  src.forEach(m=>{const c=byName.get(nk(m.name))||[],t=c.find(x=>!used.has(x.id)&&x.wbs_code===m.wbs_code)||c.find(x=>!used.has(x.id));
+    if(t){used.add(t.id);idMap[m.id]=t.id;hit[m.id]=t}else idMap[m.id]=uid()});
+  let add=0,upd=0,same=0,base=Math.max(0,...becos.map(t=>t.sort_order||0));const patch={},fresh=[];
+  src.forEach((m,i)=>{
+    const vals={start_date:m.start_date||null,due_date:m.due_date||null,duration_days:m.duration_days||null,actual_start:m.actual_start||null,actual_end:m.actual_end||null,status:m.status||'todo',progress:m.progress||0};
+    const t=hit[m.id];
+    if(t){const ch=Object.keys(vals).some(k=>(t[k]??null)!==vals[k]);if(ch){patch[t.id]={...vals,updated_at:now};upd++}else same++}
+    else{add++;fresh.push({id:idMap[m.id],project_id:p.id,parent_id:m.parent_id?idMap[m.parent_id]||null:null,wbs_code:m.wbs_code||'',task_source:'BECOS',name:m.name,owner_depts:m.owner_depts||[],collab_depts:[],...vals,priority:m.priority||'medium',notes:'',depends_on:[],checklist:[],sort_order:base+i+1,created_at:now,updated_at:now})}});
+  if(add||upd)db.save('tasks',[...all.map(t=>patch[t.id]?{...t,...patch[t.id]}:t),...fresh]);
+  PINIT.delete(p.id+'|becos');
+  if(!silent)toast(`Đồng bộ xong: +${add} mới, ${upd} cập nhật, ${same} không đổi`,false);
+  renderBell();return{add,upd,same};
+}
 async function importMaster(p,file){
   try{
     if(!window.XLSX)await loadJS(XLSX_URL);
@@ -1852,9 +1896,115 @@ async function importMaster(p,file){
       <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn" id="iRep">Lưu Master Gantt (thay bản cũ)</button></div>`);
     $('#iNo').onclick=closeModal;
     $('#iRep').onclick=()=>{const st=($('#mStart')&&$('#mStart').value)||p.start_date,out=build(st).map(r=>({...r,project_id:p.id,source_file:file.name,imported_at:new Date().toISOString()}));
-      db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';route()};
+      db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';const sr=syncMasterToBecos(p,out,true);route();if(sr)toast(`Đã đồng bộ sang thẻ Becos: +${sr.add} mới, ${sr.upd} cập nhật`,false)};
   }catch(e){toast(e.message)}
 }
+/* =====================================================================================
+   EXPORT DỰ TOÁN CHI PHÍ - FORM DUY TÂN  (hàm độc lập: exportDuyTanBudget(project, budgetItems))
+   Khung tạm thời. Khi có Form Excel mẫu, chỉ cần chỉnh trong hàm này:
+     - DT.company / DT.nation ......... tên công ty, quốc hiệu
+     - DT.cols ........................ cột của bảng (tiêu đề, độ rộng, kiểu số) -> thứ tự cột = A, B, C...
+     - Các khối đánh dấu "// [HEADER]" "// [BẢNG]" "// [FOOTER]" ........ vị trí từng dòng / cột
+   Ghi chú tọa độ: dòng 1-2 = đầu trang, dòng 4 = tiêu đề, dòng 5-7 = thông tin dự án, dòng 9 = tiêu đề bảng (DT.headRow),
+                   dữ liệu từ dòng 10, sau đó dòng TỔNG, rồi khung chữ ký.
+   ===================================================================================== */
+const DT={
+  company:'CÔNG TY NHỰA TÁI CHẾ DUY TÂN',                       // <<< đổi tên pháp lý đầy đủ nếu cần
+  nation:['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM','Độc lập - Tự do - Hạnh phúc'],
+  title:'BẢNG DỰ TOÁN CHI PHÍ DỰ ÁN',
+  headRow:9,                                                      // dòng tiêu đề bảng (mọi dòng dữ liệu bắt đầu ngay dưới)
+  /* key: dữ liệu lấy từ đâu · w: độ rộng cột · num: định dạng số */
+  cols:[
+    {key:'stt',  h:'STT',                         w:7},               // A
+    {key:'code', h:'Mã hạng mục',                 w:13},              // B
+    {key:'name', h:'Nội dung chi phí / Thiết bị', w:46},              // C
+    {key:'unit', h:'Đơn vị tính',                 w:10},              // D
+    {key:'qty',  h:'Số lượng',                    w:10, num:'#,##0.##'},   // E
+    {key:'price',h:'Đơn giá kế hoạch',            w:18, num:'#,##0'},      // F
+    {key:'plan', h:'Thành tiền kế hoạch',         w:20, num:'#,##0'},      // G
+    {key:'act',  h:'Thực chi',                    w:18, num:'#,##0'},      // H
+    {key:'diff', h:'Chênh lệch (KH − Thực chi)',  w:20, num:'#,##0;[Red]-#,##0'}, // I  (= G − H, công thức)
+    {key:'note', h:'Ghi chú',                     w:26}                // J
+  ],
+  signs:['NGƯỜI LẬP','TRƯỞNG BỘ PHẬN','BAN GIÁM ĐỐC PHÊ DUYỆT']      // [FOOTER] 3 khối chữ ký
+};
+async function exportDuyTanBudget(project,budgetItems){
+  try{
+    if(!window.ExcelJS)await loadJS(EXCELJS_URL);
+    if(!budgetItems||!budgetItems.length){toast('Dự án chưa có dữ liệu Chi phí để xuất');return}
+    const C=DT.cols,N=C.length,L=i=>String.fromCharCode(64+i),col=k=>L(C.findIndex(c=>c.key===k)+1);   // col('plan') = 'G'
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Dự toán chi phí',{views:[{showGridLines:false}]});
+    C.forEach((c,i)=>ws.getColumn(i+1).width=c.w);
+    const thin={style:'thin',color:{argb:'FF8A94A3'}},box={top:thin,bottom:thin,left:thin,right:thin};
+    const fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
+    const put=(addr,v,o={})=>{const c=ws.getCell(addr);c.value=v;if(o.f)c.font=o.f;if(o.al)c.alignment=o.al;if(o.nf)c.numFmt=o.nf;return c};
+    const merge=(r,a,b)=>{ws.mergeCells(`${L(a)}${r}:${L(b)}${r}`)};
+    const mid=Math.ceil(N/2);
+
+    // [HEADER] dòng 1-2: trái = tên công ty, phải = quốc hiệu / tiêu ngữ
+    merge(1,1,mid-1);put('A1',DT.company,{f:{bold:true,size:12},al:{horizontal:'center',vertical:'middle'}});
+    merge(1,mid,N);put(`${L(mid)}1`,DT.nation[0],{f:{bold:true,size:11},al:{horizontal:'center'}});
+    merge(2,mid,N);put(`${L(mid)}2`,DT.nation[1],{f:{bold:true,size:11,underline:true},al:{horizontal:'center'}});
+    // [HEADER] dòng 4: tiêu đề phiếu
+    merge(4,1,N);put('A4',DT.title,{f:{bold:true,size:16},al:{horizontal:'center',vertical:'middle'}});ws.getRow(4).height=28;
+    // [HEADER] dòng 5-7: Tên dự án · Mã dự án · Ngày lập · Tổng ngân sách duyệt
+    const roots=budgetItems.filter(b=>!b.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const by={};budgetItems.forEach(b=>(by[b.parent_id||'root']??=[]).push(b));
+    const kids=id=>(by[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const sumOf=b=>{const k=by[b.id];return k?k.reduce((a,x)=>{const v=sumOf(x);return{p:a.p+v.p,a:a.a+v.a}},{p:0,a:0}):{p:b.planned_amount||0,a:b.actual_amount||0}};
+    const totP=roots.reduce((a,r)=>a+sumOf(r).p,0),totA=roots.reduce((a,r)=>a+sumOf(r).a,0);
+    merge(5,1,N);put('A5',`Tên dự án: ${project.name}`,{f:{bold:true,size:12}});
+    merge(6,1,mid);put('A6',`Mã dự án: ${project.code}`,{f:{size:11}});
+    merge(6,mid+1,N);put(`${L(mid+1)}6`,`Ngày lập: ${fmtD(today())}`,{f:{size:11}});
+    merge(7,1,mid);put('A7','Tổng ngân sách duyệt (VND):',{f:{bold:true,size:11}});
+    // ô số tổng ngân sách ở dòng 7 trỏ tới ô TỔNG của bảng (gán công thức sau khi biết số dòng)
+    merge(7,mid+1,N);
+
+    // [BẢNG] dòng tiêu đề
+    const HR=DT.headRow,hr=ws.getRow(HR);hr.height=34;
+    C.forEach((c,i)=>{const cell=hr.getCell(i+1);cell.value=c.h;cell.font={bold:true};cell.fill=fill('FFDCE6F2');cell.border=box;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
+    ws.views=[{showGridLines:false,state:'frozen',ySplit:HR}];     // cố định dòng tiêu đề khi cuộn
+
+    // [BẢNG] dòng dữ liệu: nhóm (in đậm, cộng dồn) + hạng mục chi tiết
+    let r=HR+1;const rootRows=[];
+    const writeItem=(it,path,depth)=>{
+      const grp=!!(by[it.id]&&by[it.id].length),v=sumOf(it),row=ws.getRow(r),code=path;
+      const vals={stt:it.code||'',code,name:'   '.repeat(depth)+(it.name||''),unit:grp?'':(it.unit||''),qty:grp?null:it.quantity,price:grp?null:it.unit_price,
+        plan:v.p,act:v.a,diff:{formula:`${col('plan')}${r}-${col('act')}${r}`,result:v.p-v.a},note:grp?'':(it.note||it.vendor||'')};
+      C.forEach((c,i)=>{const cell=row.getCell(i+1);cell.value=vals[c.key]===undefined?null:vals[c.key];cell.border=box;
+        if(c.num)cell.numFmt=c.num;
+        cell.alignment={vertical:'middle',wrapText:c.key==='name'||c.key==='note',horizontal:['stt','code','unit'].includes(c.key)?'center':(c.num?'right':'left')};
+        if(grp){cell.font={bold:true};cell.fill=fill(depth?'FFF3F5F8':'FFE8EEF7')}});
+      if(!depth)rootRows.push(r);
+      r++;
+      kids(it.id).forEach((k,i)=>writeItem(k,`${code}.${k.code||i+1}`,depth+1));
+    };
+    roots.forEach(g=>writeItem(g,String(g.code||''),0));
+
+    // [BẢNG] dòng TỔNG CỘNG (cộng các nhóm gốc bằng công thức)
+    const TR=r,tr=ws.getRow(TR),sumF=k=>rootRows.length?rootRows.map(x=>`${col(k)}${x}`).join('+'):'0';
+    C.forEach((c,i)=>{const cell=tr.getCell(i+1);cell.border=box;cell.font={bold:true};cell.fill=fill('FFFFE9B3');if(c.num)cell.numFmt=c.num;cell.alignment={vertical:'middle',horizontal:c.num?'right':'left'}});
+    tr.getCell(1).value='';tr.getCell(3).value='TỔNG CỘNG';
+    tr.getCell(C.findIndex(c=>c.key==='plan')+1).value={formula:sumF('plan'),result:totP};
+    tr.getCell(C.findIndex(c=>c.key==='act')+1).value={formula:sumF('act'),result:totA};
+    tr.getCell(C.findIndex(c=>c.key==='diff')+1).value={formula:`${col('plan')}${TR}-${col('act')}${TR}`,result:totP-totA};
+    // dòng 7: Tổng ngân sách duyệt = ô tổng kế hoạch
+    put(`${L(mid+1)}7`,{formula:`${col('plan')}${TR}`,result:totP},{f:{bold:true,size:12,color:{argb:'FFC62828'}},nf:'#,##0',al:{horizontal:'left'}});
+
+    // [FOOTER] ngày tháng + khung chữ ký (3 khối ngang bằng nhau)
+    let f=TR+2;
+    merge(f,mid+1,N);put(`${L(mid+1)}${f}`,'Ngày ........ tháng ........ năm ..........',{f:{italic:true},al:{horizontal:'center'}});f+=1;
+    const w=Math.floor(N/3),blocks=[[1,w],[w+1,2*w],[2*w+1,N]];
+    blocks.forEach(([a,b],i)=>{merge(f,a,b);put(`${L(a)}${f}`,DT.signs[i],{f:{bold:true},al:{horizontal:'center'}});
+      merge(f+1,a,b);put(`${L(a)}${f+1}`,'(Ký, ghi rõ họ tên)',{f:{italic:true,size:10},al:{horizontal:'center'}})});
+    ws.getRow(f+2).height=60;                                  // khoảng trống để ký tay
+    // in A4 ngang, vừa chiều rộng, lặp dòng tiêu đề mỗi trang
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:`${HR}:${HR}`,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
+    const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=`DuToan_DuyTan_${project.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
+}
+
 async function exportMaster(p){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
