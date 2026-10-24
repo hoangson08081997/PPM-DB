@@ -380,7 +380,7 @@ const TB={
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
   project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ren:{role:'access_level'},ord:['project_id']},
   tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
-  budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','quote_status','note','sort_order'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note']},
+  budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','note','sort_order','section','price_usd','price_ccy','has_docs'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note','has_docs']},
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
   extra_tasks:{t:'extra_tasks',pk:['id'],cols:['id','project_id','title','note','done','created_by','created_at'],ord:['created_at','id'],txt:['title','note']},
@@ -871,7 +871,7 @@ function delProject(id){
   });
 }
 function projectForm(id){
-  const p=id?db.list('projects').find(x=>x.id===id):{code:'PRJ-'+new Date().getFullYear()+'-'+String(db.list('projects').length+1).padStart(2,'0'),name:'',description:'',client:'',status:'planning',start_date:today(),end_date:addDays(90),exchange_rate:26400};
+  const p=id?db.list('projects').find(x=>x.id===id):{code:'PRJ-'+new Date().getFullYear()+'-'+String(db.list('projects').length+1).padStart(2,'0'),name:'',description:'',client:'',status:'planning',start_date:today(),end_date:addDays(90),exchange_rate:26500};
   const f=(l,n,v,t='text',c='')=>`<label class="block ${c}"><span class="text-mute text-xs">${l}</span><input name="${n}" type="${t}" value="${esc(v)}" class="inp"></label>`;
   modal(`<h3 class="font-bold text-lg mb-3">${id?'Sửa dự án':'Dự án mới'}</h3><div class="grid grid-cols-2 gap-3 text-sm">${f('Mã dự án','code',p.code)}
    <label class="block"><span class="text-mute text-xs">Trạng thái</span><select name="status" class="inp">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===p.status?'selected':''}>${v[0]}</option>`).join('')}</select></label>
@@ -1063,239 +1063,407 @@ function colorPanel(){
 $('#palBtn').onclick=colorPanel;
 
 const collapsed=new Set();let BADD=null;
+/* ================================================================================================
+   TAB CHI PHÍ · Form Duy Tân HT-TC-01/BM01 (V04 - 17/08/2026)
+   3 khu vực:  A_I  = Phần A - Mục I  : CHI PHÍ ĐẦU TƯ MÁY CHÍNH
+               B_I  = Phần B - Mục I  : CHI PHÍ THIẾT BỊ PHỤ
+               B_II = Phần B - Mục II : CHI PHÍ CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY  (nhóm 1,2,3,4 + mục con 1.1, 1.2, ...)
+   Bảng Supabase `budgets` (app: budget_items): section, code(STT), name, unit, quantity, price_usd (Đơn giá USD),
+   unit_price (Đơn giá chưa VAT VND), planned_amount (Thành tiền VND), actual_amount (Thực tế phát sinh VND),
+   vendor (NCC - Nước SX), has_docs ('Có'|'Không'), note, price_ccy ('USD'|'VND' = tiền tệ người dùng nhập gốc).
+   Tỷ giá lưu ở projects.exchange_rate (mặc định 26,500).
+   ================================================================================================ */
+const DEFAULT_RATE=26500;
+const curProj=p=>db.list('projects').find(x=>x.id===p.id)||p;
+const rateOf=p=>{const r=+curProj(p).exchange_rate;return r>0?r:DEFAULT_RATE};
+const BSEC=[
+  {k:'A_I', tag:'PHẦN A · MỤC I',  title:'CHI PHÍ ĐẦU TƯ MÁY CHÍNH',                 grp:false},
+  {k:'B_I', tag:'PHẦN B · MỤC I',  title:'CHI PHÍ THIẾT BỊ PHỤ',                     grp:false},
+  {k:'B_II',tag:'PHẦN B · MỤC II', title:'CHI PHÍ CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY',       grp:true}];
+const BSEC_X={k:'X',tag:'CHƯA PHÂN KHU',title:'Các dòng cũ chưa gán khu vực (xóa hoặc import lại để phân khu)',grp:false};
+const secOf=b=>BSEC.some(s=>s.k===b.section)?b.section:'X';
+const descIds=(bd,id)=>{const s=new Set([id]);let ch=true;while(ch){ch=false;bd.forEach(b=>{if(b.parent_id&&s.has(b.parent_id)&&!s.has(b.id)){s.add(b.id);ch=true}})}return s};
 function budgetRows(bd,full){
   const k={};bd.forEach(r=>(k[r.parent_id||'root']??=[]).push(r));
-  const out=[],f=(id,d)=>(k[id]||[]).sort((a,b)=>a.sort_order-b.sort_order).forEach(r=>{out.push({r,d,grp:!!k[r.id]||r.quantity==null});if(full||!collapsed.has(r.id))f(r.id,d+1)});
-  f('root',0);return out}
-const descIds=(bd,id)=>{const s=new Set([id]);let ch=true;while(ch){ch=false;bd.forEach(b=>{if(b.parent_id&&s.has(b.parent_id)&&!s.has(b.id)){s.add(b.id);ch=true}})}return s};
+  const ids=new Set(bd.map(r=>r.id)),out=[];
+  const f=(id,d)=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(r=>{out.push({r,d,grp:!!k[r.id]||r.quantity==null});if(full||!collapsed.has(r.id))f(r.id,d+1)});
+  f('root',0);bd.filter(r=>r.parent_id&&!ids.has(r.parent_id)&&!out.some(o=>o.r.id===r.id)).forEach(r=>out.push({r,d:0,grp:false}));   // dòng mồ côi vẫn hiện
+  return out}
+/* Cộng dồn từng nhánh: VND (planned), thực tế (actual), USD (usd = SL x đơn giá USD) */
+function rollB(rows){
+  const k={},out={};rows.forEach(r=>(k[r.parent_id||'root']??=[]).push(r));
+  const f=r=>{const c=k[r.id];if(!c)return out[r.id]={planned:r.planned_amount||0,actual:r.actual_amount||0,usd:(r.quantity||0)*(r.price_usd||0)};
+    const s={planned:0,actual:0,usd:0};c.forEach(x=>{const v=f(x);s.planned+=v.planned;s.actual+=v.actual;s.usd+=v.usd});return out[r.id]=s};
+  rows.filter(r=>!r.parent_id||!rows.some(x=>x.id===r.parent_id)).forEach(f);return out}
+function bTotals(bd){
+  const roll=rollB(bd),T={A_I:{planned:0,actual:0,usd:0},B_I:{planned:0,actual:0,usd:0},B_II:{planned:0,actual:0,usd:0},X:{planned:0,actual:0,usd:0}};
+  bd.filter(b=>!b.parent_id).forEach(b=>{const t=T[secOf(b)],v=roll[b.id];t.planned+=v.planned;t.actual+=v.actual;t.usd+=v.usd});
+  const sum=(...ks)=>ks.reduce((a,k)=>({planned:a.planned+T[k].planned,actual:a.actual+T[k].actual,usd:a.usd+T[k].usd}),{planned:0,actual:0,usd:0});
+  const mt=sum('A_I','B_I'),all=sum('A_I','B_I','B_II','X');
+  return{roll,T,mt,infra:T.B_II,all,ratio:mt.planned?T.B_II.planned/mt.planned*100:0}}
 
-/* ===== Tab CHI PHÍ: sửa trực tiếp trên bảng + thêm nhanh ngay trên dòng đầu (không popup) ===== */
-const NUMF=new Set(['quantity','unit_price','planned_amount','actual_amount']);
+const NUMF=new Set(['quantity','price_usd','unit_price','actual_amount']);
 const nfmt=v=>v==null||v===''?'':(+v).toLocaleString('vi-VN',{maximumFractionDigits:2});
 function parseNum(s){
   s=String(s).trim().replace(/\s/g,'');if(!s)return null;
   s=/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)?s.replace(/\./g,'').replace(',','.'):s.replace(',','.');
   const n=Number(s);return isFinite(n)&&n>=0?n:NaN;
 }
-const roman=n=>{let r='';[[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']].forEach(([v,c])=>{while(n>=v){r+=c;n-=v}});return r};
-function budgetCode(mine,parentId,isGrp){
-  const n=mine.filter(b=>(b.parent_id||null)===(parentId||null)).length+1,par=parentId?mine.find(b=>b.id===parentId):null;
-  if(!par)return isGrp?roman(n):String(n);
-  return(!par.code||/^[IVX]+$/i.test(par.code))?String(n):`${par.code}.${n}`;
+function nextCode(mine,sec,par){
+  if(par){const n=mine.filter(b=>b.parent_id===par.id).length+1;return(par.code?par.code+'.':'')+n}
+  return String(mine.filter(b=>!b.parent_id&&b.section===sec).length+1);
 }
-function addBudget(p,parentId,name,planned,actual,isGrp){
-  const all=db.list('budget_items');let mx=Math.max(0,...all.filter(b=>b.project_id===p.id).map(b=>b.sort_order||0)),out=all.slice();
-  const par=parentId?all.find(b=>b.id===parentId&&b.project_id===p.id):null;
-  if(par&&par.quantity!=null&&!all.some(b=>b.parent_id===par.id)){
-    if((par.planned_amount||0)>0||(par.actual_amount||0)>0)out.push({...par,id:uid(),parent_id:par.id,code:budgetCode(all.filter(b=>b.project_id===p.id),par.id,false),sort_order:++mx});
-    out=out.map(b=>b.id===par.id?{...b,unit:'',quantity:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',quote_status:null}:b);
+function addBudget(p,sec,parentId,name,isGrp){
+  const all=db.list('budget_items'),mine=all.filter(b=>b.project_id===p.id);let mx=Math.max(0,...mine.map(b=>b.sort_order||0)),out=all.slice();
+  const par=parentId?mine.find(b=>b.id===parentId):null;
+  if(par&&par.quantity!=null&&!mine.some(b=>b.parent_id===par.id)){      // cha đang là dòng chi tiết có số liệu: chuyển số liệu xuống 1 dòng con để không mất dữ liệu
+    if((par.planned_amount||0)>0||(par.actual_amount||0)>0)out.push({...par,id:uid(),parent_id:par.id,code:nextCode(mine,par.section,par),sort_order:++mx});
+    out=out.map(b=>b.id===par.id?{...b,unit:'',quantity:null,price_usd:null,price_ccy:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',has_docs:''}:b);
   }
-  const id=uid(),code=budgetCode(out.filter(b=>b.project_id===p.id),parentId||null,isGrp),base={id,project_id:p.id,parent_id:parentId||null,code,name,vendor:'',note:'',sort_order:++mx};
-  out.push(isGrp?{...base,unit:'',quantity:null,unit_price:null,planned_amount:null,actual_amount:null,quote_status:null}
-    :{...base,unit:'',quantity:1,unit_price:planned,planned_amount:planned,actual_amount:actual,quote_status:'not_quoted'});
+  const mine2=out.filter(b=>b.project_id===p.id),id=uid(),s=par?par.section:sec;
+  const base={id,project_id:p.id,parent_id:parentId||null,section:s,code:nextCode(mine2,s,par),name,note:'',sort_order:++mx};
+  out.push(isGrp?{...base,unit:'',quantity:null,price_usd:null,price_ccy:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',has_docs:''}
+    :{...base,unit:'',quantity:1,price_usd:0,price_ccy:'VND',unit_price:0,planned_amount:0,actual_amount:0,vendor:'',has_docs:''});
   db.save('budget_items',out);return id;
 }
-function commitCell(id,f,raw){
+/* Sửa 1 ô. Quy đổi 2 chiều: nhập Đơn giá VND -> USD = VND / tỷ giá; nhập Đơn giá USD -> VND = USD x tỷ giá */
+function commitCell(p,id,f,raw){
   const all=db.list('budget_items'),it=all.find(x=>x.id===id);if(!it)return false;
   if(!NUMF.has(f)){const v=raw.trim();if(f==='name'&&!v)return false;db.save('budget_items',all.map(x=>x.id===id?{...x,[f]:v}:x));return true}
   const n=parseNum(raw);if(Number.isNaN(n)||all.some(x=>x.parent_id===id))return false;
-  const val=n==null?0:n;let b={...it},leafed=false;
-  if(b.quantity==null){b={...b,quantity:1,unit_price:0,planned_amount:0,actual_amount:b.actual_amount||0,quote_status:b.quote_status||'not_quoted'};leafed=true}
+  const val=n==null?0:n,rate=rateOf(p);let b={...it},leafed=false;
+  if(b.quantity==null){b={...b,quantity:1,unit_price:0,price_usd:0,price_ccy:'VND',planned_amount:0,actual_amount:b.actual_amount||0};leafed=true}
   if(f==='quantity'){b.quantity=val;b.planned_amount=val*(b.unit_price||0)}
-  else if(f==='unit_price'){b.unit_price=val;b.planned_amount=(b.quantity||0)*val}
-  else if(f==='planned_amount'){b.planned_amount=val;if(b.quantity>0)b.unit_price=val/b.quantity;else{b.quantity=1;b.unit_price=val}}
+  else if(f==='price_usd'){b.price_usd=val;b.unit_price=val*rate;b.price_ccy='USD';b.planned_amount=(b.quantity||0)*b.unit_price}
+  else if(f==='unit_price'){b.unit_price=val;b.price_usd=val/rate;b.price_ccy='VND';b.planned_amount=(b.quantity||0)*val}
   else b.actual_amount=val;
   db.save('budget_items',all.map(x=>x.id===id?b:x));return leafed?'rerender':true;
 }
+/* Đổi tỷ giá: dòng nhập gốc bằng USD giữ USD (VND tính lại); dòng nhập gốc bằng VND giữ VND (USD tính lại) */
+function applyRate(p,rate){
+  const out=db.list('budget_items').map(b=>{
+    if(b.project_id!==p.id||b.quantity==null)return b;
+    if(b.price_ccy==='USD'){const v=(b.price_usd||0)*rate;return{...b,unit_price:v,planned_amount:(b.quantity||0)*v}}
+    return{...b,price_usd:(b.unit_price||0)/rate}});
+  db.save('budget_items',out);updateProject(p.id,{exchange_rate:rate});
+}
 
-function bRow({r,d,grp},v,hasKids,ed){
-  const dis=ed?'':'disabled',diff=v.planned-v.actual,over=diff<0&&v.planned>0;
-  const inp=(f,val,cls='')=>`<input class="cell ${cls}" data-f="${f}" value="${esc(val)}" ${dis} autocomplete="off">`;
-  const money=(f,calc)=>hasKids?`<span data-calc="${calc}" ${f==='actual_amount'?'title="Tổng tự cộng từ các mục con. Bấm + để thêm mục con, hoặc nhập thực tế ở từng mục con."':''}>${nfmt(v[calc])}</span>`
-    :f==='actual_amount'?`<input type="number" min="0" step="1" inputmode="numeric" class="cell num" data-f="actual_amount" value="${r.actual_amount?Math.round(r.actual_amount):''}" placeholder="0" ${dis} autocomplete="off" aria-label="Chi phí thực tế">`
-    :inp(f,nfmt(r[f]),'num');
-  const qb=r.quote_status==='quoted'?['Đã có','text-green-600']:r.quote_status==='not_quoted'?['Chưa có','text-amber-600']:['—','text-mute'];
+const B_COLS=13;
+function bRow({r,d,grp},v,hasKids,ed,sec){
+  const dis=ed?'':'disabled',inp=(f,val,cls='')=>`<input class="cell ${cls}" data-f="${f}" value="${esc(val)}" ${dis} autocomplete="off">`;
+  const calc=(k,val)=>`<span data-calc="${k}">${nfmt(val)}</span>`;
+  const num=(f)=>grp?'':inp(f,nfmt(r[f]),'num');
+  const act=hasKids?calc('actual',v.actual):`<input type="number" min="0" step="1" inputmode="numeric" class="cell num" data-f="actual_amount" value="${r.actual_amount?Math.round(r.actual_amount):''}" placeholder="0" ${dis} autocomplete="off" aria-label="Thực tế phát sinh">`;
+  const docs=grp?'':`<select class="cell q" data-f="has_docs" ${dis} aria-label="Hồ sơ đính kèm"><option value="" ${!r.has_docs?'selected':''}>—</option><option ${r.has_docs==='Có'?'selected':''}>Có</option><option ${r.has_docs==='Không'?'selected':''}>Không</option></select>`;
+  const canKid=ed&&(grp||sec==='B_II');
   return `<tr data-id="${r.id}" class="${grp?'b-par':''}">
    <td style="padding-left:${.2+d*.8}rem"><div class="flex items-center gap-0.5">${hasKids?`<button data-tg="${r.id}" class="ibtn" aria-label="Thu gọn hoặc mở rộng"><i class="fa-solid fa-chevron-${collapsed.has(r.id)?'right':'down'} text-xs"></i></button>`:'<span class="inline-block shrink-0" style="width:1.2rem"></span>'}${inp('code',r.code)}</div></td>
-   <td>${inp('name',r.name)}</td><td class="c-unit">${grp?'':inp('unit',r.unit||'')}</td>
-   <td class="c-qty">${grp?'':inp('quantity',nfmt(r.quantity),'num')}</td><td class="c-price">${grp?'':inp('unit_price',nfmt(r.unit_price),'num')}</td>
-   <td class="text-right">${money('planned_amount','planned')}</td><td class="text-right">${money('actual_amount','actual')}</td>
-   <td class="text-right whitespace-nowrap ${over?'text-red-600 font-semibold':''}" data-calc="diff">${nfmt(diff)}</td>
-   <td class="c-ven">${grp?'':inp('vendor',r.vendor||'')}</td>
-   <td class="whitespace-nowrap c-quo">${grp?'':ed?`<button data-act="q" class="text-xs ${qb[1]}">${qb[0]}</button>`:`<span class="text-xs ${qb[1]}">${qb[0]}</span>`}</td>
-   <td class="whitespace-nowrap">${ed?`<button data-act="addc" class="ibtn" aria-label="Thêm mục con"><i class="fa-solid fa-plus"></i></button><button data-act="del" class="ibtn del" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
+   <td>${inp('name',r.name)}</td><td>${grp?'':inp('unit',r.unit||'')}</td><td>${num('quantity')}</td>
+   <td>${num('price_usd')}</td><td>${num('unit_price')}</td>
+   <td class="text-right">${calc('usd',v.usd)}</td><td class="text-right">${calc('planned',v.planned)}</td><td class="text-right">${act}</td>
+   <td>${grp?'':inp('vendor',r.vendor||'')}</td><td>${docs}</td><td>${grp?'':inp('note',r.note||'')}</td>
+   <td class="whitespace-nowrap">${ed?`${canKid?`<button data-act="addc" class="ibtn" aria-label="Thêm mục con"><i class="fa-solid fa-plus"></i></button>`:''}<button data-act="del" class="ibtn del" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
 }
+function secHeader(S,ed){
+  return `<tr class="b-sec" data-sec="${S.k}"><td colspan="6"><div class="flex flex-wrap items-center gap-2"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full" style="background:var(--brand);color:var(--brandtx)">${S.tag}</span><span class="font-bold">${S.title}</span>
+    ${ed&&S.k!=='X'?`<button data-act="sadd" data-sec="${S.k}" class="btn-ghost" style="padding:.1rem .55rem;font-size:.75rem"><i class="fa-solid fa-plus"></i>${S.grp?'Nhóm':'Hạng mục'}</button>`:''}</div></td>
+    <td class="text-right" data-st="${S.k}:usd"></td><td class="text-right" data-st="${S.k}:planned"></td><td class="text-right" data-st="${S.k}:actual"></td><td colspan="4"></td></tr>`;
+}
+const bAddRow=(S,parent,d,isGrp)=>`<tr class="b-add"><td colspan="${B_COLS}" style="padding-left:${.5+d*.8}rem"><div class="flex items-center gap-2"><span class="mono text-xs" style="color:var(--brand)">${parent?'↳ Con':isGrp?'+ Nhóm':'+ Hạng mục'}</span><input id="bnName" data-badd class="cell q" style="max-width:34rem" placeholder="${parent?'Tên hạng mục con':isGrp?'Tên nhóm, ví dụ: Hệ thống điện':'Tên hàng - Quy cách - Công suất'} · Enter để lưu · Esc để đóng" autocomplete="off" aria-label="Tên mới"><button data-act="badd-ok" class="btn" style="padding:.15rem .6rem">Lưu</button><button data-act="badd-x" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div></td></tr>`;
 
 function viewBudget(p,target){
   const ed=canEdit(p.id);
   if(target){const bd=db.list('budget_items').filter(b=>b.project_id===p.id);let t=bd.find(x=>x.id===target);while(t&&t.parent_id){collapsed.delete(t.parent_id);t=bd.find(x=>x.id===t.parent_id)}}
-  const sc=(l,k,x='')=>`<div class="card bg-surface border border-line rounded-xl p-3"><div class="text-xs text-mute">${l}</div><div class="text-xl font-bold mt-1 mono" data-s="${k}">0</div>${x}</div>`;
-  $('#view').innerHTML=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold">Chi phí · ${esc(p.name)}</h2><p class="text-mute text-xs">Đơn vị: VND · Tỷ giá 1 USD = ${(+p.exchange_rate).toLocaleString('vi-VN')} VND${ed?' · Bấm vào ô để sửa, Enter để xuống dòng dưới':' · Chỉ chủ dự án / quản lý được sửa'}</p></div>
-   <div class="flex flex-wrap gap-2">${ed?'<button id="bGrpBtn" class="btn btn-big"><i class="fa-solid fa-plus"></i>Tạo Hạng Mục Lớn</button><button id="bImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel</button>':''}<button id="bExp" class="btn-ghost"><i class="fa-solid fa-file-export mr-1"></i>Export Excel</button><button id="bExpDT" class="btn"><i class="fa-solid fa-file-export mr-1"></i>Export Dự toán (Form Duy Tân)</button></div></div>
-   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">${sc('Dự kiến','planned')}${sc('Thực tế','actual')}${sc('Chênh lệch (dự kiến − thực tế)','diff')}${sc('Đã chi / dự kiến','pct','<div id="sBar"></div>')}</div>
-   <div class="card bg-surface border border-line rounded-xl bwrap"><table class="tbl table-fixed w-full" style="font-size:12.5px"><colgroup><col style="width:6%"><col style="width:22%"><col class="c-unit" style="width:4%"><col class="c-qty" style="width:4%"><col class="c-price" style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:11%"><col class="c-ven" style="width:7%"><col class="c-quo" style="width:5%"><col style="width:7%"></colgroup><thead><tr class="text-left text-mute text-xs"><th>Mã</th><th>Hạng mục</th><th class="c-unit">ĐVT</th><th class="text-right c-qty">SL</th><th class="text-right c-price">Đơn giá</th><th class="text-right">Dự kiến</th><th class="text-right">Thực tế</th><th class="text-right">Chênh lệch</th><th class="c-ven">NCC</th><th class="c-quo">Báo giá</th><th></th></tr></thead>
-   ${ed?`<tbody id="bQuickBody"><tr class="bg-black/5"><td><select id="bqParent" class="cell q" style="max-width:9rem" aria-label="Thuộc nhóm"></select></td>
-     <td><input id="bqName" class="cell q" placeholder="+ Tên hạng mục…" autocomplete="off" aria-label="Tên hạng mục"></td>
-     <td colspan="3"><span class="text-xs text-mute">Chọn hạng mục cha ở cột trái</span></td>
-     <td><input id="bqPlan" class="cell q num" inputmode="numeric" placeholder="Dự kiến" autocomplete="off" aria-label="Dự kiến"></td>
-     <td><input id="bqAct" class="cell q num" inputmode="numeric" placeholder="Thực tế" autocomplete="off" aria-label="Thực tế"></td>
-     <td colspan="4"><div class="flex items-center gap-2"><button id="bqAdd" class="btn" style="padding:.2rem .6rem" aria-label="Thêm hạng mục">+ Thêm</button><span id="bqMsg" class="text-xs"></span></div></td></tr></tbody>`:''}
+  const kc=(t,k,sub='')=>`<div class="card bg-surface border border-line rounded-xl p-3 min-w-0"><div class="text-xs text-mute leading-tight" style="min-height:2.1em">${t}</div><div class="text-lg font-bold mt-1 mono truncate" data-s="${k}">0</div><div class="text-xs text-mute mono mt-0.5 truncate" data-s="${k}-u"></div>${sub}</div>`;
+  $('#view').innerHTML=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold">Chi phí · ${esc(p.name)}</h2><p class="text-mute text-xs">Biểu mẫu HT-TC-01/BM01 · Đơn vị VND / USD${ed?' · Bấm vào ô để sửa, Enter để xuống dòng dưới':' · Chỉ Admin / Manager được sửa'}</p></div>
+   <div class="flex flex-wrap gap-2">${ed?'<button id="bImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Dự toán (Excel)</button>':''}<button id="bExpDT" class="btn btn-big"><i class="fa-solid fa-file-export mr-1"></i>Export Dự toán (Form Duy Tân)</button></div></div>
+   <div class="card bg-surface border border-line rounded-xl p-3 mb-3 flex flex-wrap items-center gap-2"><span class="font-semibold text-sm">Tỷ giá tạm tính 1 USD =</span>
+     <input id="bRate" class="inp mono" style="width:9rem;margin:0;text-align:right" inputmode="decimal" value="${nfmt(rateOf(p))}" ${ed?'':'disabled'} aria-label="Tỷ giá USD sang VND"><span class="text-sm font-semibold">VND</span>
+     <span id="bRateMsg" class="text-xs text-mute">Đổi tỷ giá: dòng nhập bằng USD tính lại VND, dòng nhập bằng VND tính lại USD.</span></div>
+   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+     ${kc('Tổng Máy chính + Thiết bị phụ','k1')}${kc('Tổng Cơ sở hạ tầng + Lắp đặt máy','k2')}
+     ${kc('Tỷ lệ CP CSHT &amp; Lắp đặt / (Máy chính + TB phụ)','k3','<div class="text-[11px] text-mute mt-0.5">= B.II / (A.I + B.I)</div>')}
+     ${kc('Tổng cộng Dự toán CAPEX · so với Thực tế phát sinh','k4','<div id="sBar"></div>')}</div>
+   <div class="card bg-surface border border-line rounded-xl bwrap"><table class="tbl w-full" style="font-size:12.5px;min-width:1500px;table-layout:fixed"><colgroup><col style="width:5.6rem"><col style="width:20rem"><col style="width:4.5rem"><col style="width:5rem"><col style="width:7.5rem"><col style="width:9.5rem"><col style="width:8.5rem"><col style="width:10rem"><col style="width:10rem"><col style="width:12rem"><col style="width:6rem"><col style="width:10rem"><col style="width:4.5rem"></colgroup>
+   <thead><tr class="text-left text-mute text-xs"><th>STT</th><th>Tên hàng - Quy cách - Công suất</th><th>ĐVT</th><th class="text-right">Số Lượng</th><th class="text-right">Đơn giá (USD)</th><th class="text-right">Đơn giá chưa VAT (VND)</th><th class="text-right">Thành tiền (USD)</th><th class="text-right">Thành tiền (VND)</th><th class="text-right">Thực tế phát sinh (VND)</th><th>Nhà cung cấp - Nước SX</th><th>Hồ sơ đính kèm</th><th>Ghi chú</th><th></th></tr></thead>
    <tbody id="bBody"></tbody>
-   <tfoot><tr class="font-bold"><td></td><td>TỔNG CỘNG</td><td colspan="3"></td><td class="text-right" data-t="planned"></td><td class="text-right" data-t="actual"></td><td class="text-right" data-t="diff"></td><td colspan="3"></td></tr></tfoot></table></div>
+   <tfoot><tr class="font-bold"><td></td><td>TỔNG CỘNG DỰ TOÁN CAPEX</td><td colspan="4"></td><td class="text-right" data-t="usd"></td><td class="text-right" data-t="planned"></td><td class="text-right" data-t="actual"></td><td colspan="4"></td></tr></tfoot></table></div>
    <input type="file" id="bFile" accept=".xlsx,.xls" class="hidden">`;
   const body=$('#bBody');
   const doBAdd=()=>{const inp=$('[data-badd]');if(!inp||!BADD)return;const nm=inp.value.trim();
     if(!nm){inp.classList.add('err');inp.placeholder='Nhập tên trước khi nhấn Enter';return}
-    const par=BADD.parent,id=addBudget(p,par,nm,0,0,!par);if(par)collapsed.delete(par);
+    const id=addBudget(p,BADD.sec,BADD.parent,nm,!!BADD.grp);if(BADD.parent)collapsed.delete(BADD.parent);
     drawBudgetBody(p);const tr=$(`#bBody tr[data-id="${id}"]`);if(tr)tr.classList.add('flash');
     const n=$('[data-badd]');if(n){n.focus();n.scrollIntoView({block:'nearest'})}};
-  if(ed){$('#bImp').onclick=()=>$('#bFile').click();$('#bFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importBudget(p,f)}}
-  $('#bExp').onclick=()=>exportBudget(p);
-  $('#bExpDT').onclick=()=>exportDuyTanBudget(p,db.list('budget_items').filter(b=>b.project_id===p.id));
-
+  if(ed){$('#bImp').onclick=()=>$('#bFile').click();$('#bFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importDuyTan(p,f)}}
+  $('#bExpDT').onclick=()=>exportDuyTanBudget(curProj(p),db.list('budget_items').filter(b=>b.project_id===p.id));
+  $('#bRate').onchange=e=>{
+    const n=parseNum(e.target.value);
+    if(!(n>0)){e.target.value=nfmt(rateOf(p));toast('Tỷ giá phải là số lớn hơn 0');return}
+    applyRate(p,n);e.target.value=nfmt(n);drawBudgetBody(p);toast('Đã cập nhật tỷ giá 1 USD = '+nfmt(n)+' VND',false)};
   body.addEventListener('focusin',e=>{if(e.target.matches('.cell.num'))e.target.select()});
   body.onclick=e=>{
     const tg=e.target.closest('[data-tg]');if(tg){const i=tg.dataset.tg;collapsed.has(i)?collapsed.delete(i):collapsed.add(i);drawBudgetBody(p);return}
     const b=e.target.closest('[data-act]');if(!b||!ed)return;
     if(b.dataset.act==='badd-ok'){doBAdd();return}if(b.dataset.act==='badd-x'){BADD=null;drawBudgetBody(p);return}
+    if(b.dataset.act==='sadd'){const S=BSEC.find(s=>s.k===b.dataset.sec);BADD={sec:S.k,parent:null,grp:S.grp};drawBudgetBody(p);const n=$('#bnName');if(n){n.focus();n.scrollIntoView({block:'nearest'})}return}
     const id=b.closest('tr').dataset.id,a=b.dataset.act;
-    if(a==='q'){const it=db.list('budget_items').find(x=>x.id===id);db.save('budget_items',db.list('budget_items').map(x=>x.id===id?{...x,quote_status:it.quote_status==='quoted'?'not_quoted':'quoted'}:x));drawBudgetBody(p)}
-    else if(a==='addc'){BADD={parent:id};collapsed.delete(id);drawBudgetBody(p);const n=$('#bcName');if(n){n.focus();n.scrollIntoView({block:'nearest'})}}
+    if(a==='addc'){const it=db.list('budget_items').find(x=>x.id===id);BADD={sec:it.section,parent:id};collapsed.delete(id);drawBudgetBody(p);const n=$('#bnName');if(n){n.focus();n.scrollIntoView({block:'nearest'})}}
     else if(a==='del'){const bd=db.list('budget_items').filter(x=>x.project_id===p.id),it=bd.find(x=>x.id===id),ids=descIds(bd,id);
-      ask(`Xóa "${it.name}"${ids.size>1?` và ${ids.size-1} mục con`:''}?`,()=>{db.save('budget_items',db.list('budget_items').filter(x=>!ids.has(x.id)));if(BADD&&ids.has(BADD.parent))BADD=null;drawBudgetBody(p);toast('Đã xóa '+ids.size+' dòng chi phí',false)})}
+      ask(`Xóa "${it.name}"${ids.size>1?` và ${ids.size-1} mục con`:''}?`,()=>{db.save('budget_items',db.list('budget_items').filter(x=>!ids.has(x.id)));if(BADD&&BADD.parent&&ids.has(BADD.parent))BADD=null;drawBudgetBody(p);toast('Đã xóa '+ids.size+' dòng chi phí',false)})}
   };
   body.onchange=e=>{
-    const el=e.target;if(!el.matches('.cell[data-f]')||!ed)return;
-    const r=commitCell(el.closest('tr').dataset.id,el.dataset.f,el.type==='number'?String(Math.max(0,Math.round(+el.value||0))):el.value);
+    const el=e.target;if(!el.matches('[data-f]')||!ed)return;
+    const id=el.closest('tr').dataset.id,r=commitCell(p,id,el.dataset.f,el.type==='number'?String(Math.max(0,Math.round(+el.value||0))):el.value);
     if(r==='rerender'){drawBudgetBody(p);return}
     refreshBudgetCalcs(p,!r);
-    const it=db.list('budget_items').find(x=>x.id===el.closest('tr').dataset.id);if(it)el.value=el.type==='number'?(it[el.dataset.f]?Math.round(it[el.dataset.f]):''):NUMF.has(el.dataset.f)?nfmt(it[el.dataset.f]):(it[el.dataset.f]??'');
   };
   body.onkeydown=e=>{
     if(e.target.matches('[data-badd]')){if(e.key==='Enter'){e.preventDefault();doBAdd()}else if(e.key==='Escape'){BADD=null;drawBudgetBody(p)}return}
-    if(e.key!=='Enter'||!e.target.matches('.cell[data-f]'))return;e.preventDefault();
-    const f=e.target.dataset.f,ids=[];let tr=e.target.closest('tr').nextElementSibling;while(tr){ids.push(tr.dataset.id);tr=tr.nextElementSibling}
+    if(e.key!=='Enter'||!e.target.matches('input.cell[data-f]'))return;e.preventDefault();
+    const f=e.target.dataset.f,ids=[];let tr=e.target.closest('tr').nextElementSibling;while(tr){if(tr.dataset.id)ids.push(tr.dataset.id);tr=tr.nextElementSibling}
     e.target.blur();
     for(const i of ids){const nx=$(`#bBody tr[data-id="${i}"] .cell[data-f="${f}"]:not(:disabled)`);if(nx){nx.focus();nx.scrollIntoView({block:'nearest'});break}}
   };
-  if(ed){
-    const fmtIn=e=>{const d=e.target.value.replace(/\D/g,'');e.target.value=d?(+d).toLocaleString('vi-VN'):''};
-    $('#bqPlan').oninput=fmtIn;$('#bqAct').oninput=fmtIn;
-    $('#bGrpBtn').onclick=()=>{BADD={parent:null};drawBudgetBody(p);const n=$('#bgName');if(n){n.focus();n.scrollIntoView({block:'nearest'})}};
-    const msg=(t,c)=>{const m=$('#bqMsg');m.className='text-xs '+c;m.innerHTML=t};
-    const add=()=>{
-      const nm=$('#bqName').value.trim();if(!nm){msg('Nhập tên hạng mục','text-red-600');$('#bqName').focus();return}
-      const g=false,num=el=>parseInt(el.value.replace(/\D/g,'')||'0',10),par=$('#bqParent').value||null;
-      const id=addBudget(p,par,nm,num($('#bqPlan')),num($('#bqAct')),g);
-      if(par)collapsed.delete(par);
-      $('#bqName').value='';$('#bqPlan').value='';$('#bqAct').value='';
-      drawBudgetBody(p);$('#bqParent').value=par||'';
-      msg(`✓ Đã thêm “${esc(nm)}” <button class="underline" data-goto="${id}">xem</button>`,'text-green-600');
-      const tr=$(`#bBody tr[data-id="${id}"]`);if(tr){tr.classList.add('flash')}
-      $('#bqName').focus();
-    };
-    $('#bqAdd').onclick=add;
-    $('#bQuickBody').onkeydown=e=>{if(e.key==='Enter'&&e.target.tagName!=='BUTTON'){e.preventDefault();add()}};
-    $('#bQuickBody').onclick=e=>{const g=e.target.closest('[data-goto]');if(g){const tr=$(`#bBody tr[data-id="${g.dataset.goto}"]`);if(tr){tr.classList.remove('flash');void tr.offsetWidth;tr.classList.add('flash');tr.scrollIntoView({block:'center'})}}};
-  }
   drawBudgetBody(p);
 }
 
 function drawBudgetBody(p){
-  const ed=canEdit(p.id),bd=db.list('budget_items').filter(b=>b.project_id===p.id),roll=rollBudget(bd),par=new Set(bd.map(b=>b.parent_id).filter(Boolean));
-  const addRow=(pid,d)=>`<tr class="b-add"><td colspan="11" style="padding-left:${.5+d*.8}rem"><div class="flex items-center gap-2"><span class="mono text-xs" style="color:var(--brand)">${pid?'↳ Con':'+ Hạng mục lớn'}</span><input ${pid?'id="bcName"':'id="bgName"'} data-badd class="cell q" style="max-width:34rem" placeholder="${pid?'Tên hạng mục con':'Tên hạng mục lớn, ví dụ: THIẾT BỊ ĐIỆN'} · Enter để lưu · Esc để đóng" autocomplete="off" aria-label="Tên hạng mục mới"><button data-act="badd-ok" class="btn" style="padding:.15rem .6rem">Lưu</button><button data-act="badd-x" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div></td></tr>`;
+  const ed=canEdit(p.id),bd=db.list('budget_items').filter(b=>b.project_id===p.id),roll=rollB(bd),par=new Set(bd.map(b=>b.parent_id).filter(Boolean));
   if(BADD&&BADD.parent&&!bd.some(b=>b.id===BADD.parent))BADD=null;
-  $('#bBody').innerHTML=((BADD&&!BADD.parent&&ed)?addRow(null,0):'')+budgetRows(bd).map(x=>bRow(x,roll[x.r.id],par.has(x.r.id),ed)+((BADD&&ed&&BADD.parent===x.r.id)?addRow(x.r.id,x.d+1):'')).join('')||'<tr><td colspan="11" class="text-mute p-4">Chưa có hạng mục. Gõ tên vào dòng đầu bảng rồi nhấn Enter, hoặc dùng "Import Excel".</td></tr>';
-  const sel=$('#bqParent');
-  if(sel){const cur=sel.value;sel.innerHTML='<option value="">(Gốc)</option>'+budgetRows(bd,true).map(x=>`<option value="${x.r.id}">${'— '.repeat(x.d)}${esc(x.r.code)} ${esc(x.r.name)}</option>`).join('');sel.value=bd.some(b=>b.id===cur)?cur:''}
+  const secs=[...BSEC,...(bd.some(b=>secOf(b)==='X')?[BSEC_X]:[])];
+  $('#bBody').innerHTML=secs.map(S=>{
+    const rows=bd.filter(b=>secOf(b)===S.k);
+    return secHeader(S,ed)+((BADD&&ed&&BADD.sec===S.k&&!BADD.parent)?bAddRow(S,null,0,S.grp):'')
+      +(budgetRows(rows).map(x=>bRow(x,roll[x.r.id],par.has(x.r.id),ed,S.k)+((BADD&&ed&&BADD.parent===x.r.id)?bAddRow(S,x.r.id,x.d+1):'')).join('')
+        ||`<tr><td colspan="${B_COLS}" class="text-mute text-xs p-3">Chưa có dòng nào. ${ed&&S.k!=='X'?`Bấm <b>+ ${S.grp?'Nhóm':'Hạng mục'}</b> ở thanh tiêu đề, hoặc dùng “Import Dự toán (Excel)”.`:''}</td></tr>`)}).join('');
   refreshBudgetCalcs(p,true);
 }
 
 function refreshBudgetCalcs(p,force){
-  const bd=db.list('budget_items').filter(b=>b.project_id===p.id),roll=rollBudget(bd),by=Object.fromEntries(bd.map(b=>[b.id,b])),ae=document.activeElement;
+  const bd=db.list('budget_items').filter(b=>b.project_id===p.id),T=bTotals(bd),roll=T.roll,by=Object.fromEntries(bd.map(b=>[b.id,b])),ae=document.activeElement,rate=rateOf(p);
   document.querySelectorAll('#bBody tr[data-id]').forEach(tr=>{
-    const r=by[tr.dataset.id];if(!r)return;const v=roll[r.id],diff=v.planned-v.actual;
-    tr.querySelectorAll('[data-calc]').forEach(c=>{const k=c.dataset.calc;
-      if(k==='diff'){c.textContent=nfmt(diff);c.className='text-right whitespace-nowrap '+(diff<0&&v.planned>0?'text-red-600 font-semibold':'')}else c.textContent=nfmt(v[k])});
-    tr.querySelectorAll('input.cell[data-f]').forEach(i=>{if(i===ae&&!force)return;const f=i.dataset.f;i.value=i.type==='number'?(r[f]?Math.round(r[f]):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
+    const r=by[tr.dataset.id];if(!r)return;const v=roll[r.id];
+    tr.querySelectorAll('[data-calc]').forEach(c=>{c.textContent=nfmt(v[c.dataset.calc])});
+    tr.querySelectorAll('[data-f]').forEach(i=>{if(i===ae&&!force)return;const f=i.dataset.f;
+      if(i.tagName==='SELECT')i.value=r[f]||'';else i.value=i.type==='number'?(r[f]?Math.round(r[f]):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
   });
-  const roots=bd.filter(b=>!b.parent_id),tp=roots.reduce((s,r)=>s+roll[r.id].planned,0),ta=roots.reduce((s,r)=>s+roll[r.id].actual,0),df=tp-ta,pc=tp?Math.round(ta/tp*100):0;
   const set=(sel,t)=>{const e=$(sel);if(e)e.textContent=t};
-  set('[data-t=planned]',nfmt(tp));set('[data-t=actual]',nfmt(ta));set('[data-t=diff]',nfmt(df));
-  const cl=(sel,c)=>{const e=$(sel);if(e)e.className='text-right mono text-base '+c};
-  cl('[data-t=planned]','tot-g');cl('[data-t=actual]','tot-b');
-  const fd=$('[data-t=diff]');if(fd){fd.className='text-right mono text-base';fd.innerHTML=df<0?`<span class="tot-bad">${nfmt(df)}</span>`:`<span class="tot-g">${nfmt(df)}</span>`}
-  set('[data-s=planned]',fmtVND(tp));set('[data-s=actual]',fmtVND(ta));set('[data-s=diff]',(df<0?'−':'')+fmtVND(Math.abs(df)));set('[data-s=pct]',pc+'%');
-  const sd=$('[data-s=diff]');if(sd)sd.className='text-xl font-bold mt-1 mono '+(df<0?'tot-r':'tot-g');
-  const sp=$('[data-s=planned]'),sa=$('[data-s=actual]');if(sp)sp.className='text-xl font-bold mt-1 mono tot-g';if(sa)sa.className='text-xl font-bold mt-1 mono tot-b';
-  const sb=$('#sBar');if(sb)sb.innerHTML=bar(pc,pc>100?'#dc2626':'var(--brand)');
+  ['A_I','B_I','B_II','X'].forEach(k=>{set(`[data-st="${k}:usd"]`,nfmt(T.T[k].usd));set(`[data-st="${k}:planned"]`,nfmt(T.T[k].planned));set(`[data-st="${k}:actual"]`,nfmt(T.T[k].actual))});
+  set('[data-t=usd]',nfmt(T.all.usd));set('[data-t=planned]',nfmt(T.all.planned));set('[data-t=actual]',nfmt(T.all.actual));
+  const money=(x)=>nfmt(Math.round(x.planned))+' VND',usd=x=>'≈ '+nfmt(x.usd)+' USD';
+  set('[data-s=k1]',money(T.mt));set('[data-s=k1-u]',usd(T.mt));
+  set('[data-s=k2]',money(T.infra));set('[data-s=k2-u]',usd(T.infra));
+  set('[data-s=k3]',T.ratio.toLocaleString('vi-VN',{minimumFractionDigits:2,maximumFractionDigits:2})+' %');set('[data-s=k3-u]','Mục B.II / (A.I + B.I)');
+  set('[data-s=k4]',money(T.all));set('[data-s=k4-u]',usd(T.all)+' · Thực tế: '+nfmt(Math.round(T.all.actual))+' VND');
+  const pc=T.all.planned?Math.round(T.all.actual/T.all.planned*100):0,sb=$('#sBar');if(sb)sb.innerHTML=bar(pc,pc>100?'#dc2626':'var(--brand)')+`<div class="text-[11px] text-mute mt-0.5">Đã phát sinh ${pc}% dự toán</div>`;
   renderBell();
 }
 
-function parseBudget(rows){
-  const num=v=>{const n=typeof v==='number'?v:parseFloat(v);return isNaN(n)?null:n};
-  let H=false,col={},rate=null,items=[],stack=[],skipped=0,sec=0;
-  for(const r of rows){
-    const line=r.map(c=>String(c).toLowerCase());
-    if(rate==null&&line.some(c=>c.includes('tỷ giá')))rate=r.map(num).find(x=>x>1000)||null;
-    if(H&&/xác nhận ngân sách/.test(line.join('|')))break;
-    if(line.some(c=>c.includes('tên hàng'))&&line.some(c=>c.trim()==='stt')){
-      if(!H){H=true;const f=re=>line.findIndex(c=>re.test(c));col={stt:f(/^stt$/),name:f(/tên hàng/),unit:f(/đvt/),qty:f(/số lượng/),pusd:f(/đơn giá[\s\S]*usd/),pvnd:f(/đơn giá[\s\S]*vnd/),tvnd:f(/thành tiền[\s\S]*vnd/),vendor:f(/nhà cung cấp/),note:f(/ghi chú/)}}
-      continue}
-    if(!H)continue;
-    const s=String(r[col.stt]).trim(),name=String(r[col.name]).trim();
-    if(!s||!name){if(s||name)skipped++;continue}
-    const lv=/^[A-Z]$/.test(s)&&!/^[IVX]$/.test(s)?0:/^[IVX]+$/i.test(s)?1:/^\d+$/.test(s)?2:/^\d+(\.\d+)+$/.test(s)?3:-1;
-    if(lv<0){skipped++;continue}
-    if(lv===0){sec++;stack=[];continue}
-    while(stack.length&&stack[stack.length-1].lv>=lv)stack.pop();
-    const qty=num(r[col.qty]),pv=num(r[col.pvnd]),pu=num(r[col.pusd]),tv=num(r[col.tvnd]);
-    const price=pv??(pu!=null&&rate?pu*rate:null),planned=tv??(price!=null?price*(qty??1):null);
-    const qs=r.slice(col.vendor+1).map(String).find(c=>/báo giá/i.test(c)&&c.length<30),note=String(r[col.note]??'').trim();
-    const it={id:uid(),parent_id:stack.length?stack[stack.length-1].id:null,code:s,name,unit:String(r[col.unit]??'').trim(),quantity:qty,unit_price:price,planned_amount:planned,actual_amount:0,vendor:String(r[col.vendor]??'').trim(),quote_status:qs?(/chưa/i.test(qs)?'not_quoted':'quoted'):null,note:isNaN(+note)&&note.length>1?note:'',lv};
-    items.push(it);stack.push(it);
+/* ===================== IMPORT: file Excel Dự toán Duy Tân (mẫu HT-TC-01/BM01) ===================== */
+function parseDuyTan(rows,ws){
+  const num=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''));return isNaN(n)?null:n};
+  const low=r=>r.map(c=>String(c??'').toLowerCase().replace(/\s+/g,' ').trim());
+  const r0=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s.r:0;
+  /* Tỷ giá: ưu tiên ô H5 (V04). Mẫu cũ để ở ô khác trên dòng "Tỷ giá" -> tự dò */
+  let rate=null;const h5=ws['H5']&&num(ws['H5'].v);if(h5&&h5>1000)rate=h5;
+  if(!rate)for(const r of rows.slice(0,12)){if(low(r).some(c=>c.includes('tỷ giá'))){const v=r.map(num).find(x=>x&&x>1000);if(v){rate=v;break}}}
+  let H=-1,col={};
+  for(let i=0;i<rows.length;i++){const l=low(rows[i]);
+    if(l.some(c=>c==='stt')&&l.some(c=>c.includes('tên hàng'))){H=i;const f=re=>l.findIndex(c=>re.test(c));
+      col={stt:f(/^stt$/),name:f(/tên hàng/),unit:f(/đvt/),qty:f(/số lượng/),pusd:f(/đơn giá.*usd/),pvnd:f(/đơn giá.*(vnd|chưa vat)/),tusd:f(/thành tiền.*usd/),tvnd:f(/thành tiền.*vnd/),act:f(/thực tế/),vendor:f(/nhà cung cấp/),docs:f(/hồ sơ/),note:f(/ghi chú/)};break}}
+  if(H<0)return null;
+  const items=[],skipped=[];let sec=null;
+  for(let i=H+1;i<rows.length;i++){
+    const r=rows[i],l=low(r);
+    if(/xác nhận ngân sách/.test(l.join('|'))||(l.includes('stt')&&l.includes('nội dung'))||l.includes('đề xuất này trong/ngoài ngân sách'))break;   // hết bảng chi phí, bắt đầu bảng kiểm soát ngân sách KTQT
+    if(l.some(c=>c==='stt')&&l.some(c=>c.includes('tên hàng')))continue;                 // dòng tiêu đề lặp lại ở Phần B
+    const stt=String(r[col.stt]??'').trim(),name=String(r[col.name]??'').replace(/\s+/g,' ').trim(),nm=name.toLowerCase();
+    if(name){
+      if(/^chi phí đầu tư máy chính$/.test(nm)){sec='A_I';continue}
+      if(/^chi phí thiết bị phụ$/.test(nm)){sec='B_I';continue}
+      if(/^chi phí cơ sở hạ tầng[, ]+lắp đặt máy$/.test(nm)){sec='B_II';continue}
+    }
+    if(!name||!/^\d+(\.\d+)*$/.test(stt)){if(stt||name)skipped.push(stt||name);continue}   // tiêu đề phần, dòng TỔNG, tỷ lệ...
+    const qty=num(r[col.qty]),pu=num(r[col.pusd]),pv=num(r[col.pvnd]),tv=num(r[col.tvnd]),ac=col.act>=0?num(r[col.act]):null;
+    const ad=c=>XLSX.utils.encode_cell({r:i+r0,c}),fvnd=col.pvnd>=0&&ws[ad(col.pvnd)]&&ws[ad(col.pvnd)].f,fusd=col.pusd>=0&&ws[ad(col.pusd)]&&ws[ad(col.pusd)].f;
+    /* Tiền tệ nhập gốc: ô công thức TRỎ SANG ô kia là ô được quy đổi (vd G10 "=F10*$I$5" -> USD là gốc; F15 "=G15/I5" -> VND là gốc) */
+    const colL=c=>String.fromCharCode(65+c),refs=(fm,c)=>!!fm&&c>=0&&new RegExp('(^|[^A-Z])\\$?'+colL(c)+'\\$?\\d+').test(String(fm).toUpperCase());
+    const ccy=refs(fvnd,col.pusd)?'USD':refs(fusd,col.pvnd)?'VND':fvnd&&!fusd?'USD':fusd&&!fvnd?'VND':(pu!=null&&pv==null)?'USD':'VND';
+    const vnd=pv??(pu!=null&&rate?pu*rate:null),usd=pu??(pv!=null&&rate?pv/rate:null);
+    let docs=col.docs>=0?String(r[col.docs]??'').trim():'';
+    if(docs)docs=/^(không|khong|chưa|no)/i.test(docs)?'Không':'Có';
+    else{const q=r.slice(Math.max(col.note,col.vendor)+1).map(String).find(c=>/báo giá/i.test(c));if(q)docs=/chưa/i.test(q)?'Không':'Có'}
+    const note=String(r[col.note]??'').trim();
+    items.push({id:uid(),section:sec||'A_I',code:stt,name,unit:String(r[col.unit]??'').trim(),quantity:qty,price_usd:usd,price_ccy:ccy,unit_price:vnd,
+      planned_amount:tv??(vnd!=null?vnd*(qty??1):null),actual_amount:ac||0,vendor:String(r[col.vendor]??'').trim(),has_docs:docs,note:isNaN(+note)&&note.length>1?note:''});
   }
-  const par=new Set(items.map(i=>i.parent_id));
-  items.forEach(i=>{if(par.has(i.id))Object.assign(i,{quantity:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',quote_status:null,unit:''});
-    else{i.quantity??=1;i.unit_price??=0;i.planned_amount??=0}});
-  return{items,rate,skipped,sec,groups:par.size-(par.has(null)?1:0),leaves:items.length-par.size+(par.has(null)?1:0),total:items.reduce((s,i)=>s+(i.planned_amount||0),0)}}
+  const bySC={};items.forEach(it=>bySC[it.section+'|'+it.code]=it);
+  items.forEach(it=>{const m=it.code.match(/^(.+)\.\d+$/);it.parent_id=m&&bySC[it.section+'|'+m[1]]?bySC[it.section+'|'+m[1]].id:null});
+  const par=new Set(items.map(i=>i.parent_id).filter(Boolean));
+  items.forEach(i=>{if(par.has(i.id))Object.assign(i,{unit:'',quantity:null,price_usd:null,price_ccy:null,unit_price:null,planned_amount:null,actual_amount:null,vendor:'',has_docs:'',note:''});
+    else{i.quantity??=1;i.price_usd??=0;i.unit_price??=0;i.planned_amount??=0}});
+  const leaves=items.filter(i=>!par.has(i.id)),cnt=k=>items.filter(i=>i.section===k).length;
+  return{items,rate,skipped:skipped.length,cnt:{A_I:cnt('A_I'),B_I:cnt('B_I'),B_II:cnt('B_II')},groups:par.size,leaves:leaves.length,
+    total:leaves.reduce((s,i)=>s+(i.planned_amount||0),0),usd:leaves.reduce((s,i)=>s+(i.quantity||0)*(i.price_usd||0),0)}}
 
-async function importBudget(p,file){
+async function importDuyTan(p,file){
   try{
     if(!window.XLSX)await loadJS(XLSX_URL);
-    const ws=(wb=>wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer(),{type:'array'}));
-    const res=parseBudget(XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true}));
-    if(!res.items.length)throw new Error('Không tìm thấy dòng ngân sách. File cần có dòng tiêu đề chứa "Stt" và "Tên hàng".');
-    modal(`<h3 class="font-bold text-lg mb-2">Xem trước dữ liệu import</h3><ul class="text-sm space-y-1 mb-3"><li>File: <b>${esc(file.name)}</b></li><li>${res.groups} nhóm · ${res.leaves} hạng mục · bỏ qua ${res.skipped+res.sec} dòng (tiêu đề phần, tổng cộng, ghi chú)</li>
-     <li>Tổng dự kiến: <b>${Math.round(res.total).toLocaleString('vi-VN')} VND</b> (${fmtVND(res.total)})</li><li>Tỷ giá đọc được: <b>${res.rate?res.rate.toLocaleString('vi-VN'):'không có (giữ tỷ giá dự án)'}</b></li></ul>
-     <div class="flex flex-wrap justify-end gap-2"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn-ghost" id="iAdd">Thêm vào cuối</button><button class="btn" id="iRep">Thay thế ngân sách hiện tại</button></div>`);
-    const save=rep=>{const all=db.list('budget_items'),keep=rep?all.filter(b=>b.project_id!==p.id):all,base=rep?0:Math.max(0,...all.filter(b=>b.project_id===p.id).map(b=>b.sort_order));
-      db.save('budget_items',[...keep,...res.items.map(({lv,...i},k)=>({...i,project_id:p.id,sort_order:base+k+1}))]);
-      if(rep&&res.rate)db.save('projects',db.list('projects').map(x=>x.id===p.id?{...x,exchange_rate:res.rate}:x));closeModal();route()};
+    const ws=(wb=>wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer(),{type:'array'}));      // chỉ đọc Sheet đầu tiên
+    const res=parseDuyTan(XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true}),ws);
+    if(!res||!res.items.length)throw new Error('Không nhận dạng được file. Cần Sheet đầu có dòng tiêu đề chứa "STT" và "Tên hàng" (mẫu HT-TC-01/BM01).');
+    modal(`<h3 class="font-bold text-lg mb-2">Xem trước import Dự toán</h3><ul class="text-sm space-y-1 mb-3 list-disc pl-5"><li>File: <b>${esc(file.name)}</b></li>
+     <li>Phần A · Mục I (Máy chính): <b>${res.cnt.A_I}</b> dòng</li><li>Phần B · Mục I (Thiết bị phụ): <b>${res.cnt.B_I}</b> dòng</li><li>Phần B · Mục II (Cơ sở hạ tầng, lắp đặt): <b>${res.cnt.B_II}</b> dòng (${res.groups} nhóm)</li>
+     <li>Tổng dự toán: <b>${nfmt(Math.round(res.total))} VND</b> · ${nfmt(res.usd)} USD</li>
+     <li>Tỷ giá đọc từ ô H5: <b>${res.rate?nfmt(res.rate)+' VND':'không có (giữ tỷ giá dự án)'}</b></li><li class="text-mute">Bỏ qua ${res.skipped} dòng (tiêu đề phần, tổng cộng, tỷ lệ, bảng xác nhận)</li></ul>
+     <div class="flex flex-wrap justify-end gap-2"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn-ghost" id="iAdd">Thêm vào cuối</button><button class="btn" id="iRep">Thay thế dự toán hiện tại</button></div>`);
+    const save=rep=>{const all=db.list('budget_items'),keep=rep?all.filter(b=>b.project_id!==p.id):all,base=rep?0:Math.max(0,...all.filter(b=>b.project_id===p.id).map(b=>b.sort_order||0));
+      db.save('budget_items',[...keep,...res.items.map((i,k)=>({...i,project_id:p.id,sort_order:base+k+1}))]);
+      if(res.rate)updateProject(p.id,{exchange_rate:res.rate});          // H5 -> projects.exchange_rate
+      BADD=null;closeModal();route();toast('Đã import '+res.items.length+' dòng dự toán',false)};
     $('#iNo').onclick=closeModal;$('#iAdd').onclick=()=>save(false);$('#iRep').onclick=()=>save(true);
   }catch(e){toast(e.message)}
 }
 
-async function exportBudget(p){
+/* ===================== EXPORT: file Excel chuẩn Form Duy Tân (2 Sheet: "Dự toán" + "Khung Tên") ===================== */
+const DT_SIGNS=[   // [chức danh, vai trò, họ tên]  - thứ tự trải từ cột A đến L (mỗi người 2 cột)
+  ['Chủ tịch HĐTV','Phê duyệt','TRẦN DUY HY'],['Giám Đốc Tài Chính TNHH','Xem xét','NGUYỄN BẢO QUỐC'],['Tổng Giám Đốc DTR','Xem xét','HUỲNH NGỌC THẠCH'],
+  ['Phó Tổng Giám Đốc Khối Vận Hành DTR','Xem xét','ĐÁI TRUNG QUÂN'],['Trưởng Phòng Kế Toán Quản Trị DTR','Kiểm tra','LƯU THỊ MINH TÂM'],['Giám đốc Kỹ Thuật DTR','Người lập','LÊ VĂN TY']];
+async function exportDuyTanBudget(project,budgetItems){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
-    const bd=db.list('budget_items').filter(b=>b.project_id===p.id),roll=rollBudget(bd),rows=budgetRows(bd,true);
-    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Ngân sách',{views:[{state:'frozen',ySplit:5}]}),fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
-    ws.columns=[9,46,8,8,16,18,18,18,9,28,11,28].map(width=>({width}));
-    ws.mergeCells('A1:L1');Object.assign(ws.getCell('A1'),{value:'BẢNG NGÂN SÁCH DỰ ÁN - '+p.name.toUpperCase()});ws.getCell('A1').font={bold:true,size:14};
-    ws.getCell('A2').value='Mã dự án: '+p.code;ws.getCell('A3').value=`Ngày xuất: ${fmtD(today())}    Tỷ giá: 1 USD = ${(+p.exchange_rate).toLocaleString('vi-VN')} VND`;
-    const hr=ws.getRow(5);hr.values=['Mã','Hạng mục','ĐVT','SL','Đơn giá (VND)','Dự kiến (VND)','Thực tế (VND)','Chênh lệch (VND)','% dùng','Nhà cung cấp','Báo giá','Ghi chú'];hr.height=26;
-    hr.eachCell(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill=fill('FF1F3A5F');c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
-    const t={style:'thin',color:{argb:'FFBFC5CD'}},bo={top:t,bottom:t,left:t,right:t};let r=6,tp=0,ta=0;
-    rows.forEach(({r:it,d,grp})=>{const v=roll[it.id],row=ws.getRow(r);if(!it.parent_id){tp+=v.planned;ta+=v.actual}
-      row.values=[it.code,'   '.repeat(d)+it.name,it.unit,grp?null:it.quantity,grp?null:it.unit_price,v.planned,v.actual,{formula:`F${r}-G${r}`,result:v.planned-v.actual},v.planned?{formula:`G${r}/F${r}`,result:v.actual/v.planned}:null,it.vendor,it.quote_status==='quoted'?'Đã có':it.quote_status?'Chưa có':'',it.note];
-      for(let c=1;c<=12;c++){const cell=row.getCell(c);cell.border=bo;if(c>=4&&c<=8)cell.numFmt='#,##0';if(c===9)cell.numFmt='0%';if(grp){cell.font={bold:true};cell.fill=fill(d?'FFF3F5F8':'FFDCE6F2')}}
-      if(v.planned-v.actual<0)row.getCell(8).font={bold:grp,color:{argb:'FFC62828'}};r++});
-    const tr=ws.getRow(r);tr.values=['','TỔNG CỘNG','','','',tp,ta,{formula:`F${r}-G${r}`,result:tp-ta},tp?{formula:`G${r}/F${r}`,result:ta/tp}:null];
-    for(let c=1;c<=12;c++){const cell=tr.getCell(c);cell.font={bold:true};cell.fill=fill('FFFFE9B3');cell.border=bo;if(c>=6&&c<=8)cell.numFmt='#,##0';if(c===9)cell.numFmt='0%'}
+    budgetItems=budgetItems||[];
+    if(!budgetItems.length){toast('Dự án chưa có dữ liệu Chi phí để xuất');return}
+    const rate=rateOf(project),FONT='Times New Roman',COLW=[8,55,12,12,18,22,18,22,22,30,20,25];     // A..L
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Dự toán',{views:[{showGridLines:false}]});
+    COLW.forEach((w,i)=>ws.getColumn(i+1).width=w);
+    const thin={style:'thin',color:{argb:'FF000000'}},box={top:thin,bottom:thin,left:thin,right:thin};
+    const fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
+    const L=i=>String.fromCharCode(64+i);
+    const cellOf=(a,v,o={})=>{const c=ws.getCell(a);c.value=v;if(o.f)c.font=o.f;if(o.al)c.alignment=o.al;if(o.nf)c.numFmt=o.nf;if(o.fill)c.fill=o.fill;if(o.b)c.border=o.b;return c};
+    const mg=(a)=>ws.mergeCells(a);
+    /* ---- Dòng 1-2: tiêu đề + mã biểu mẫu ---- */
+    mg('C1:J2');cellOf('C1','BẢNG DỰ TOÁN CHI PHÍ ĐẦU TƯ \n(Áp dụng cho máy móc thiết bị - CAPEX)',{f:{bold:true,size:16,color:{argb:'FF0000FF'}},al:{horizontal:'center',vertical:'middle',wrapText:true}});
+    ws.getRow(1).height=24;ws.getRow(2).height=24;
+    cellOf('L1','HT-TC-01/BM01',{f:{bold:true},al:{horizontal:'center',vertical:'middle'}});cellOf('L2','V04 - 17/08/2026',{f:{bold:true},al:{horizontal:'center',vertical:'middle'}});
+    /* ---- Dòng 4-6: phòng ban / dự án / tỷ giá / tên bảng ---- */
+    cellOf('A4','Phòng ban: Kỹ Thuật',{f:{bold:true}});
+    cellOf('D4','Dự án/ Hạng mục: '+(project.name||''),{f:{bold:true,color:{argb:'FF0070C0'}}});
+    mg('F5:G5');cellOf('F5','Tỷ giá tạm tính 1 USD = ',{f:{bold:true},al:{horizontal:'right'}});
+    cellOf('H5',rate,{f:{bold:true},nf:'#,##0 "VND"',al:{horizontal:'center'}});
+    mg('A6:L6');cellOf('A6','BẢNG TỔNG HỢP CHI PHÍ ĐẦU TƯ',{f:{bold:true,color:{argb:'FFFF0000'}},fill:fill('FFFFFFCC'),al:{horizontal:'center',vertical:'middle'}});
+    for(let c=1;c<=12;c++)ws.getCell(6,c).border=box;
+    /* ---- Dòng tiêu đề bảng (dùng cho cả Phần A và Phần B) ---- */
+    const HEAD=['STT','Tên hàng - Quy cách - Công suất','ĐVT','Số Lượng','Đơn giá \n(USD)','Đơn giá chưa VAT \n(VND)','Thành tiền \n(USD)','Thành tiền \n(VND)','Thực tế phát sinh\n(VND)','Nhà cung cấp - \nNước sản xuất','Hồ sơ đính kèm','Ghi chú'];
+    const header=r=>{HEAD.forEach((h,i)=>{const c=ws.getCell(r,i+1);c.value=h;c.font={bold:true,color:{argb:'FFFF0000'}};c.fill=fill('FFFFFFCC');c.border=box;c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});ws.getRow(r).height=36};
+    header(7);
+    ws.views=[{showGridLines:false,state:'frozen',ySplit:7}];
+    /* ---- Chuẩn bị dữ liệu: cây theo parent_id, chia theo section ---- */
+    const by={};budgetItems.forEach(b=>(by[b.parent_id||'root']??=[]).push(b));
+    const kids=id=>(by[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const secRoots=k=>budgetItems.filter(b=>b.section===k&&!b.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+    const sumOf=b=>{const k=by[b.id];return k&&k.length?k.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0}):{u:(b.quantity||0)*(b.price_usd||0),p:b.planned_amount||0,a:b.actual_amount||0}};
+    const NF={usd:'#,##0.00',vnd:'#,##0',qty:'#,##0.##'};
+    let r=8;
+    const style=(row,o={})=>{for(let c=1;c<=12;c++){const cell=ws.getCell(row,c);cell.border=box;
+      cell.font={...(cell.font||{}),bold:!!o.bold,color:o.color?{argb:o.color}:undefined};if(o.fill)cell.fill=fill(o.fill);
+      cell.alignment={vertical:'middle',wrapText:c===2||c===10||c===12,horizontal:(c===1||c===3||c===11)?'center':(c>=4&&c<=9?'right':'left')}}};
+    const fmtRow=row=>{ws.getCell(row,4).numFmt=NF.qty;ws.getCell(row,5).numFmt=NF.usd;ws.getCell(row,6).numFmt=NF.vnd;ws.getCell(row,7).numFmt=NF.usd;ws.getCell(row,8).numFmt=NF.vnd;ws.getCell(row,9).numFmt=NF.vnd};
+    /* Ghi 1 hạng mục chi tiết. Cột G=E*D, H=F*D; E hoặc F là công thức quy đổi theo tỷ giá $H$5 */
+    const leaf=(it,depth)=>{
+      const row=r,q=it.quantity||0,usd=it.price_usd||0,vnd=it.unit_price||0,usdIsInput=it.price_ccy==='USD';
+      ws.getCell(row,1).value=it.code;ws.getCell(row,2).value=it.name;ws.getCell(row,3).value=it.unit||'';ws.getCell(row,4).value=q;
+      ws.getCell(row,5).value=usdIsInput?usd:{formula:`F${row}/$H$5`,result:vnd/rate};
+      ws.getCell(row,6).value=usdIsInput?{formula:`E${row}*$H$5`,result:usd*rate}:vnd;
+      ws.getCell(row,7).value={formula:`E${row}*D${row}`,result:q*(usdIsInput?usd:vnd/rate)};
+      ws.getCell(row,8).value={formula:`F${row}*D${row}`,result:q*(usdIsInput?usd*rate:vnd)};
+      ws.getCell(row,9).value=it.actual_amount||0;ws.getCell(row,10).value=it.vendor||'';ws.getCell(row,11).value=it.has_docs||'';ws.getCell(row,12).value=it.note||'';
+      style(row);fmtRow(row);r++;return row};
+    /* Ghi 1 dòng tiêu đề/nhóm có SUM: sumRefs = chuỗi tham chiếu, ví dụ "G10:G12" hoặc "G22,G25" */
+    const sumRow=(row,stt,title,refs,o={})=>{
+      ws.getCell(row,1).value=stt;ws.getCell(row,2).value=title;
+      [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>{ws.getCell(row,idx).value=refs?{formula:`SUM(${refs(c)})`,result:o.res?o.res[k]:0}:0});
+      style(row,{bold:true,color:o.color,fill:o.fill});fmtRow(row);return row};
+    const range=(a,b)=>c=>b>=a?`${c}${a}:${c}${b}`:`${c}${a}`;
+
+    /* ===== PHẦN A: dòng "A" + Mục I (MÁY CHÍNH) ===== */
+    ws.getCell(r,1).value='A';ws.getCell(r,2).value='CHI PHÍ DỰ TOÁN ĐÃ ĐƯỢC DUYỆT';style(r,{bold:true});r++;
+    const A=secRoots('A_I'),rA=r,resA=A.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
+    r++;A.forEach(it=>leaf(it,0));
+    sumRow(rA,'I','CHI PHÍ ĐẦU TƯ MÁY CHÍNH',A.length?range(rA+1,r-1):null,{res:resA});
+    /* ===== PHẦN B ===== */
+    r++;ws.getCell(r,1).value='B';ws.getCell(r,2).value='BẢNG CHI TIẾT CHI PHÍ CƠ SỞ HẠ TẦNG + THIẾT BỊ PHỤ';style(r,{bold:true});r++;
+    header(r);r++;
+    const B=secRoots('B_I'),rB=r,resB=B.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
+    r++;B.forEach(it=>leaf(it,0));
+    sumRow(rB,'I','CHI PHÍ THIẾT BỊ PHỤ',B.length?range(rB+1,r-1):null,{res:resB});
+    /* Dòng TỔNG MÁY CHÍNH + THIẾT BỊ PHỤ */
+    const rMT=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ MÁY CHÍNH + THIẾT BỊ PHỤ';
+    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rA},${c}${rB})`,result:resA[k]+resB[k]});
+    style(r,{bold:true,fill:'FFF2F2F2'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
+    /* Dòng TỶ LỆ (công thức ở cột H, định dạng 0.00%) - trỏ tới Mục II ở bên dưới nên gán công thức sau */
+    const rRT=r;mg(`A${r}:G${r}`);ws.getCell(r,1).value='TỶ LỆ CP CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY/(MÁY CHÍNH + CHI PHÍ CẢI TẠO + THIẾT BỊ PHỤ)';style(r,{bold:true});ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
+    /* ===== Mục II: CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY: nhóm cha (chữ xanh đậm) + mục con ===== */
+    r++;const G2=secRoots('B_II'),rII=r,resII=G2.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
+    r++;const grpRows=[];
+    const walk=(it,depth)=>{
+      const ks=kids(it.id);
+      if(!ks.length){leaf(it,depth);return}
+      const row=r;r++;grpRows.push({row,depth});
+      ks.forEach(k=>walk(k,depth+1));
+      sumRow(row,it.code,it.name,range(row+1,r-1),{res:sumOf(it),color:'FF1F3864'});
+    };
+    const topRows=[];G2.forEach(g=>{const before=r;walk(g,0);topRows.push(before)});
+    sumRow(rII,'II','Chi Phí Cơ Sở Hạ Tầng, Lắp Đặt Máy',topRows.length?(c=>topRows.map(x=>`${c}${x}`).join(',')):null,{res:resII});
+    /* gán công thức dòng TỶ LỆ (đã biết dòng Mục II và dòng TỔNG MÁY+TB PHỤ) */
+    const ratio=(resA.p+resB.p)?resII.p/(resA.p+resB.p):0;
+    ws.getCell(rRT,8).value={formula:`IF(H${rMT}=0,0,H${rII}/H${rMT})`,result:ratio};ws.getCell(rRT,8).numFmt='0.00%';
+    /* Dòng TỔNG CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY / TỔNG CHUNG */
+    const rT1=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY';
+    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rII})`,result:resII[k]});
+    style(r,{bold:true,fill:'FFF2F2F2'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
+    const rT2=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG, MÁY CHÍNH, THIẾT BỊ PHỤ';
+    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rMT},${c}${rT1})`,result:resA[k]+resB[k]+resII[k]});
+    style(r,{bold:true,fill:'FFFFE9B3'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};
+    ['A','B','C','D','E','F','G','H','I','J','K','L'].forEach(c=>{const cell=ws.getCell(`${c}${r}`);cell.border={top:{style:'medium'},bottom:{style:'medium'},left:cell.border.left,right:cell.border.right}});
+    r++;
+    /* ===== Bảng kiểm soát ngân sách KTQT (cách 2 dòng trống) ===== */
+    r+=2;const rK=r;
+    const kh=[['A','STT'],['B','Nội dung'],['C','Số tiền (Triệu Đồng)'],['E','Phần trăm (%)'],['F','KTQT xác nhận']];
+    mg(`C${r}:D${r}`);mg(`F${r}:G${r}`);kh.forEach(([c,t])=>cellOf(`${c}${r}`,t,{f:{bold:true},al:{horizontal:'center',vertical:'middle',wrapText:true},fill:fill('FFFFFFCC')}));
+    for(let c=1;c<=7;c++)ws.getCell(r,c).border=box;r++;
+    [['1','Đề xuất này trong/ngoài ngân sách'],['2','Tổng ngân sách kế hoạch năm'],['3','Tổng số tiền đã duyệt trong năm'],['3.1','   Số tiền đã duyệt trong ngân sách'],['3.2','   Số tiền đã duyệt ngoài ngân sách']].forEach(([s,t],i)=>{
+      mg(`C${r}:D${r}`);mg(`F${r}:G${r}`);ws.getCell(r,1).value=s;ws.getCell(r,2).value=t;
+      if(i===0){ws.getCell(r,3).value={formula:`H${rT2}/1000000`,result:(resA.p+resB.p+resII.p)/1e6};ws.getCell(r,3).numFmt='#,##0.0'}
+      for(let c=1;c<=7;c++){const cell=ws.getCell(r,c);cell.border=box;cell.alignment={vertical:'middle',horizontal:c===1?'center':c===2?'left':'right'}}r++});
+    /* ngày tháng góc phải (J:L) */
+    mg(`J${rK}:L${rK}`);cellOf(`J${rK}`,'DTR, ngày ... tháng ... năm 2026',{f:{italic:true},al:{horizontal:'center',vertical:'middle'}});
+    /* ===== Khung chữ ký 6 cấp phê duyệt: mỗi người 2 cột, trải từ A đến L ===== */
+    r+=1;const signs=(sh,row0,cols,hTitle,hSign)=>{
+      DT_SIGNS.forEach(([t,role,name],i)=>{const a=cols[i][0],b=cols[i][1];
+        if(a!==b){sh.mergeCells(`${a}${row0}:${b}${row0}`);sh.mergeCells(`${a}${row0+1}:${b}${row0+1}`);sh.mergeCells(`${a}${row0+2}:${b}${row0+2}`)}
+        const c1=sh.getCell(`${a}${row0}`),c2=sh.getCell(`${a}${row0+2}`);
+        c1.value=`${t}\n(${role})`;c1.font={bold:true};c1.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+        c2.value=name;c2.font={bold:true};c2.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+        for(let c=a.charCodeAt(0);c<=b.charCodeAt(0);c++)for(let k=0;k<3;k++)sh.getCell(`${String.fromCharCode(c)}${row0+k}`).border=box});
+      sh.getRow(row0).height=hTitle;sh.getRow(row0+1).height=hSign;sh.getRow(row0+2).height=26};
+    signs(ws,r,[['A','B'],['C','D'],['E','F'],['G','H'],['I','J'],['K','L']],48,70);
+    /* ===== Sheet 2: Khung Tên ===== */
+    const w2=wb.addWorksheet('Khung Tên',{views:[{showGridLines:false}]});
+    'ABCDEF'.split('').forEach(c=>w2.getColumn(c).width=32);
+    DT_SIGNS.forEach(([t,role,name],i)=>{const c=String.fromCharCode(65+i);
+      const a=w2.getCell(`${c}1`),b=w2.getCell(`${c}2`);
+      a.value=`${t}\n\n\n(${role})`;a.font={bold:true,name:FONT,size:12};a.alignment={horizontal:'center',vertical:'middle',wrapText:true};a.border=box;
+      b.value=name;b.font={bold:true,name:FONT,size:12};b.alignment={horizontal:'center',vertical:'middle'};b.border=box});
+    w2.getRow(1).height=110;w2.getRow(2).height=32;
+    /* ===== Font Times New Roman toàn bộ Sheet 1 (giữ nguyên đậm/màu/cỡ đã đặt) ===== */
+    ws.eachRow({includeEmpty:true},row=>{for(let c=1;c<=12;c++){const cell=row.getCell(c);cell.font={size:11,...(cell.font||{}),name:FONT}}});
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:1,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
+    w2.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
     const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);a.download=`NganSach_${p.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();
-  }catch(e){toast(e.message)}
+    a.href=URL.createObjectURL(blob);a.download=`HT-TC-01-BM01_DuToan_${project.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
 }
 
 const addTo=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return iso(d)};
@@ -1899,112 +2067,6 @@ async function importMaster(p,file){
       db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';const sr=syncMasterToBecos(p,out,true);route();if(sr)toast(`Đã đồng bộ sang thẻ Becos: +${sr.add} mới, ${sr.upd} cập nhật`,false)};
   }catch(e){toast(e.message)}
 }
-/* =====================================================================================
-   EXPORT DỰ TOÁN CHI PHÍ - FORM DUY TÂN  (hàm độc lập: exportDuyTanBudget(project, budgetItems))
-   Khung tạm thời. Khi có Form Excel mẫu, chỉ cần chỉnh trong hàm này:
-     - DT.company / DT.nation ......... tên công ty, quốc hiệu
-     - DT.cols ........................ cột của bảng (tiêu đề, độ rộng, kiểu số) -> thứ tự cột = A, B, C...
-     - Các khối đánh dấu "// [HEADER]" "// [BẢNG]" "// [FOOTER]" ........ vị trí từng dòng / cột
-   Ghi chú tọa độ: dòng 1-2 = đầu trang, dòng 4 = tiêu đề, dòng 5-7 = thông tin dự án, dòng 9 = tiêu đề bảng (DT.headRow),
-                   dữ liệu từ dòng 10, sau đó dòng TỔNG, rồi khung chữ ký.
-   ===================================================================================== */
-const DT={
-  company:'CÔNG TY NHỰA TÁI CHẾ DUY TÂN',                       // <<< đổi tên pháp lý đầy đủ nếu cần
-  nation:['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM','Độc lập - Tự do - Hạnh phúc'],
-  title:'BẢNG DỰ TOÁN CHI PHÍ DỰ ÁN',
-  headRow:9,                                                      // dòng tiêu đề bảng (mọi dòng dữ liệu bắt đầu ngay dưới)
-  /* key: dữ liệu lấy từ đâu · w: độ rộng cột · num: định dạng số */
-  cols:[
-    {key:'stt',  h:'STT',                         w:7},               // A
-    {key:'code', h:'Mã hạng mục',                 w:13},              // B
-    {key:'name', h:'Nội dung chi phí / Thiết bị', w:46},              // C
-    {key:'unit', h:'Đơn vị tính',                 w:10},              // D
-    {key:'qty',  h:'Số lượng',                    w:10, num:'#,##0.##'},   // E
-    {key:'price',h:'Đơn giá kế hoạch',            w:18, num:'#,##0'},      // F
-    {key:'plan', h:'Thành tiền kế hoạch',         w:20, num:'#,##0'},      // G
-    {key:'act',  h:'Thực chi',                    w:18, num:'#,##0'},      // H
-    {key:'diff', h:'Chênh lệch (KH − Thực chi)',  w:20, num:'#,##0;[Red]-#,##0'}, // I  (= G − H, công thức)
-    {key:'note', h:'Ghi chú',                     w:26}                // J
-  ],
-  signs:['NGƯỜI LẬP','TRƯỞNG BỘ PHẬN','BAN GIÁM ĐỐC PHÊ DUYỆT']      // [FOOTER] 3 khối chữ ký
-};
-async function exportDuyTanBudget(project,budgetItems){
-  try{
-    if(!window.ExcelJS)await loadJS(EXCELJS_URL);
-    if(!budgetItems||!budgetItems.length){toast('Dự án chưa có dữ liệu Chi phí để xuất');return}
-    const C=DT.cols,N=C.length,L=i=>String.fromCharCode(64+i),col=k=>L(C.findIndex(c=>c.key===k)+1);   // col('plan') = 'G'
-    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Dự toán chi phí',{views:[{showGridLines:false}]});
-    C.forEach((c,i)=>ws.getColumn(i+1).width=c.w);
-    const thin={style:'thin',color:{argb:'FF8A94A3'}},box={top:thin,bottom:thin,left:thin,right:thin};
-    const fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
-    const put=(addr,v,o={})=>{const c=ws.getCell(addr);c.value=v;if(o.f)c.font=o.f;if(o.al)c.alignment=o.al;if(o.nf)c.numFmt=o.nf;return c};
-    const merge=(r,a,b)=>{ws.mergeCells(`${L(a)}${r}:${L(b)}${r}`)};
-    const mid=Math.ceil(N/2);
-
-    // [HEADER] dòng 1-2: trái = tên công ty, phải = quốc hiệu / tiêu ngữ
-    merge(1,1,mid-1);put('A1',DT.company,{f:{bold:true,size:12},al:{horizontal:'center',vertical:'middle'}});
-    merge(1,mid,N);put(`${L(mid)}1`,DT.nation[0],{f:{bold:true,size:11},al:{horizontal:'center'}});
-    merge(2,mid,N);put(`${L(mid)}2`,DT.nation[1],{f:{bold:true,size:11,underline:true},al:{horizontal:'center'}});
-    // [HEADER] dòng 4: tiêu đề phiếu
-    merge(4,1,N);put('A4',DT.title,{f:{bold:true,size:16},al:{horizontal:'center',vertical:'middle'}});ws.getRow(4).height=28;
-    // [HEADER] dòng 5-7: Tên dự án · Mã dự án · Ngày lập · Tổng ngân sách duyệt
-    const roots=budgetItems.filter(b=>!b.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-    const by={};budgetItems.forEach(b=>(by[b.parent_id||'root']??=[]).push(b));
-    const kids=id=>(by[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-    const sumOf=b=>{const k=by[b.id];return k?k.reduce((a,x)=>{const v=sumOf(x);return{p:a.p+v.p,a:a.a+v.a}},{p:0,a:0}):{p:b.planned_amount||0,a:b.actual_amount||0}};
-    const totP=roots.reduce((a,r)=>a+sumOf(r).p,0),totA=roots.reduce((a,r)=>a+sumOf(r).a,0);
-    merge(5,1,N);put('A5',`Tên dự án: ${project.name}`,{f:{bold:true,size:12}});
-    merge(6,1,mid);put('A6',`Mã dự án: ${project.code}`,{f:{size:11}});
-    merge(6,mid+1,N);put(`${L(mid+1)}6`,`Ngày lập: ${fmtD(today())}`,{f:{size:11}});
-    merge(7,1,mid);put('A7','Tổng ngân sách duyệt (VND):',{f:{bold:true,size:11}});
-    // ô số tổng ngân sách ở dòng 7 trỏ tới ô TỔNG của bảng (gán công thức sau khi biết số dòng)
-    merge(7,mid+1,N);
-
-    // [BẢNG] dòng tiêu đề
-    const HR=DT.headRow,hr=ws.getRow(HR);hr.height=34;
-    C.forEach((c,i)=>{const cell=hr.getCell(i+1);cell.value=c.h;cell.font={bold:true};cell.fill=fill('FFDCE6F2');cell.border=box;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
-    ws.views=[{showGridLines:false,state:'frozen',ySplit:HR}];     // cố định dòng tiêu đề khi cuộn
-
-    // [BẢNG] dòng dữ liệu: nhóm (in đậm, cộng dồn) + hạng mục chi tiết
-    let r=HR+1;const rootRows=[];
-    const writeItem=(it,path,depth)=>{
-      const grp=!!(by[it.id]&&by[it.id].length),v=sumOf(it),row=ws.getRow(r),code=path;
-      const vals={stt:it.code||'',code,name:'   '.repeat(depth)+(it.name||''),unit:grp?'':(it.unit||''),qty:grp?null:it.quantity,price:grp?null:it.unit_price,
-        plan:v.p,act:v.a,diff:{formula:`${col('plan')}${r}-${col('act')}${r}`,result:v.p-v.a},note:grp?'':(it.note||it.vendor||'')};
-      C.forEach((c,i)=>{const cell=row.getCell(i+1);cell.value=vals[c.key]===undefined?null:vals[c.key];cell.border=box;
-        if(c.num)cell.numFmt=c.num;
-        cell.alignment={vertical:'middle',wrapText:c.key==='name'||c.key==='note',horizontal:['stt','code','unit'].includes(c.key)?'center':(c.num?'right':'left')};
-        if(grp){cell.font={bold:true};cell.fill=fill(depth?'FFF3F5F8':'FFE8EEF7')}});
-      if(!depth)rootRows.push(r);
-      r++;
-      kids(it.id).forEach((k,i)=>writeItem(k,`${code}.${k.code||i+1}`,depth+1));
-    };
-    roots.forEach(g=>writeItem(g,String(g.code||''),0));
-
-    // [BẢNG] dòng TỔNG CỘNG (cộng các nhóm gốc bằng công thức)
-    const TR=r,tr=ws.getRow(TR),sumF=k=>rootRows.length?rootRows.map(x=>`${col(k)}${x}`).join('+'):'0';
-    C.forEach((c,i)=>{const cell=tr.getCell(i+1);cell.border=box;cell.font={bold:true};cell.fill=fill('FFFFE9B3');if(c.num)cell.numFmt=c.num;cell.alignment={vertical:'middle',horizontal:c.num?'right':'left'}});
-    tr.getCell(1).value='';tr.getCell(3).value='TỔNG CỘNG';
-    tr.getCell(C.findIndex(c=>c.key==='plan')+1).value={formula:sumF('plan'),result:totP};
-    tr.getCell(C.findIndex(c=>c.key==='act')+1).value={formula:sumF('act'),result:totA};
-    tr.getCell(C.findIndex(c=>c.key==='diff')+1).value={formula:`${col('plan')}${TR}-${col('act')}${TR}`,result:totP-totA};
-    // dòng 7: Tổng ngân sách duyệt = ô tổng kế hoạch
-    put(`${L(mid+1)}7`,{formula:`${col('plan')}${TR}`,result:totP},{f:{bold:true,size:12,color:{argb:'FFC62828'}},nf:'#,##0',al:{horizontal:'left'}});
-
-    // [FOOTER] ngày tháng + khung chữ ký (3 khối ngang bằng nhau)
-    let f=TR+2;
-    merge(f,mid+1,N);put(`${L(mid+1)}${f}`,'Ngày ........ tháng ........ năm ..........',{f:{italic:true},al:{horizontal:'center'}});f+=1;
-    const w=Math.floor(N/3),blocks=[[1,w],[w+1,2*w],[2*w+1,N]];
-    blocks.forEach(([a,b],i)=>{merge(f,a,b);put(`${L(a)}${f}`,DT.signs[i],{f:{bold:true},al:{horizontal:'center'}});
-      merge(f+1,a,b);put(`${L(a)}${f+1}`,'(Ký, ghi rõ họ tên)',{f:{italic:true,size:10},al:{horizontal:'center'}})});
-    ws.getRow(f+2).height=60;                                  // khoảng trống để ký tay
-    // in A4 ngang, vừa chiều rộng, lặp dòng tiêu đề mỗi trang
-    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:`${HR}:${HR}`,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);a.download=`DuToan_DuyTan_${project.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
-}
-
 async function exportMaster(p){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
