@@ -1261,6 +1261,8 @@ function refreshBudgetCalcs(p,force){
 }
 
 /* ===================== IMPORT: file Excel Dự toán Duy Tân (mẫu HT-TC-01/BM01) ===================== */
+/* Đọc sheet thành mảng dòng, luôn bắt đầu từ A1 (một số file có <dimension> lệch, SheetJS sẽ cắt mất cột đầu) */
+function dtRows(ws){const rg=XLSX.utils.decode_range(ws['!ref']||'A1');rg.s.r=0;rg.s.c=0;ws['!ref']=XLSX.utils.encode_range(rg);return XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true})}
 function parseDuyTan(rows,ws){
   const num=v=>{if(v===''||v==null)return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''));return isNaN(n)?null:n};
   const low=r=>r.map(c=>String(c??'').toLowerCase().replace(/\s+/g,' ').trim());
@@ -1292,7 +1294,8 @@ function parseDuyTan(rows,ws){
     const ccy=refs(fvnd,col.pusd)?'USD':refs(fusd,col.pvnd)?'VND':fvnd&&!fusd?'USD':fusd&&!fvnd?'VND':(pu!=null&&pv==null)?'USD':'VND';
     const vnd=pv??(pu!=null&&rate?pu*rate:null),usd=pu??(pv!=null&&rate?pv/rate:null);
     let docs=col.docs>=0?String(r[col.docs]??'').trim():'';
-    if(docs)docs=/^(không|khong|chưa|no)/i.test(docs)?'Không':'Có';
+    if(/[☐☒☑✔✓]/.test(docs)){docs=/[☒☑✔✓]\s*Có/i.test(docs)?'Có':/[☒☑✔✓]\s*Không/i.test(docs)?'Không':''}   // ô tích "☐ Có ☐ Không"
+    else if(docs)docs=/^(không|khong|chưa|no)/i.test(docs)?'Không':'Có';
     else{const q=r.slice(Math.max(col.note,col.vendor)+1).map(String).find(c=>/báo giá/i.test(c));if(q)docs=/chưa/i.test(q)?'Không':'Có'}
     const note=String(r[col.note]??'').trim();
     items.push({id:uid(),section:sec||'A_I',code:stt,name,unit:String(r[col.unit]??'').trim(),quantity:qty,price_usd:usd,price_ccy:ccy,unit_price:vnd,
@@ -1311,7 +1314,7 @@ async function importDuyTan(p,file){
   try{
     if(!window.XLSX)await loadJS(XLSX_URL);
     const ws=(wb=>wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer(),{type:'array'}));      // chỉ đọc Sheet đầu tiên
-    const res=parseDuyTan(XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true}),ws);
+    const res=parseDuyTan(dtRows(ws),ws);
     if(!res||!res.items.length)throw new Error('Không nhận dạng được file. Cần Sheet đầu có dòng tiêu đề chứa "STT" và "Tên hàng" (mẫu HT-TC-01/BM01).');
     modal(`<h3 class="font-bold text-lg mb-2">Xem trước import Dự toán</h3><ul class="text-sm space-y-1 mb-3 list-disc pl-5"><li>File: <b>${esc(file.name)}</b></li>
      <li>Phần A · Mục I (Máy chính): <b>${res.cnt.A_I}</b> dòng</li><li>Phần B · Mục I (Thiết bị phụ): <b>${res.cnt.B_I}</b> dòng</li><li>Phần B · Mục II (Cơ sở hạ tầng, lắp đặt): <b>${res.cnt.B_II}</b> dòng (${res.groups} nhóm)</li>
@@ -1326,141 +1329,157 @@ async function importDuyTan(p,file){
   }catch(e){toast(e.message)}
 }
 
-/* ===================== EXPORT: file Excel chuẩn Form Duy Tân (2 Sheet: "Dự toán" + "Khung Tên") ===================== */
-const DT_SIGNS=[   // [chức danh, vai trò, họ tên]  - thứ tự trải từ cột A đến L (mỗi người 2 cột)
+/* ===================== EXPORT: file Excel chuẩn Form Duy Tân HT-TC-01/BM01 (V04) — bố cục/màu/cỡ chữ sao y file mẫu "Dự toán đầu tư" 19.10.2026 ===================== */
+const DT_LOGO='data:image/png;base64,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';
+const DT_SIGNS=[   // [chức danh, vai trò, họ tên]
   ['Chủ tịch HĐTV','Phê duyệt','TRẦN DUY HY'],['Giám Đốc Tài Chính TNHH','Xem xét','NGUYỄN BẢO QUỐC'],['Tổng Giám Đốc DTR','Xem xét','HUỲNH NGỌC THẠCH'],
   ['Phó Tổng Giám Đốc Khối Vận Hành DTR','Xem xét','ĐÁI TRUNG QUÂN'],['Trưởng Phòng Kế Toán Quản Trị DTR','Kiểm tra','LƯU THỊ MINH TÂM'],['Giám đốc Kỹ Thuật DTR','Người lập','LÊ VĂN TY']];
+/* Khung chữ ký 6 ô (file mẫu dán dạng hình) -> vẽ bằng canvas, nền trắng, viền đen, chữ xanh 0070C0 */
+function dtSignPng(){
+  const W=3640,H=600,S=1.5,cv=document.createElement('canvas');cv.width=W*S;cv.height=H*S;
+  const g=cv.getContext('2d');g.scale(S,S);g.fillStyle='#fff';g.fillRect(0,0,W,H);
+  const n=DT_SIGNS.length,cw=(W-2)/n,hh=165,F="'Times New Roman',Times,serif";
+  g.strokeStyle='#000';g.lineWidth=2;g.strokeRect(1,1,W-2,H-2);g.beginPath();g.moveTo(1,hh);g.lineTo(W-1,hh);
+  for(let i=1;i<n;i++){const x=1+cw*i;g.moveTo(x,1);g.lineTo(x,H-1)}g.stroke();
+  const wrap=(t,w)=>{const out=[];let cur='';t.split(' ').forEach(wd=>{const nx=cur?cur+' '+wd:wd;if(cur&&g.measureText(nx).width>w){out.push(cur);cur=wd}else cur=nx});if(cur)out.push(cur);return out};
+  g.fillStyle='#0070C0';g.textAlign='center';
+  DT_SIGNS.forEach(([t,role,name],i)=>{
+    const cx=1+cw*i+cw/2;g.font=`bold 46px ${F}`;const ls=wrap(t,cw-30);
+    const lh=52,tot=ls.length*lh+lh;let y=(hh-tot)/2+lh*0.8;
+    ls.forEach(l=>{g.font=`bold 46px ${F}`;g.fillText(l,cx,y);y+=lh});
+    g.font=`italic 44px ${F}`;g.fillText('('+role+')',cx,y);
+    g.font=`bold 46px ${F}`;g.fillText(name,cx,H-18)});
+  return cv.toDataURL('image/png');
+}
 async function exportDuyTanBudget(project,budgetItems){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
     budgetItems=budgetItems||[];
     if(!budgetItems.length){toast('Dự án chưa có dữ liệu Chi phí để xuất');return}
-    const rate=rateOf(project),FONT='Times New Roman',COLW=[8,55,12,12,18,22,18,22,22,30,20,25];     // A..L
-    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Dự toán',{views:[{showGridLines:false}]});
+    const rate=rateOf(project),FONT='Times New Roman';
+    const BLUE='FF0000FF',RED='FFFF0000',TEAL='FF0070C0',YEL='FFFFFFCC',GRP='FFB6C7EA',KHD='FFDAE3F5';   // GRP = theme accent1 tint 60% ; KHD = tint 80% (như file mẫu)
+    const MF='_-* #,##0\\ _₫_-;\\-* #,##0\\ _₫_-;_-* "-"??\\ _₫_-;_-@_-',RF='#,##0\\ [$VND]';
+    const COLW=[12.82,108.27,21.17,26.07,45.71,40.71,30.71,40.71,42.71,52.5,42.14,51.71];     // A..L (y như mẫu)
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Dự toán',{views:[{zoomScale:40,zoomScaleNormal:40}]});
     COLW.forEach((w,i)=>ws.getColumn(i+1).width=w);
     const thin={style:'thin',color:{argb:'FF000000'}},box={top:thin,bottom:thin,left:thin,right:thin};
     const fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
-    const L=i=>String.fromCharCode(64+i);
-    const cellOf=(a,v,o={})=>{const c=ws.getCell(a);c.value=v;if(o.f)c.font=o.f;if(o.al)c.alignment=o.al;if(o.nf)c.numFmt=o.nf;if(o.fill)c.fill=o.fill;if(o.b)c.border=o.b;return c};
-    const mg=(a)=>ws.mergeCells(a);
-    /* ---- Dòng 1-2: tiêu đề + mã biểu mẫu ---- */
-    mg('C1:J2');cellOf('C1','BẢNG DỰ TOÁN CHI PHÍ ĐẦU TƯ \n(Áp dụng cho máy móc thiết bị - CAPEX)',{f:{bold:true,size:16,color:{argb:'FF0000FF'}},al:{horizontal:'center',vertical:'middle',wrapText:true}});
-    ws.getRow(1).height=24;ws.getRow(2).height=24;
-    cellOf('L1','HT-TC-01/BM01',{f:{bold:true},al:{horizontal:'center',vertical:'middle'}});cellOf('L2','V04 - 17/08/2026',{f:{bold:true},al:{horizontal:'center',vertical:'middle'}});
-    /* ---- Dòng 4-6: phòng ban / dự án / tỷ giá / tên bảng ---- */
-    cellOf('A4','Phòng ban: Kỹ Thuật',{f:{bold:true}});
-    cellOf('D4','Dự án/ Hạng mục: '+(project.name||''),{f:{bold:true,color:{argb:'FF0070C0'}}});
-    mg('F5:G5');cellOf('F5','Tỷ giá tạm tính 1 USD = ',{f:{bold:true},al:{horizontal:'right'}});
-    cellOf('H5',rate,{f:{bold:true},nf:'#,##0 "VND"',al:{horizontal:'center'}});
-    mg('A6:L6');cellOf('A6','BẢNG TỔNG HỢP CHI PHÍ ĐẦU TƯ',{f:{bold:true,color:{argb:'FFFF0000'}},fill:fill('FFFFFFCC'),al:{horizontal:'center',vertical:'middle'}});
-    for(let c=1;c<=12;c++)ws.getCell(6,c).border=box;
-    /* ---- Dòng tiêu đề bảng (dùng cho cả Phần A và Phần B) ---- */
-    const HEAD=['STT','Tên hàng - Quy cách - Công suất','ĐVT','Số Lượng','Đơn giá \n(USD)','Đơn giá chưa VAT \n(VND)','Thành tiền \n(USD)','Thành tiền \n(VND)','Thực tế phát sinh\n(VND)','Nhà cung cấp - \nNước sản xuất','Hồ sơ đính kèm','Ghi chú'];
-    const header=r=>{HEAD.forEach((h,i)=>{const c=ws.getCell(r,i+1);c.value=h;c.font={bold:true,color:{argb:'FFFF0000'}};c.fill=fill('FFFFFFCC');c.border=box;c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});ws.getRow(r).height=36};
-    header(7);
-    ws.views=[{showGridLines:false,state:'frozen',ySplit:7}];
+    const H=(r,h)=>ws.getRow(r).height=h;
+    /* put: ghi 1 ô với font Times New Roman cỡ 26 (mẫu) */
+    const put=(a,v,o={})=>{const c=typeof a==='string'?ws.getCell(a):ws.getCell(a[0],a[1]);if(c.type===ExcelJS.ValueType.Merge)return c;   // ô phụ của vùng gộp: kiểu dáng lấy từ ô chính
+      if(v!==undefined)c.value=v;
+      c.font={name:FONT,size:o.sz||26,bold:!!o.b,italic:!!o.i,color:{argb:o.c||BLUE}};
+      c.alignment={horizontal:o.h,vertical:o.v||'middle',wrapText:!!o.w};
+      if(o.nf)c.numFmt=o.nf;if(o.fill)c.fill=fill(o.fill);if(o.bd!==false)c.border=o.bd||box;return c};
+    const mg=a=>ws.mergeCells(a);
+    /* ---- Dòng 1-2: logo | tiêu đề | mã biểu mẫu ---- */
+    H(1,40.15);H(2,40);H(3,18);H(4,54);H(5,45.65);H(6,80);H(7,99);
+    mg('A1:B2');mg('C1:J2');
+    put('A1',undefined,{sz:32,b:1,h:'center',w:1});
+    put('C1','BẢNG DỰ TOÁN CHI PHÍ ĐẦU TƯ \n(Áp dụng cho máy móc thiết bị - CAPEX)',{sz:32,b:1,c:TEAL,h:'center',w:1});
+    put('K1',undefined,{sz:32,c:'FF000000',w:1,bd:{right:thin,top:thin}});put('K2',undefined,{sz:32,c:'FF000000',bd:{right:thin,bottom:thin}});
+    const lb={right:thin,top:thin,bottom:thin};put('L1','HT-TC-01/BM01',{sz:32,c:'FF000000',w:1,bd:lb});put('L2','V04 - 17/08/2026',{sz:32,c:'FF000000',bd:lb});
+    try{ws.addImage(wb.addImage({base64:DT_LOGO,extension:'png'}),{tl:{col:0.25,row:0.47},ext:{width:352,height:78}})}catch(e){}
+    /* ---- Dòng 4-5: phòng ban / dự án / tỷ giá ---- */
+    put('A4','Phòng ban: Kỹ Thuật',{sz:32,b:1,c:TEAL,bd:false});
+    put('D4','Dự án/ Hạng mục: '+(project.name||''),{sz:32,b:1,c:TEAL,h:'left',bd:false});
+    mg('F5:G5');put('F5','Tỷ giá tạm tính 1 USD = ',{sz:32,h:'right',bd:false});
+    put('H5',rate,{sz:32,nf:RF,h:'left',bd:false});
+    /* ---- Dòng 6: tên bảng; dòng 7: tiêu đề cột ---- */
+    mg('A6:L6');put('A6','BẢNG TỔNG HỢP CHI PHÍ ĐẦU TƯ',{b:1,c:RED,fill:YEL,h:'center',w:1});for(let c=2;c<=12;c++)put([6,c],undefined,{b:1,c:RED,fill:YEL});
+    const HEAD=['STT','Tên hàng - Quy cách - Công suất','ĐVT','Số Lượng ','Đơn giá \n(USD)','Đơn giá chưa VAT \n(VND)','Thành tiền \n(USD)','Thành tiền \n(VND)','Thực tế phát sinh\n(VND)','Nhà cung cấp - \nNước sản xuất','Hồ sơ đính kèm','Ghi chú'];
+    const HEAD_B=['Stt','Tên hàng , Qui cách','ĐVT','Số Lượng ','Đơn giá \n(USD)','Đơn giá chưa VAT\n(VND)','Thành tiền \n(USD)','Thành tiền \n(VND)',undefined,'Nhà cung cấp - \nNước sản xuất',undefined,'Ghi chú'];
+    const header=(r,labels)=>{labels.forEach((t,i)=>put([r,i+1],t,{b:1,c:RED,fill:YEL,h:'center',w:1}))};
+    header(7,HEAD);
     /* ---- Chuẩn bị dữ liệu: cây theo parent_id, chia theo section ---- */
     const by={};budgetItems.forEach(b=>(by[b.parent_id||'root']??=[]).push(b));
     const kids=id=>(by[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
     const secRoots=k=>budgetItems.filter(b=>b.section===k&&!b.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-    const sumOf=b=>{const k=by[b.id];return k&&k.length?k.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0}):{u:(b.quantity||0)*(b.price_usd||0),p:b.planned_amount||0,a:b.actual_amount||0}};
-    const NF={usd:'#,##0.00',vnd:'#,##0',qty:'#,##0.##'};
+    const add=(a,v)=>({u:a.u+v.u,p:a.p+v.p,a:a.a+v.a});
+    const sumOf=b=>{const k=by[b.id];return k&&k.length?k.reduce((a,x)=>add(a,sumOf(x)),{u:0,p:0,a:0}):{u:(b.quantity||0)*(b.price_usd||0),p:b.planned_amount||0,a:b.actual_amount||0}};
+    const sumAll=arr=>arr.reduce((a,x)=>add(a,sumOf(x)),{u:0,p:0,a:0});
+    const stt=s=>/^\d+$/.test(String(s))?Number(s):s;
+    const docsTxt=d=>d==='Có'?'☒  Có ☐  Không':d==='Không'?'☐  Có ☒  Không':'☐  Có ☐  Không';
+    const range=(a,b)=>c=>b>a?`${c}${a}:${c}${b}`:`${c}${a}`;
     let r=8;
-    const style=(row,o={})=>{for(let c=1;c<=12;c++){const cell=ws.getCell(row,c);cell.border=box;
-      cell.font={...(cell.font||{}),bold:!!o.bold,color:o.color?{argb:o.color}:undefined};if(o.fill)cell.fill=fill(o.fill);
-      cell.alignment={vertical:'middle',wrapText:c===2||c===10||c===12,horizontal:(c===1||c===3||c===11)?'center':(c>=4&&c<=9?'right':'left')}}};
-    const fmtRow=row=>{ws.getCell(row,4).numFmt=NF.qty;ws.getCell(row,5).numFmt=NF.usd;ws.getCell(row,6).numFmt=NF.vnd;ws.getCell(row,7).numFmt=NF.usd;ws.getCell(row,8).numFmt=NF.vnd;ws.getCell(row,9).numFmt=NF.vnd};
-    /* Ghi 1 hạng mục chi tiết. Cột G=E*D, H=F*D; E hoặc F là công thức quy đổi theo tỷ giá $H$5 */
-    const leaf=(it,depth)=>{
-      const row=r,q=it.quantity||0,usd=it.price_usd||0,vnd=it.unit_price||0,usdIsInput=it.price_ccy==='USD';
-      ws.getCell(row,1).value=it.code;ws.getCell(row,2).value=it.name;ws.getCell(row,3).value=it.unit||'';ws.getCell(row,4).value=q;
-      ws.getCell(row,5).value=usdIsInput?usd:{formula:`F${row}/$H$5`,result:vnd/rate};
-      ws.getCell(row,6).value=usdIsInput?{formula:`E${row}*$H$5`,result:usd*rate}:vnd;
-      ws.getCell(row,7).value={formula:`E${row}*D${row}`,result:q*(usdIsInput?usd:vnd/rate)};
-      ws.getCell(row,8).value={formula:`F${row}*D${row}`,result:q*(usdIsInput?usd*rate:vnd)};
-      ws.getCell(row,9).value=it.actual_amount||0;ws.getCell(row,10).value=it.vendor||'';ws.getCell(row,11).value=it.has_docs||'';ws.getCell(row,12).value=it.note||'';
-      style(row);fmtRow(row);r++;return row};
-    /* Ghi 1 dòng tiêu đề/nhóm có SUM: sumRefs = chuỗi tham chiếu, ví dụ "G10:G12" hoặc "G22,G25" */
-    const sumRow=(row,stt,title,refs,o={})=>{
-      ws.getCell(row,1).value=stt;ws.getCell(row,2).value=title;
-      [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>{ws.getCell(row,idx).value=refs?{formula:`SUM(${refs(c)})`,result:o.res?o.res[k]:0}:0});
-      style(row,{bold:true,color:o.color,fill:o.fill});fmtRow(row);return row};
-    const range=(a,b)=>c=>b>=a?`${c}${a}:${c}${b}`:`${c}${a}`;
-
-    /* ===== PHẦN A: dòng "A" + Mục I (MÁY CHÍNH) ===== */
-    ws.getCell(r,1).value='A';ws.getCell(r,2).value='CHI PHÍ DỰ TOÁN ĐÃ ĐƯỢC DUYỆT';style(r,{bold:true});r++;
-    const A=secRoots('A_I'),rA=r,resA=A.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
-    r++;A.forEach(it=>leaf(it,0));
-    sumRow(rA,'I','CHI PHÍ ĐẦU TƯ MÁY CHÍNH',A.length?range(rA+1,r-1):null,{res:resA});
+    /* Ghi 1 hạng mục chi tiết: E=USD, F=VND (1 trong 2 là nhập, ô còn lại quy đổi theo $H$5); G=E*D, H=F*D */
+    const leaf=it=>{
+      const row=r,q=it.quantity||0,usd=it.price_usd||0,vnd=it.unit_price||0,uIn=it.price_ccy==='USD';H(row,80);
+      put([row,1],stt(it.code),{h:'center'});put([row,2],it.name,{w:1,h:'left'});put([row,3],it.unit||'',{h:'center'});put([row,4],q,{h:'center'});
+      put([row,5],uIn?usd:{formula:`F${row}/$H$5`,result:vnd/rate},{nf:MF});
+      put([row,6],uIn?{formula:`E${row}*$H$5`,result:usd*rate}:vnd,{nf:MF});
+      put([row,7],{formula:`E${row}*D${row}`,result:q*(uIn?usd:vnd/rate)},{nf:MF});
+      put([row,8],{formula:`F${row}*D${row}`,result:q*(uIn?usd*rate:vnd)},{nf:MF});
+      put([row,9],it.actual_amount||null,{nf:RF,h:'center',w:1});put([row,10],it.vendor||'',{h:'center',w:1});put([row,11],docsTxt(it.has_docs),{h:'center'});put([row,12],it.note||'',{b:1,h:'center',w:1});
+      r++;return row};
+    /* Dòng tổng có SUM: kind='sec' (chữ đỏ, nền xanh nhạt) | 'grp' (chữ xanh, in đậm, nền xanh nhạt) */
+    const sumRow=(row,s,title,refs,res,kind)=>{const col=kind==='sec'?RED:BLUE;H(row,kind==='sec'?70:70);
+      put([row,1],stt(s),{b:1,c:col,fill:GRP,h:'center',w:1});put([row,2],title,{b:1,c:col,fill:GRP,w:1,h:'left'});
+      [3,4,5,6].forEach(c=>put([row,c],undefined,{b:1,c:col,fill:GRP,h:'center',nf:c>=5?MF:undefined}));
+      [['G','u',7],['H','p',8]].forEach(([c,k,i])=>put([row,i],refs?{formula:`SUM(${refs(c)})`,result:res[k]}:0,{b:1,c:col,fill:GRP,nf:MF,h:'right'}));
+      put([row,9],refs&&res.a?{formula:`SUM(${refs('I')})`,result:res.a}:null,{b:1,c:col,fill:GRP,nf:MF,h:'center'});
+      [10,11,12].forEach(c=>put([row,c],undefined,{b:1,c:col,fill:GRP,h:'center'}))};
+    /* Duyệt cây: nhóm cha (có con) -> dòng tổng; lá -> dòng chi tiết. Trả về số dòng. SUM chỉ cộng các con TRỰC TIẾP (tránh cộng trùng) */
+    const walk=it=>{const ks=kids(it.id);if(!ks.length)return leaf(it);
+      const row=r;r++;const cr=ks.map(walk),allLeaf=ks.every(k=>!kids(k.id).length);
+      sumRow(row,it.code,it.name,allLeaf?range(cr[0],cr[cr.length-1]):c=>cr.map(x=>c+x).join(','),sumOf(it),'grp');return row};
+    const section=(key,stt_,title)=>{const roots=secRoots(key),hr=r;r++;const tops=roots.map(walk),res=sumAll(roots),allLeaf=roots.every(k=>!kids(k.id).length);
+      sumRow(hr,stt_,title,tops.length?(allLeaf?range(tops[0],tops[tops.length-1]):c=>tops.map(x=>c+x).join(',')):null,res,'sec');return{hr,res,tops}};
+    const banner=(row,a,text)=>{H(row,row===8?70:70);mg(`B${row}:L${row}`);put([row,1],a,{b:1,c:RED,fill:YEL,h:'center',w:1});put([row,2],text,{b:1,c:RED,fill:YEL,h:'left',w:1});for(let c=3;c<=12;c++)put([row,c],undefined,{b:1,c:RED,fill:YEL})};
+    const totalRow=(row,mgTo,label,fs,o={})=>{H(row,o.h||(row===17?70:80));mg(`A${row}:${mgTo}${row}`);
+      put([row,1],label,{b:o.lb!==undefined?o.lb:1,c:o.lc||RED,h:'center',w:1,fill:o.fill});for(let c=2;c<=12;c++)put([row,c],undefined,{b:1,c:BLUE,fill:o.fill,nf:MF,h:'center'});
+      return row};
+    /* ===== PHẦN A ===== */
+    banner(8,'A','CHI PHÍ ĐẦU TƯ VÀ CẢI TẠO MÁY CHÍNH');r=9;
+    const A=section('A_I','I','CHI PHÍ ĐẦU TƯ MÁY CHÍNH');
     /* ===== PHẦN B ===== */
-    r++;ws.getCell(r,1).value='B';ws.getCell(r,2).value='BẢNG CHI TIẾT CHI PHÍ CƠ SỞ HẠ TẦNG + THIẾT BỊ PHỤ';style(r,{bold:true});r++;
-    header(r);r++;
-    const B=secRoots('B_I'),rB=r,resB=B.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
-    r++;B.forEach(it=>leaf(it,0));
-    sumRow(rB,'I','CHI PHÍ THIẾT BỊ PHỤ',B.length?range(rB+1,r-1):null,{res:resB});
-    /* Dòng TỔNG MÁY CHÍNH + THIẾT BỊ PHỤ */
-    const rMT=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ MÁY CHÍNH + THIẾT BỊ PHỤ';
-    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rA},${c}${rB})`,result:resA[k]+resB[k]});
-    style(r,{bold:true,fill:'FFF2F2F2'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
-    /* Dòng TỶ LỆ (công thức ở cột H, định dạng 0.00%) - trỏ tới Mục II ở bên dưới nên gán công thức sau */
-    const rRT=r;mg(`A${r}:G${r}`);ws.getCell(r,1).value='TỶ LỆ CP CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY/(MÁY CHÍNH + CHI PHÍ CẢI TẠO + THIẾT BỊ PHỤ)';style(r,{bold:true});ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
-    /* ===== Mục II: CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY: nhóm cha (chữ xanh đậm) + mục con ===== */
-    r++;const G2=secRoots('B_II'),rII=r,resII=G2.reduce((a,x)=>{const v=sumOf(x);return{u:a.u+v.u,p:a.p+v.p,a:a.a+v.a}},{u:0,p:0,a:0});
-    r++;const grpRows=[];
-    const walk=(it,depth)=>{
-      const ks=kids(it.id);
-      if(!ks.length){leaf(it,depth);return}
-      const row=r;r++;grpRows.push({row,depth});
-      ks.forEach(k=>walk(k,depth+1));
-      sumRow(row,it.code,it.name,range(row+1,r-1),{res:sumOf(it),color:'FF1F3864'});
-    };
-    const topRows=[];G2.forEach(g=>{const before=r;walk(g,0);topRows.push(before)});
-    sumRow(rII,'II','Chi Phí Cơ Sở Hạ Tầng, Lắp Đặt Máy',topRows.length?(c=>topRows.map(x=>`${c}${x}`).join(',')):null,{res:resII});
-    /* gán công thức dòng TỶ LỆ (đã biết dòng Mục II và dòng TỔNG MÁY+TB PHỤ) */
-    const ratio=(resA.p+resB.p)?resII.p/(resA.p+resB.p):0;
-    ws.getCell(rRT,8).value={formula:`IF(H${rMT}=0,0,H${rII}/H${rMT})`,result:ratio};ws.getCell(rRT,8).numFmt='0.00%';
-    /* Dòng TỔNG CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY / TỔNG CHUNG */
-    const rT1=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY';
-    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rII})`,result:resII[k]});
-    style(r,{bold:true,fill:'FFF2F2F2'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};r++;
-    const rT2=r;mg(`A${r}:F${r}`);ws.getCell(r,1).value='TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG, MÁY CHÍNH, THIẾT BỊ PHỤ';
-    [['G','u',7],['H','p',8],['I','a',9]].forEach(([c,k,idx])=>ws.getCell(r,idx).value={formula:`SUM(${c}${rMT},${c}${rT1})`,result:resA[k]+resB[k]+resII[k]});
-    style(r,{bold:true,fill:'FFFFE9B3'});fmtRow(r);ws.getCell(r,1).alignment={horizontal:'left',vertical:'middle'};
-    ['A','B','C','D','E','F','G','H','I','J','K','L'].forEach(c=>{const cell=ws.getCell(`${c}${r}`);cell.border={top:{style:'medium'},bottom:{style:'medium'},left:cell.border.left,right:cell.border.right}});
-    r++;
-    /* ===== Bảng kiểm soát ngân sách KTQT (cách 2 dòng trống) ===== */
-    r+=2;const rK=r;
-    const kh=[['A','STT'],['B','Nội dung'],['C','Số tiền (Triệu Đồng)'],['E','Phần trăm (%)'],['F','KTQT xác nhận']];
-    mg(`C${r}:D${r}`);mg(`F${r}:G${r}`);kh.forEach(([c,t])=>cellOf(`${c}${r}`,t,{f:{bold:true},al:{horizontal:'center',vertical:'middle',wrapText:true},fill:fill('FFFFFFCC')}));
-    for(let c=1;c<=7;c++)ws.getCell(r,c).border=box;r++;
-    [['1','Đề xuất này trong/ngoài ngân sách'],['2','Tổng ngân sách kế hoạch năm'],['3','Tổng số tiền đã duyệt trong năm'],['3.1','   Số tiền đã duyệt trong ngân sách'],['3.2','   Số tiền đã duyệt ngoài ngân sách']].forEach(([s,t],i)=>{
-      mg(`C${r}:D${r}`);mg(`F${r}:G${r}`);ws.getCell(r,1).value=s;ws.getCell(r,2).value=t;
-      if(i===0){ws.getCell(r,3).value={formula:`H${rT2}/1000000`,result:(resA.p+resB.p+resII.p)/1e6};ws.getCell(r,3).numFmt='#,##0.0'}
-      for(let c=1;c<=7;c++){const cell=ws.getCell(r,c);cell.border=box;cell.alignment={vertical:'middle',horizontal:c===1?'center':c===2?'left':'right'}}r++});
-    /* ngày tháng góc phải (J:L) */
-    mg(`J${rK}:L${rK}`);cellOf(`J${rK}`,'DTR, ngày ... tháng ... năm 2026',{f:{italic:true},al:{horizontal:'center',vertical:'middle'}});
-    /* ===== Khung chữ ký 6 cấp phê duyệt: mỗi người 2 cột, trải từ A đến L ===== */
-    r+=1;const signs=(sh,row0,cols,hTitle,hSign)=>{
-      DT_SIGNS.forEach(([t,role,name],i)=>{const a=cols[i][0],b=cols[i][1];
-        if(a!==b){sh.mergeCells(`${a}${row0}:${b}${row0}`);sh.mergeCells(`${a}${row0+1}:${b}${row0+1}`);sh.mergeCells(`${a}${row0+2}:${b}${row0+2}`)}
-        const c1=sh.getCell(`${a}${row0}`),c2=sh.getCell(`${a}${row0+2}`);
-        c1.value=`${t}\n(${role})`;c1.font={bold:true};c1.alignment={horizontal:'center',vertical:'middle',wrapText:true};
-        c2.value=name;c2.font={bold:true};c2.alignment={horizontal:'center',vertical:'middle',wrapText:true};
-        for(let c=a.charCodeAt(0);c<=b.charCodeAt(0);c++)for(let k=0;k<3;k++)sh.getCell(`${String.fromCharCode(c)}${row0+k}`).border=box});
-      sh.getRow(row0).height=hTitle;sh.getRow(row0+1).height=hSign;sh.getRow(row0+2).height=26};
-    signs(ws,r,[['A','B'],['C','D'],['E','F'],['G','H'],['I','J'],['K','L']],48,70);
+    banner(r,'B','BẢNG CHI TIẾT CHI PHÍ CƠ SỞ HẠ TẦNG +THIẾT BỊ PHỤ');r++;
+    header(r,HEAD_B);H(r,70);r++;
+    const Bs=section('B_I','I','CHI PHÍ THIẾT BỊ PHỤ');
+    /* TỔNG MÁY CHÍNH + THIẾT BỊ PHỤ */
+    const rMT=r,mt={u:A.res.u+Bs.res.u,p:A.res.p+Bs.res.p,a:A.res.a+Bs.res.a};
+    totalRow(r,'F','TỔNG CHI PHÍ MÁY CHÍNH + THIẾT BỊ PHỤ');
+    [['G','u',7],['H','p',8]].forEach(([c,k,i])=>put([r,i],{formula:`SUM(${c}${A.hr},${c}${Bs.hr})`,result:mt[k]},{b:1,c:RED,nf:MF,h:'center'}));
+    put([r,9],mt.a?{formula:`SUM(I${A.hr},I${Bs.hr})`,result:mt.a}:null,{c:BLUE,nf:RF,h:'center'});r++;
+    /* TỶ LỆ */
+    const rRT=r;totalRow(r,'G','TỶ LỆ CP CƠ SỞ HẠ TẦNG, LẮP ĐẶT MÁY/(MÁY CHÍNH + CHI PHÍ CẢI TẠO + THIẾT BỊ PHỤ)',0,{fill:GRP,h:70});for(let c=8;c<=12;c++)put([r,c],undefined,{b:1,c:RED,fill:GRP,h:'center',nf:'0.00%'});r++;
+    H(r,80);r++;    // dòng trống giữa Mục I và Mục II (không viền)
+    /* ===== Mục II ===== */
+    const II=section('B_II','II','Chi Phí Cơ Sở Hạ Tầng, Lắp Đặt Máy');
+    put([rRT,8],{formula:`IF(H${rMT}=0,0,H${II.hr}/H${rMT})`,result:mt.p?II.res.p/mt.p:0},{b:1,c:RED,fill:GRP,nf:'0.00%',h:'center'});
+    /* TỔNG CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY / TỔNG CHUNG */
+    const allr={u:mt.u+II.res.u,p:mt.p+II.res.p,a:mt.a+II.res.a};
+    const rT1=totalRow(r,'F','TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG + LẮP ĐẶT MÁY',0,{lc:BLUE,lb:0});
+    [['G','u',7],['H','p',8]].forEach(([c,k,i])=>put([r,i],{formula:`${c}${II.hr}`,result:II.res[k]},{b:1,c:RED,nf:MF,h:'center'}));
+    put([r,9],II.res.a?{formula:`I${II.hr}`,result:II.res.a}:null,{c:BLUE,nf:RF,h:'center'});r++;
+    const rT2=totalRow(r,'F','TỔNG CHI PHÍ CƠ SỞ HẠ TẦNG, MÁY CHÍNH, THIẾT BỊ PHỤ',0,{lc:BLUE,lb:0});
+    [['G','u',7],['H','p',8]].forEach(([c,k,i])=>put([r,i],{formula:`SUM(${c}${rMT},${c}${rT1})`,result:allr[k]},{b:1,c:RED,nf:MF,h:'center'}));
+    put([r,9],allr.a?{formula:`SUM(I${rMT},I${rT1})`,result:allr.a}:null,{c:BLUE,nf:RF,h:'center'});r++;
+    const rEnd=r;
+    mg(`A${r}:E${r}`);H(r,45);r++;H(r,30);r++;
+    /* ===== Bảng kiểm soát ngân sách KTQT ===== */
+    const rK=r,kc={c:TEAL};H(r,84);mg(`C${r}:D${r}`);mg(`F${r}:G${r}`);
+    [[1,'STT'],[2,'Nội dung'],[3,'Số tiền \n(Triệu Đồng)'],[4,undefined],[5,'Phần trăm (%)'],[6,'KTQT xác nhận'],[7,undefined]].forEach(([c,t])=>put([r,c],t,{b:1,c:TEAL,fill:KHD,h:'center',w:1}));r++;
+    const K5=[['1','Đề xuất này trong/ngoài ngân sách'],['2','Tổng ngân sách kế hoạch năm'],['3','Tổng số tiền đã duyệt trong năm'],['3.1','Số tiền đã duyệt trong ngân sách'],['3.2','Số tiền đã duyệt ngoài ngân sách']];
+    mg(`F${r}:G${r+4}`);
+    K5.forEach(([s,t],i)=>{H(r,50);mg(`C${r}:D${r}`);const it=i>=3;
+      put([r,1],stt(s),{c:TEAL,i:it,h:'center'});put([r,2],t,{c:TEAL,i:it,h:'left'});
+      put([r,3],i===0?{formula:`H${rT2}/1000000`,result:allr.p/1e6}:undefined,{c:TEAL,h:'center',nf:'#,##0.0'});put([r,4],undefined,{c:TEAL});put([r,5],undefined,{c:TEAL,h:'center'});put([r,6],undefined,{c:TEAL});put([r,7],undefined,{c:TEAL});r++});
+    H(r,30);r++;
+    H(r,40);mg(`J${r}:L${r}`);put([r,10],'                 DTR,  ngày      tháng      năm 2026',{sz:28,i:1,c:TEAL,bd:false,v:'middle'});r++;
+    /* ===== Khung chữ ký 6 cấp phê duyệt (hình, đặt dưới bảng KTQT như file mẫu) ===== */
+    try{ws.addImage(wb.addImage({base64:dtSignPng(),extension:'png'}),{tl:{col:0.31,row:r-1+0.12},ext:{width:3640,height:600}})}catch(e){console.warn('sign img',e)}
+    const lastRow=r+30;
     /* ===== Sheet 2: Khung Tên ===== */
-    const w2=wb.addWorksheet('Khung Tên',{views:[{showGridLines:false}]});
-    'ABCDEF'.split('').forEach(c=>w2.getColumn(c).width=32);
-    DT_SIGNS.forEach(([t,role,name],i)=>{const c=String.fromCharCode(65+i);
-      const a=w2.getCell(`${c}1`),b=w2.getCell(`${c}2`);
-      a.value=`${t}\n\n\n(${role})`;a.font={bold:true,name:FONT,size:12};a.alignment={horizontal:'center',vertical:'middle',wrapText:true};a.border=box;
-      b.value=name;b.font={bold:true,name:FONT,size:12};b.alignment={horizontal:'center',vertical:'middle'};b.border=box});
-    w2.getRow(1).height=110;w2.getRow(2).height=32;
-    /* ===== Font Times New Roman toàn bộ Sheet 1 (giữ nguyên đậm/màu/cỡ đã đặt) ===== */
-    ws.eachRow({includeEmpty:true},row=>{for(let c=1;c<=12;c++){const cell=row.getCell(c);cell.font={size:11,...(cell.font||{}),name:FONT}}});
-    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:1,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    w2.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+    const w2=wb.addWorksheet('Khung Tên');
+    'ABCDEF'.split('').forEach(c=>w2.getColumn(c).width=40.71);w2.getRow(1).height=60;w2.getRow(2).height=150;
+    DT_SIGNS.forEach(([t,role,name],i)=>{const c=String.fromCharCode(65+i),a=w2.getCell(`${c}1`),b=w2.getCell(`${c}2`),f={name:FONT,size:16,bold:true,color:{argb:TEAL}};
+      a.value={richText:[{text:t+'\n',font:f},{text:'('+role+')',font:{...f,bold:false,italic:true}}]};a.alignment={horizontal:'center',vertical:'middle',wrapText:true};a.border=box;
+      b.value=name;b.font=f;b.alignment={horizontal:'center',vertical:'bottom',wrapText:true};b.border=box});
+    w2.pageSetup={paperSize:9,orientation:'portrait'};
+    /* ===== In ấn: A4 ngang, vừa 1 trang rộng, lề hẹp như mẫu ===== */
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.1,right:.1,top:.2,bottom:.2,header:.5,footer:.5},printArea:`A1:L${lastRow}`};
+    ws.getRow(rEnd-1).addPageBreak();
     const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
     a.href=URL.createObjectURL(blob);a.download=`HT-TC-01-BM01_DuToan_${project.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
