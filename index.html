@@ -399,6 +399,9 @@ const TB={
 /* quyền trong dự án: viewer (chỉ xem) | editor (sửa task) | manager (quản lý dự án). 'owner' = người tạo dự án (Admin); 'member' là giá trị cũ = editor */
 const normRole=r=>({member:'editor',manager:'manager',owner:'owner',viewer:'viewer',editor:'editor'})[String(r||'').toLowerCase()]||'viewer';
 const DATEC=new Set(['start_date','end_date','due_date','actual_start_date','actual_end_date','approved_at','created_at','updated_at','imported_at']);
+/* Global State của dự án đang mở: dữ liệu chỉ tải 1 lần, đổi tab chỉ render lại từ đây. db.save cập nhật cục bộ (CACHE) ngay rồi mới gửi Supabase */
+let currentProjectData={project:null,tasks:[],budgets:[],members:[]};
+function syncCPD(){try{const pid=curPid;currentProjectData={project:CACHE.projects.find(x=>x.id===pid)||null,tasks:CACHE.tasks.filter(x=>x.project_id===pid),budgets:CACHE.budget_items.filter(x=>x.project_id===pid),members:CACHE.project_members.filter(x=>x.project_id===pid)}}catch(e){}}
 const CACHE={},SNAP={};Object.keys(TB).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});
 const pkOf=(c,r)=>c.pk.map(f=>r[f]).join('|');
 function toDB(k,r){
@@ -422,7 +425,7 @@ const db={
     const c=TB[k],old=SNAP[k],next=new Map(),ups=[];
     rows.forEach(r=>{const key=pkOf(c,r),o=toDB(k,r),j=JSON.stringify(o);next.set(key,j);if(old.get(key)!==j)ups.push(o)});
     const dels=[...old.keys()].filter(x=>!next.has(x));
-    CACHE[k]=structuredClone(rows);SNAP[k]=next;
+    CACHE[k]=structuredClone(rows);SNAP[k]=next;syncCPD();
     if(!ups.length&&!dels.length)return Promise.resolve(true);
     return enqueue(()=>pushRows(k,ups,dels));
   }
@@ -487,10 +490,11 @@ async function fetchAll(){
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
 }
 async function fetchProject(pid){
-  const admin=isAdmin();
-  await Promise.all([fetchTable('tasks','project_id',[pid]),canBudget(pid)?fetchTable('budget_items','project_id',[pid]):null,fetchTable('extra_tasks','project_id',[pid]),
-    fetchTable('notes','project_id',[pid]),fetchTable('master_gantt','project_id',[pid]),fetchTable('project_members','project_id',[pid])]);
-  await fetchTable('attachments','task_id',CACHE.tasks.filter(t=>t.project_id===pid).map(t=>t.id));
+  /* tasks / budgets / extra_tasks đã nằm trong CACHE từ fetchAll -> chỉ tải phần còn thiếu, tất cả song song trong 1 lượt Promise.all */
+  const need=[];if(!CACHE.tasks.some(t=>t.project_id===pid))need.push(fetchTable('tasks','project_id',[pid]));
+  if(canBudget(pid)&&!CACHE.budget_items.some(t=>t.project_id===pid))need.push(fetchTable('budget_items','project_id',[pid]));
+  const tids=CACHE.tasks.filter(t=>t.project_id===pid).map(t=>t.id);
+  await Promise.all([...need,fetchTable('notes','project_id',[pid]),fetchTable('master_gantt','project_id',[pid]),fetchTable('project_members','project_id',[pid]),fetchTable('attachments','task_id',tids)]);
 }
 async function resync(){await fetchAll();if(curPid)await fetchProject(curPid);route(true)}
 
@@ -1016,11 +1020,11 @@ function route(keep){
     if(!LOADING_R){LOADING_R=true;$('#view').innerHTML=SPIN_HTML;
       (pid?withLoad('Đang tải dữ liệu...',()=>Q.then(()=>fetchProject(pid))):withLoad('Đang tải dữ liệu...',()=>Q.then(fetchAll)))
         .catch(e=>{console.error(e);toast('Không tải được dữ liệu: '+(e.message||e),true)})
-        .finally(()=>{LOADING_R=false;if(pid)LOADED.add(pid);else{LISTOK=true;LOADED.clear()}route(keep)})}
+        .finally(()=>{LOADING_R=false;if(pid)LOADED.add(pid);else LISTOK=true;syncCPD();route(keep)})}
     return;
   }
-  if(pid)LISTOK=false;
   if(curTab!==name||curPid!==pid){EDIT=null;PADD=null;curTab=name;curPid=pid;keep=false}
+  syncCPD();
   renderSide(pid);
   const inP=!!pr;
   $('#sideProj').innerHTML=inP?`<div class="side-proj"><div class="flex justify-between text-[10px] font-bold tracking-wide opacity-80"><span>ĐANG XEM DỰ ÁN</span><span style="color:#fbbf24">${esc(pr.code)}</span></div><div class="font-semibold text-white my-1 truncate">${esc(pr.name)}</div><a href="#/projects">← Về danh sách tất cả</a></div>`:'';
