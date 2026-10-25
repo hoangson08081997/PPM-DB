@@ -261,6 +261,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     </div>
 
     <div class="relative">
+      <span id="syncInd" class="hidden items-center gap-1 text-xs text-mute whitespace-nowrap" title="Đồng bộ dữ liệu các dự án ở chế độ nền"></span>
       <button id="bellBtn" class="relative p-2" aria-label="Thông báo"><i class="fa-solid fa-bell"></i>
         <span id="bellBadge" class="absolute top-0 right-0 text-[10px] bg-red-600 text-white rounded-full px-1.5">0</span></button>
       <div id="bellMenu" class="hidden absolute right-0 mt-2 w-[24rem] max-w-[92vw] bg-surface border border-line rounded-xl shadow-lg p-3 z-40">
@@ -496,12 +497,21 @@ async function fetchHeavy(){
 async function fetchAll(){await fetchLight();await fetchHeavy()}
 /* Tải ngầm sau khi trang chủ đã hiện. window.appCache = bộ nhớ dùng chung (CACHE). Chỉ chạy 1 lần, ai cần thì chờ cùng 1 promise */
 window.appCache=CACHE;
+/* window.projectCache[projectId] = { tasks, budgets, members } — luôn lấy từ bộ nhớ chung nên không bao giờ cũ */
+window.projectCache=new Proxy({},{get:(_,pid)=>typeof pid!=='string'?undefined:{tasks:CACHE.tasks.filter(x=>x.project_id===pid),budgets:CACHE.budget_items.filter(x=>x.project_id===pid),members:CACHE.project_members.filter(x=>x.project_id===pid)},has:(_,pid)=>LOADED.has(pid),ownKeys:()=>[...LOADED],getOwnPropertyDescriptor:(_,pid)=>LOADED.has(pid)?{enumerable:true,configurable:true,value:window.projectCache[pid]}:undefined});
+const CLOUD='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/></svg>';
+function syncInd(st){const e=document.getElementById('syncInd');if(!e)return;
+  if(st==='loading'){e.className='inline-flex items-center gap-1 text-xs text-mute whitespace-nowrap';e.innerHTML='<span class="animate-pulse inline-flex items-center gap-1">'+CLOUD+'Đang đồng bộ ngầm...</span>'}
+  else if(st==='done'){e.className='inline-flex items-center gap-1 text-xs whitespace-nowrap';e.style.color='#16a34a';e.innerHTML=CLOUD+'✓ Đã đồng bộ';setTimeout(()=>{e.className='hidden'},3500)}
+  else{e.className='hidden'}}
+/* Chạy ngầm ngay sau khi trang chủ hiện: hút Tasks, Budgets, Members, ... của TẤT CẢ dự án (song song) vào bộ nhớ chung */
+function prefetchAllProjects(){return startPrefetch()}
 const PF={state:'idle',p:null};
 function startPrefetch(){
-  if(PF.p)return PF.p;PF.state='loading';
-  PF.p=Q.then(fetchHeavy).then(()=>{PF.state='done';CACHE.projects.forEach(x=>LOADED.add(x.id));syncCPD();
+  if(PF.p)return PF.p;PF.state='loading';syncInd('loading');
+  PF.p=Q.then(fetchHeavy).then(()=>{PF.state='done';syncInd('done');CACHE.projects.forEach(x=>LOADED.add(x.id));syncCPD();
       if(!curPid&&!LOADING_R)route(true);else{try{updateBadges();renderBell()}catch(e){}}},
-    e=>{PF.state='error';PF.p=null;console.error(e);toast('Không tải ngầm được dữ liệu: '+(e.message||e),true)});
+    e=>{PF.state='error';syncInd('');PF.p=null;console.error(e);toast('Không tải ngầm được dữ liệu: '+(e.message||e),true)});
   return PF.p}
 const idle=fn=>setTimeout(()=>('requestIdleCallback' in window)?requestIdleCallback(fn,{timeout:1500}):fn(),500);
 async function fetchProject(pid){
@@ -674,7 +684,7 @@ async function onSignedIn(su){
     CUR=await ensureUser(su);SESS=(CUR.prefs&&typeof CUR.prefs==='object')?CUR.prefs:{};
     await fetchLight();LISTOK=true;LOADED.clear();PF.state='idle';PF.p=null;
     if(location.search.includes('code=')){try{history.replaceState(null,'',location.pathname+(location.hash||''))}catch(e){}}
-    boot();idle(startPrefetch);      // trang chủ đã hiện -> sau 500ms tải ngầm dữ liệu nặng
+    boot();idle(prefetchAllProjects);      // trang chủ đã hiện -> sau 500ms tải ngầm dữ liệu nặng
   }catch(e){
     console.error(e);CUR=null;
     renderGate('<span class="text-red-600">Lỗi: '+esc(e.message||e)+'</span><br>Kiểm tra đã chạy file <b>supabase_setup.sql</b> chưa. <button id="gOut" class="underline">Đăng xuất</button>');
