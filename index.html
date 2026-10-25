@@ -479,16 +479,31 @@ function ingest(k,rows,col,vals){
   SNAP[k]=new Map(CACHE[k].map(r=>[pkOf(c,r),JSON.stringify(toDB(k,r))]));
   return rows;
 }
-async function fetchAll(){
+/* Lớp 1 (nhẹ, chạy ngay khi vào app): User + danh sách dự án + thành viên -> đủ để vẽ trang chủ */
+async function fetchLight(){
   const admin=isAdmin();
   await Promise.all([fetchTable('users'),fetchTable('project_members')]);
   if(admin)await fetchTable('projects');
   else await fetchTable('projects','id',CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id));
-  const pids=CACHE.projects.map(p=>p.id);
-  const bp=admin?pids:pids.filter(id=>roleOf(id)==='manager');
-  await Promise.all([fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids)]);
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
 }
+/* Lớp 2 (nặng): Tasks, Budgets, Việc phát sinh, Ghi chú, Master Gantt, File đính kèm của MỌI dự án */
+async function fetchHeavy(){
+  const admin=isAdmin(),pids=CACHE.projects.map(p=>p.id),bp=admin?pids:pids.filter(id=>roleOf(id)==='manager');
+  await Promise.all([fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids)]);
+  await fetchTable('attachments','task_id',CACHE.tasks.map(t=>t.id));
+}
+async function fetchAll(){await fetchLight();await fetchHeavy()}
+/* Tải ngầm sau khi trang chủ đã hiện. window.appCache = bộ nhớ dùng chung (CACHE). Chỉ chạy 1 lần, ai cần thì chờ cùng 1 promise */
+window.appCache=CACHE;
+const PF={state:'idle',p:null};
+function startPrefetch(){
+  if(PF.p)return PF.p;PF.state='loading';
+  PF.p=Q.then(fetchHeavy).then(()=>{PF.state='done';CACHE.projects.forEach(x=>LOADED.add(x.id));syncCPD();
+      if(!curPid&&!LOADING_R)route(true);else{try{updateBadges();renderBell()}catch(e){}}},
+    e=>{PF.state='error';PF.p=null;console.error(e);toast('Không tải ngầm được dữ liệu: '+(e.message||e),true)});
+  return PF.p}
+const idle=fn=>setTimeout(()=>('requestIdleCallback' in window)?requestIdleCallback(fn,{timeout:1500}):fn(),500);
 async function fetchProject(pid){
   /* tasks / budgets / extra_tasks đã nằm trong CACHE từ fetchAll -> chỉ tải phần còn thiếu, tất cả song song trong 1 lượt Promise.all */
   const need=[];if(!CACHE.tasks.some(t=>t.project_id===pid))need.push(fetchTable('tasks','project_id',[pid]));
@@ -657,9 +672,9 @@ async function onSignedIn(su){
   if(SIGNING)return;SIGNING=true;loading(true,'Đang đăng nhập và tải dữ liệu...');
   try{
     CUR=await ensureUser(su);SESS=(CUR.prefs&&typeof CUR.prefs==='object')?CUR.prefs:{};
-    await fetchAll();LISTOK=true;LOADED.clear();
+    await fetchLight();LISTOK=true;LOADED.clear();PF.state='idle';PF.p=null;
     if(location.search.includes('code=')){try{history.replaceState(null,'',location.pathname+(location.hash||''))}catch(e){}}
-    boot();
+    boot();idle(startPrefetch);      // trang chủ đã hiện -> sau 500ms tải ngầm dữ liệu nặng
   }catch(e){
     console.error(e);CUR=null;
     renderGate('<span class="text-red-600">Lỗi: '+esc(e.message||e)+'</span><br>Kiểm tra đã chạy file <b>supabase_setup.sql</b> chưa. <button id="gOut" class="underline">Đăng xuất</button>');
@@ -676,7 +691,7 @@ async function checkSession(){
   if(s)await onSignedIn(s.user);else renderGate();
 }
 async function logout(){
-  CUR=null;SESS={};Object.keys(CACHE).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});LOADED.clear();LISTOK=false;
+  CUR=null;SESS={};Object.keys(CACHE).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});LOADED.clear();LISTOK=false;PF.state='idle';PF.p=null;
   try{await sb.auth.signOut()}catch(e){}
   renderGate();
 }
@@ -1018,7 +1033,7 @@ function route(keep){
   const need=pid?!LOADED.has(pid):!LISTOK;
   if(need){
     if(!LOADING_R){LOADING_R=true;$('#view').innerHTML=SPIN_HTML;
-      (pid?withLoad('Đang tải dữ liệu...',()=>Q.then(()=>fetchProject(pid))):withLoad('Đang tải dữ liệu...',()=>Q.then(fetchAll)))
+      (pid?startPrefetch().then(()=>PF.state==='error'?fetchProject(pid):0):Q.then(fetchLight))     // chỉ hiện loading nhỏ trong vùng nội dung, chờ đúng lượt tải ngầm
         .catch(e=>{console.error(e);toast('Không tải được dữ liệu: '+(e.message||e),true)})
         .finally(()=>{LOADING_R=false;if(pid)LOADED.add(pid);else LISTOK=true;syncCPD();route(keep)})}
     return;
