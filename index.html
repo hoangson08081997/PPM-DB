@@ -110,12 +110,8 @@ input[type=number].pgn-in{-moz-appearance:textfield;appearance:textfield}.pgn-in
 .chip-ahead{background:linear-gradient(90deg,#dbeafe,#ede9fe);color:#4338ca;padding:.08rem .5rem;border-radius:999px;font-size:.7rem;font-weight:700;white-space:nowrap}
 .dd-in{width:100%;border:1px solid var(--line);border-radius:.375rem;background:var(--bg);color:inherit;font:inherit;font-size:.78rem;padding:.15rem .25rem;text-align:center}.dd-in::-webkit-outer-spin-button,.dd-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 /* Cảnh báo ngân sách (tab Chi phí) */
-tr.bs-ok>td.b-act{background:rgba(16,185,129,.14)!important;color:#047857;font-weight:600}
-tr.bs-warn>td.b-act{background:rgba(245,158,11,.16)!important;color:#b45309;font-weight:600}
-tr.bs-over>td{background:rgba(220,38,38,.07)}
-td.bs-ok-c{background:rgba(16,185,129,.14)!important;color:#047857}td.bs-warn-c{background:rgba(245,158,11,.16)!important;color:#b45309}td.bs-over-c{background:rgba(220,38,38,.16)!important;color:#b91c1c;font-weight:700}
-tr.bs-over>td.b-act{background:rgba(220,38,38,.16)!important;color:#b91c1c;font-weight:700;box-shadow:inset 0 0 0 1.5px #dc2626}
 tr[class*=bs-] input.b-actin{color:inherit;font-weight:inherit}
+.pill-dot{box-shadow:0 0 6px currentColor}
 .bdg{display:inline-block;font-size:.65rem;font-weight:700;padding:.03rem .4rem;border-radius:999px;white-space:nowrap;margin-top:1px}
 .bdg.ok{background:#d1fae5;color:#047857}.bdg.warn{background:#fef3c7;color:#b45309}.bdg.over{background:#fee2e2;color:#b91c1c}
 input[type=number].cell{-moz-appearance:textfield;appearance:textfield}
@@ -1200,16 +1196,17 @@ const bAddRow=(S,parent,d,isGrp)=>`<tr class="b-add"><td colspan="${B_COLS}" sty
 function viewBudget(p,target){
   const ed=canEdit(p.id);
   if(target){const bd=db.list('budget_items').filter(b=>b.project_id===p.id);let t=bd.find(x=>x.id===target);while(t&&t.parent_id){collapsed.delete(t.parent_id);t=bd.find(x=>x.id===t.parent_id)}}
-  const kc=(t,k,sub='')=>`<div class="card bg-surface border border-line rounded-xl p-3 min-w-0"><div class="text-xs text-mute leading-tight" style="min-height:2.1em">${t}</div><div class="text-lg font-bold mt-1 mono truncate" data-s="${k}">0</div><div class="text-xs text-mute mono mt-0.5 truncate" data-s="${k}-u"></div>${sub}</div>`;
+  const TONE={indigo:['#6366f1','#e0e7ff','text-indigo-700','border-indigo-500','gears'],cyan:['#06b6d4','#cffafe','text-cyan-700','border-cyan-500','building'],amber:['#f59e0b','#fef3c7','text-amber-600','border-amber-500','chart-pie'],emerald:['#10b981','#d1fae5','text-emerald-700','border-emerald-500','wallet']};
+  const kc=(t,k,sub='',tone='indigo')=>{const T=TONE[tone];return `<div class="card bg-surface rounded-xl p-3 min-w-0 relative border-l-4 ${T[3]}" style="border:1px solid var(--line);border-left:4px solid ${T[0]}"><div class="absolute top-3 right-3 w-9 h-9 rounded-xl flex items-center justify-center" style="background:${T[1]};color:${T[0]}"><i class="fa-solid fa-${T[4]}"></i></div><div class="text-xs text-mute leading-tight pr-11" style="min-height:2.1em">${t}</div><div class="text-xl font-bold mt-1 mono truncate ${T[2]}" data-s="${k}">0</div><div class="text-xs text-mute mono mt-0.5 truncate" data-s="${k}-u"></div>${sub}</div>`};
   $('#view').innerHTML=`<div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold">Chi phí · ${esc(p.name)}</h2><p class="text-mute text-xs">Biểu mẫu HT-TC-01/BM01 · Đơn vị VND / USD${ed?' · Bấm vào ô để sửa, Enter để xuống dòng dưới':' · Chỉ Admin / Manager được sửa'}</p></div>
    <div class="flex flex-wrap gap-2">${ed?'<button id="bImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Dự toán (Excel)</button>':''}<button id="bExpDT" class="btn btn-big"><i class="fa-solid fa-file-export mr-1"></i>Export Dự toán (Form Duy Tân)</button></div></div>
    <div class="card bg-surface border border-line rounded-xl p-3 mb-3 flex flex-wrap items-center gap-2"><span class="font-semibold text-sm">Tỷ giá tạm tính 1 USD =</span>
      <input id="bRate" class="inp mono" style="width:9rem;margin:0;text-align:right" inputmode="decimal" value="${nfmt(rateOf(p))}" ${ed?'':'disabled'} aria-label="Tỷ giá USD sang VND"><span class="text-sm font-semibold">VND</span>
      <span id="bRateMsg" class="text-xs text-mute">Đổi tỷ giá: dòng nhập bằng USD tính lại VND, dòng nhập bằng VND tính lại USD.</span></div>
    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-     ${kc('Tổng Máy chính + Thiết bị phụ','k1')}${kc('Tổng Cơ sở hạ tầng + Lắp đặt máy','k2')}
-     ${kc('Tỷ lệ CP CSHT &amp; Lắp đặt / (Máy chính + TB phụ)','k3','<div class="text-[11px] text-mute mt-0.5">= B.II / (A.I + B.I)</div>')}
-     ${kc('Tổng cộng Dự toán CAPEX · so với Thực tế phát sinh','k4','<div id="sBar"></div>')}</div>
+     ${kc('Tổng Máy chính + Thiết bị phụ','k1','','indigo')}${kc('Tổng Cơ sở hạ tầng + Lắp đặt máy','k2','','cyan')}
+     ${kc('Tỷ lệ CP CSHT &amp; Lắp đặt / (Máy chính + TB phụ)','k3','<div class="text-[11px] text-mute mt-0.5">= B.II / (A.I + B.I)</div>','amber')}
+     ${kc('Tổng cộng Dự toán CAPEX · so với Thực tế phát sinh','k4','<div id="sBar"></div>','emerald')}</div>
    <div class="card bg-surface border border-line rounded-xl bwrap"><table class="tbl w-full" style="font-size:12.5px;min-width:1500px;table-layout:fixed"><colgroup><col style="width:5.6rem"><col style="width:20rem"><col style="width:4.5rem"><col style="width:5rem"><col style="width:7.5rem"><col style="width:9.5rem"><col style="width:8.5rem"><col style="width:10rem"><col style="width:10rem"><col style="width:12rem"><col style="width:6rem"><col style="width:10rem"><col style="width:4.5rem"></colgroup>
    <thead><tr class="text-left text-mute text-xs"><th>STT</th><th>Tên hàng - Quy cách - Công suất</th><th>ĐVT</th><th class="text-right">Số Lượng</th><th class="text-right">Đơn giá (USD)</th><th class="text-right">Đơn giá chưa VAT (VND)</th><th class="text-right">Thành tiền (USD)</th><th class="text-right">Thành tiền (VND)</th><th class="text-right">Thực tế phát sinh (VND)</th><th>Nhà cung cấp - Nước SX</th><th>Hồ sơ đính kèm</th><th>Ghi chú</th><th></th></tr></thead>
    <tbody id="bBody"></tbody>
@@ -1270,10 +1267,18 @@ function drawBudgetBody(p){
 /* Trạng thái ngân sách: actual=0 -> trung tính | <=90% kế hoạch -> Trong hạn mức | 90-100% -> Sát ngân sách | >100% -> Vượt +X% */
 function bStat(planned,actual){
   planned=planned||0;actual=actual||0;if(actual<=0)return{k:''};
-  if(planned<=0)return{k:'over',label:'🔥 Vượt (chưa có KH)'};
-  if(actual>planned)return{k:'over',label:'🔥 Vượt +'+Math.round((actual/planned-1)*100)+'%'};
+  if(planned<=0)return{k:'over',label:'Vượt (chưa có KH)'};
+  if(actual>planned)return{k:'over',label:'Vượt +'+Math.round((actual/planned-1)*100)+'%'};
   if(actual>planned*0.9)return{k:'warn',label:'Sát ngân sách'};
   return{k:'ok',label:'Trong hạn mức'}}
+/* Pill badge + chấm LED: ok = xanh lá | warn = vàng nhấp nháy | over = đỏ phát sáng (animate-ping) */
+const STC={ok:'text-emerald-700',warn:'text-amber-600',over:'text-rose-600 font-bold'},STC_ALL='text-emerald-700 text-amber-600 text-rose-600 font-bold';
+function pillHTML(st){
+  if(!st.k)return'';
+  const m={ok:['bg-emerald-50 text-emerald-700 border border-emerald-200','<span class="relative flex h-2 w-2"><span class="pill-dot relative inline-flex rounded-full h-2 w-2 bg-emerald-500" style="color:#10b981"></span></span>'],
+    warn:['bg-amber-50 text-amber-700 border border-amber-200','<span class="relative flex h-2 w-2"><span class="pill-dot animate-pulse relative inline-flex rounded-full h-2 w-2 bg-amber-400" style="color:#f59e0b"></span></span>'],
+    over:['bg-rose-50 text-rose-600 border border-rose-300 shadow-sm','<span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span><span class="pill-dot relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" style="color:#f43f5e"></span></span>']}[st.k];
+  return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${m[0]}">${m[1]}${st.label}</span>`}
 function refreshBudgetCalcs(p,force){
   const bd=db.list('budget_items').filter(b=>b.project_id===p.id),T=bTotals(bd),roll=T.roll,by=Object.fromEntries(bd.map(b=>[b.id,b])),ae=document.activeElement,rate=rateOf(p);
   document.querySelectorAll('#bBody tr[data-id]').forEach(tr=>{
@@ -1283,10 +1288,11 @@ function refreshBudgetCalcs(p,force){
       if(i.tagName==='SELECT')i.value=r[f]||'';else i.value=f==='actual_amount'?(r[f]?nfmt(Math.round(r[f])):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
     /* Y3: tô màu theo ngân sách: actual so với planned (kế hoạch) */
     const st=bStat(v.planned,v.actual);tr.classList.remove('bs-ok','bs-warn','bs-over');if(st.k)tr.classList.add('bs-'+st.k);
-    const bg=tr.querySelector('[data-bdg]');if(bg)bg.innerHTML=st.k?`<span class="bdg ${st.k}">${st.label}</span>`:'';
+    const ta=tr.querySelector('td.b-act');if(ta){ta.classList.remove(...STC_ALL.split(' '));if(st.k)ta.classList.add(...STC[st.k].split(' '))}
+    const bg=tr.querySelector('[data-bdg]');if(bg)bg.innerHTML=pillHTML(st);
   });
   const set=(sel,t)=>{const e=$(sel);if(e)e.textContent=t};
-  const stCls=(sel,pl,ac)=>{const e=$(sel);if(!e)return;const td=e.closest('td');if(!td)return;td.classList.remove('bs-ok-c','bs-warn-c','bs-over-c');const st=bStat(pl,ac);if(st.k)td.classList.add('bs-'+st.k+'-c');let bd=td.querySelector('[data-sbdg]');if(!bd){bd=document.createElement('div');bd.dataset.sbdg='';td.appendChild(bd)}bd.innerHTML=st.k?`<span class="bdg ${st.k}">${st.label}</span>`:''};
+  const stCls=(sel,pl,ac)=>{const e=$(sel);if(!e)return;const td=e.closest('td');if(!td)return;td.classList.remove(...STC_ALL.split(' '));const st=bStat(pl,ac);if(st.k)td.classList.add(...STC[st.k].split(' '));let bd=td.querySelector('[data-sbdg]');if(!bd){bd=document.createElement('div');bd.dataset.sbdg='';td.appendChild(bd)}bd.innerHTML=pillHTML(st)};
   ['A_I','B_I','B_II','X'].forEach(k=>stCls(`[data-st="${k}:actual"]`,T.T[k].planned,T.T[k].actual));stCls('[data-t=actual]',T.all.planned,T.all.actual);
   ['A_I','B_I','B_II','X'].forEach(k=>{set(`[data-st="${k}:usd"]`,nfmt(T.T[k].usd));set(`[data-st="${k}:planned"]`,nfmt(T.T[k].planned));set(`[data-st="${k}:actual"]`,nfmt(T.T[k].actual))});
   set('[data-t=usd]',nfmt(T.all.usd));set('[data-t=planned]',nfmt(T.all.planned));set('[data-t=actual]',nfmt(T.all.actual));
@@ -1295,7 +1301,7 @@ function refreshBudgetCalcs(p,force){
   set('[data-s=k2]',money(T.infra));set('[data-s=k2-u]',usd(T.infra));
   set('[data-s=k3]',T.ratio.toLocaleString('vi-VN',{minimumFractionDigits:2,maximumFractionDigits:2})+' %');set('[data-s=k3-u]','Mục B.II / (A.I + B.I)');
   set('[data-s=k4]',money(T.all));set('[data-s=k4-u]',usd(T.all)+' · Thực tế: '+nfmt(Math.round(T.all.actual))+' VND');
-  const pc=T.all.planned?Math.round(T.all.actual/T.all.planned*100):0,sb=$('#sBar');if(sb)sb.innerHTML=bar(pc,pc>100?'#dc2626':'var(--brand)')+`<div class="text-[11px] text-mute mt-0.5">Đã phát sinh ${pc}% dự toán</div>`;
+  const pc=T.all.planned?Math.round(T.all.actual/T.all.planned*100):0,sb=$('#sBar');if(sb)sb.innerHTML=bar(pc,pc>100?'linear-gradient(90deg,#fb7185,#e11d48)':pc>90?'linear-gradient(90deg,#fbbf24,#f59e0b)':'linear-gradient(90deg,#6ee7b7,#059669)')+`<div class="text-[11px] text-mute mt-0.5">Đã phát sinh ${pc}% dự toán</div>`;
   renderBell();
 }
 
@@ -1774,6 +1780,12 @@ function spSync(t,ch){
 }
 const setStatus=(id,st)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{status:st}))};
 const setProgress=(id,pg)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{progress:pg}))};
+/* Kéo % ở đầu mục cha: áp cho cả nhánh con (trạng thái, ngày BĐ thực tế = hôm nay nếu trống) và lưu 1 lần lên Supabase */
+function setProgressTree(id,pg){
+  const all=db.list('tasks'),t0=all.find(x=>x.id===id);if(!t0)return;
+  const ids=descOf(all.filter(x=>x.project_id===t0.project_id),id),now=new Date().toISOString();
+  db.save('tasks',all.map(x=>ids.has(x.id)?{...x,...spSync(x,{progress:pg}),updated_at:now}:x));
+}
 
 /* ===== Trình sửa nhanh nằm ngay trong thẻ / dòng (không popup) ===== */
 const attHTML=t=>{const ex=db.list('attachments').filter(a=>a.task_id===t.id),pd=PEND[t.id]||[];
@@ -1843,7 +1855,7 @@ function viewProgress(p,target){
   $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-3" role="tablist" aria-label="Nguồn công việc">${[['pmp','Check list',cntPMP],['becos','Becos',cntBec]].map(([k,l,n])=>`<button role="tab" data-psub="${k}" aria-selected="${PSUB===k}" class="seg px-4 py-1.5 ${PSUB===k?'on':''}">${l} <span class="text-[11px] opacity-70">${n}</span></button>`).join('')}</div>
    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-bars-progress" style="color:var(--brand)"></i>${becos?'Becos · hạng mục từ Master Gantt':'Check list · tiến độ &amp; phân cấp công việc'}</h2>
     <p class="text-mute text-xs">${becos?'Các hạng mục lấy từ Master Gantt (task_source = BECOS). Bấm <b>Đồng bộ từ Master Gantt</b> để cập nhật ngày / % mới nhất.':'Bấm <b>+</b> trên thẻ để thêm việc con (không giới hạn cấp). Kéo thanh trượt để cập nhật % hoàn thành. Dữ liệu ở thẻ này vẽ ra sơ đồ <b>Check list PMP</b> bên tab Gantt.'}</p></div>
-   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Master Gantt${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
+   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button><button id="pExp" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-file-excel mr-1"></i>📥 Xuất Excel Tiến độ</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Master Gantt${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
    ${ed?`<div class="card p-3 mb-3"><div class="flex flex-wrap gap-2 items-center"><span class="lbl" style="color:#f59e0b"><i class="fa-solid fa-plus"></i> Khởi tạo nhanh</span><input id="pqName" class="inp" style="margin:0;flex:1;min-width:11rem" placeholder="Thêm đầu mục lớn: gõ tên rồi nhấn Enter" aria-label="Tên đầu mục mới"><input id="pqDue" type="date" class="inp" style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button id="pqAdd" class="btn" aria-label="Thêm đầu mục"><i class="fa-solid fa-plus"></i> Thêm việc</button></div><div id="pqErr" class="text-red-600 text-xs h-4 mt-1"></div></div>`:''}
    <div class="flex flex-wrap items-center gap-2 mb-3"><input id="pqSearch" class="inp" style="max-width:17rem;margin:0" placeholder="Tìm tên, mã WBS, bộ phận..." value="${esc(pq)}">${nd?`<button id="ndChip" class="text-xs px-2 py-1 rounded-full" style="background:${pnd?'#f59e0b':'#fef3c7'};color:#92400e">⚠ ${nd} việc thiếu thời lượng${pnd?' (đang lọc)':''}</button>`:''}</div>
    <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>BĐ kế hoạch</div><div>KT kế hoạch</div><div title="Số ngày kế hoạch" class="text-center">Ngày KH</div><div>BĐ thực tế</div><div>KT thực tế</div><div title="Số ngày thực tế" class="text-center">Ngày TT</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
@@ -1857,6 +1869,7 @@ function viewProgress(p,target){
   const chip=$('#ndChip');if(chip)chip.onclick=()=>{pnd=!pnd;viewProgress(p)};
   $('#pAll').onclick=()=>{pRows(p).forEach(t=>PEXP.add(t.id));redraw()};
   $('#pNone').onclick=()=>{pRows(p).forEach(t=>PEXP.delete(t.id));redraw()};
+  $('#pExp').onclick=()=>exportProgressXLSX(p);
   if(adm&&$('#tImp')){$('#tImp').onclick=()=>$('#tFile').click();$('#tFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importChecklist(p,f)}}
 
   const doAdd=(row)=>{const pid=row.dataset.addrow,nm=row.querySelector('[data-addname]').value.trim(),er=row.querySelector('[data-adderr]');
@@ -1883,8 +1896,8 @@ function viewProgress(p,target){
   tree.onchange=e=>{
     if(edFile(e))return;
     const el=e.target,card=el.closest('[data-id]'),id=card&&card.dataset.id,a=el.dataset.act;if(!a)return;
-    if(a==='pg'){setProgress(id,+el.value);redraw();renderBell()}   // luôn cho kéo, kể cả khi chưa tới ngày BĐ kế hoạch (vượt tiến độ)
-    else if(a==='pgn'){const v=Math.max(0,Math.min(100,Math.round(+el.value||0)));setProgress(id,v);redraw();renderBell()}
+    if(a==='pg'){setProgressTree(id,+el.value);redraw();renderBell()}   // luôn cho kéo, kể cả khi chưa tới ngày BĐ kế hoạch (vượt tiến độ)
+    else if(a==='pgn'){const v=Math.max(0,Math.min(100,Math.round(+el.value||0)));setProgressTree(id,v);redraw();renderBell()}
     else if(a==='as'||a==='ae'){
       const t=db.list('tasks').find(x=>x.id===id);if(!t)return;
       const as=a==='as'?(el.value||null):t.actual_start_date,ae=a==='ae'?(el.value||null):t.actual_end_date;
@@ -1904,6 +1917,41 @@ function viewProgress(p,target){
   drawProgress(p);
 }
 
+
+/* ===== Xuất Excel Tiến độ (thẻ đang mở: Check list hoặc Becos) — giữ cây cha-con, import ngược lại được bằng "Import Check list" ===== */
+async function exportProgressXLSX(p){
+  try{
+    if(!window.ExcelJS)await loadJS(EXCELJS_URL);
+    const tk=pRows(p);if(!tk.length){toast('Thẻ này chưa có công việc để xuất');return}
+    const {k,R}=rollTasks(tk),becos=PSUB==='becos',flat=[];
+    const walk=(id,d)=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(t=>{flat.push({t,d,grp:!!k[t.id]});if(k[t.id])walk(t.id,d+1)});walk('root',0);
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet(becos?'Becos':'Check list',{views:[{state:'frozen',ySplit:4}]});
+    const F='Times New Roman',thin={style:'thin',color:{argb:'FF9CA3AF'}},box={top:thin,bottom:thin,left:thin,right:thin};
+    const HEAD=['STT','Tên công việc','Cấp độ','Tiến độ (%)','Trạng thái','BĐ Kế hoạch','KT Kế hoạch','Thời gian KH (ngày)','Thực tế bắt đầu (BĐ TT)','Thực tế kết thúc (KT TT)','Số ngày TT','Chênh lệch ngày','Ràng buộc / Ghi chú'];
+    [8,52,9,11,15,13,13,14,16,16,11,14,42].forEach((w,i)=>ws.getColumn(i+1).width=w);
+    ws.mergeCells('A1:M1');ws.getCell('A1').value=(becos?'BÁO CÁO TIẾN ĐỘ BECOS':'BÁO CÁO TIẾN ĐỘ CHECK LIST')+' · '+p.name;ws.getCell('A1').font={name:F,size:16,bold:true,color:{argb:'FF1F4E79'}};ws.getRow(1).height=28;
+    ws.mergeCells('A2:M2');ws.getCell('A2').value=`Mã dự án: ${p.code||''} · Ngày xuất: ${fmtD(today())}`;ws.getCell('A2').font={name:F,size:11,italic:true,color:{argb:'FF475569'}};
+    const hr=ws.getRow(4);hr.height=34;
+    HEAD.forEach((h,i)=>{const c=hr.getCell(i+1);c.value=h;c.font={name:F,size:11,bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F4E79'}};c.border=box;c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
+    const toD=v=>v?new Date(v+'T00:00:00Z'):null,TST_L={todo:'Chưa làm',in_progress:'Đang làm',review:'Chờ duyệt',done:'Hoàn thành'};
+    flat.forEach(({t,d,grp},i)=>{
+      const r=R[t.id],row=ws.getRow(5+i),pd=grp?(r.s&&r.e?daysBetween(r.s,r.e)+1:null):plannedDays(t),ad=t.actual_days??(t.actual_start_date&&t.actual_end_date?daysBetween(t.actual_start_date,t.actual_end_date)+1:null);
+      const stt=r.pg>=100?'done':r.pg>0?'in_progress':'todo',status=grp?stt:t.status;
+      const vals=[t.wbs_code,t.name,d+1,r.pg/100,TST_L[status]||status,toD(r.s),toD(r.e),pd,toD(t.actual_start_date),toD(t.actual_end_date),ad,ad!=null&&pd!=null?ad-pd:null,[t.notes,(t.depends_on||[]).length?'Ràng buộc: '+t.depends_on.map(x=>(tk.find(y=>y.id===x)||{}).wbs_code).filter(Boolean).join(', '):''].filter(Boolean).join(' | ')];
+      vals.forEach((v,c)=>{const cell=row.getCell(c+1);cell.value=v;cell.border=box;
+        cell.font={name:F,size:11,bold:grp,color:{argb:'FF0F172A'}};
+        cell.alignment={vertical:'middle',wrapText:c===1||c===12,horizontal:c===1||c===12?'left':'center',indent:c===1?d:0};
+        if(grp)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:d===0?'FFDAE3F5':'FFF1F5F9'}};
+        if(c===3)cell.numFmt='0%';if([5,6,8,9].includes(c))cell.numFmt='dd/mm/yyyy'});
+      const dif=vals[11];if(dif!=null){const c=row.getCell(12);c.font={name:F,size:11,bold:true,color:{argb:dif>0?'FFDC2626':status==='done'?'FF16A34A':'FF0F172A'}};c.numFmt='+0;-0;0'}
+    });
+    ws.autoFilter={from:{row:4,column:1},to:{row:4,column:13}};
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+    const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=`TienDo_${becos?'Becos':'Checklist'}_${p.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
+}
+
 /* ---- Số ngày kế hoạch / thực tế + Vượt tiến độ ---- */
 const plannedDays=t=>t.start_date&&t.due_date?daysBetween(t.start_date,t.due_date)+1:(t.planned_days??t.duration_days??null);
 const aheadOf=t=>t.start_date&&t.start_date>today()&&(t.progress||0)>0;           // chưa tới ngày BĐ kế hoạch mà đã có % -> làm vượt tiến độ
@@ -1921,18 +1969,18 @@ function drawProgress(p){
      <div class="c-name flex flex-wrap items-center gap-1.5 min-w-0" style="padding-left:${flat?0:d*1.3}rem">
       ${!leaf&&!flat?`<button data-act="tg" class="ibtn" aria-label="Mở hoặc thu gọn"><i class="fa-solid fa-chevron-${open?'down':'right'} text-xs"></i></button>`:'<span class="inline-block" style="width:1.55rem"></span>'}
       <span class="mono text-xs" style="color:#f59e0b">${esc(t.wbs_code)}</span>
-      <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>${leaf&&aheadOf(t)?'<span class="chip-ahead bg-indigo-100 text-indigo-700" title="Đã làm trước ngày bắt đầu kế hoạch">⚡ Vượt tiến độ</span>':''}
+      <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>${(leaf?aheadOf(t):(r.s&&r.s>today()&&r.pg>0))?'<span class="chip-ahead bg-indigo-100 text-indigo-700" title="Đã làm trước ngày bắt đầu kế hoạch">⚡ Vượt tiến độ</span>':''}
       ${ed?`<button data-act="add" class="add-mini" aria-label="Thêm việc con"><i class="fa-solid fa-plus"></i></button>`:''}
       ${priSel(t,!ed)}
       <div class="basis-full" style="padding-left:${leaf||flat?1.55:1.55}rem"><textarea class="note-in" rows="1" data-act="note" placeholder="Ghi chú..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" ${ed?'':'disabled'}>${esc(t.notes)}</textarea></div>
      </div>
-     <div class="c-prog flex items-center gap-2">${leaf?`<input type="range" class="rng" min="0" max="100" step="5" value="${r.pg}" data-act="pg" ${ed?'':'disabled'} aria-label="Phần trăm hoàn thành">`:`<div class="flex-1">${bar(r.pg)}</div>`}${leaf?`<span class="pgn-w"><input type="number" class="pgn-in mono" min="0" max="100" step="1" value="${r.pg}" data-act="pgn" data-pgv ${ed?'':'disabled'} aria-label="Nhập phần trăm">%</span>`:`<b class="mono text-xs w-10 text-right" data-pgv style="color:var(--brand)">${r.pg}%</b>`}</div>
+     <div class="c-prog flex items-center gap-2"><input type="range" class="rng" min="0" max="100" step="5" value="${r.pg}" data-act="pg" ${ed?'':'disabled'} aria-label="Phần trăm hoàn thành"><span class="pgn-w"><input type="number" class="pgn-in mono" min="0" max="100" step="1" value="${r.pg}" data-act="pgn" data-pgv ${ed?'':'disabled'} aria-label="Nhập phần trăm">%</span></div>
      <div class="c-sd text-xs">${leaf?`<input type="date" class="dt-in" data-act="sd" value="${t.start_date||''}" ${ed?'':'disabled'} aria-label="Ngày bắt đầu">`:`<div class="mono">${fmtD(r.s)}</div>`}</div>
      <div class="c-ed text-xs">${leaf?`<input type="date" class="dt-in" data-act="ed" value="${t.due_date||''}" ${ed?'':'disabled'} aria-label="Ngày kết thúc"><div class="mt-0.5">${dlChip(t)}</div>`:`<div class="mono">${fmtD(r.e)}</div><div class="text-mute mt-0.5">${kids.length} việc con</div>`}</div>
      <div class="c-d text-xs text-center mono">${leaf?(plannedDays(t)??'—'):(r.s&&r.e?daysBetween(r.s,r.e)+1:'—')}</div>
-     <div class="c-d text-xs">${leaf?`<input type="date" class="dt-in" data-act="as" value="${t.actual_start_date||''}" ${ed?'':'disabled'} aria-label="Ngày bắt đầu thực tế">`:'<div class="text-mute">—</div>'}</div>
-     <div class="c-d text-xs">${leaf?`<input type="date" class="dt-in" data-act="ae" value="${t.actual_end_date||''}" ${ed?'':'disabled'} aria-label="Ngày kết thúc thực tế">`:'<div class="text-mute">—</div>'}</div>
-     <div class="c-d text-xs text-center">${leaf?actDaysCell(t,ed):'<div class="text-mute">—</div>'}</div>
+     <div class="c-d text-xs"><input type="date" class="dt-in" data-act="as" value="${t.actual_start_date||''}" ${ed?'':'disabled'} aria-label="Ngày bắt đầu thực tế"></div>
+     <div class="c-d text-xs"><input type="date" class="dt-in" data-act="ae" value="${t.actual_end_date||''}" ${ed?'':'disabled'} aria-label="Ngày kết thúc thực tế"></div>
+     <div class="c-d text-xs text-center">${actDaysCell(t,ed)}</div>
      <div class="c-act text-right whitespace-nowrap">${ed?`<button data-act="edit" class="ibtn" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button><button data-act="del" class="ibtn del" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button>`:''}</div>
      ${editing?editorHTML(t,leaf):''}</div>`;
     if(PADD===t.id)h+=`<div class="tg-row tg-add" data-addrow="${t.id}"><div class="tg-full flex flex-wrap gap-2 items-center" style="padding-left:${flat?0:(d+1)*1.3}rem"><span class="mono text-xs" style="color:#f59e0b">↳</span><input class="inp" data-addname style="margin:0;flex:1;min-width:10rem" placeholder="Tên việc con · Enter để thêm · Esc để đóng" aria-label="Tên việc con"><input type="date" class="inp" data-adddue style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button class="btn" data-act="add-ok" aria-label="Thêm"><i class="fa-solid fa-plus"></i></button><button class="ibtn" data-act="add-x" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button><span data-adderr class="text-red-600 text-xs"></span></div></div>`;
