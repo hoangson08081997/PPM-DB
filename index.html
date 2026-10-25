@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Technical PM</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link id="fontLink" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
@@ -104,6 +105,19 @@ input[type=range].rng{width:100%;accent-color:var(--brand);cursor:pointer}
 .cell:focus{outline:none;border-color:var(--brand);background:var(--bg)}
 .cell:disabled{opacity:1;cursor:default}
 .cell.num{text-align:right}
+.pgn-w{display:inline-flex;align-items:center;gap:1px;font-size:.75rem;font-weight:700;color:var(--brand)}.pgn-in{width:3.1rem;text-align:right;border:1px solid var(--line);border-radius:.375rem;background:var(--bg);color:inherit;font:inherit;padding:.1rem .2rem}
+input[type=number].pgn-in{-moz-appearance:textfield;appearance:textfield}.pgn-in::-webkit-outer-spin-button,.pgn-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.chip-ahead{background:linear-gradient(90deg,#dbeafe,#ede9fe);color:#4338ca;padding:.08rem .5rem;border-radius:999px;font-size:.7rem;font-weight:700;white-space:nowrap}
+.dd-in{width:100%;border:1px solid var(--line);border-radius:.375rem;background:var(--bg);color:inherit;font:inherit;font-size:.78rem;padding:.15rem .25rem;text-align:center}.dd-in::-webkit-outer-spin-button,.dd-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* Cảnh báo ngân sách (tab Chi phí) */
+tr.bs-ok>td.b-act{background:rgba(16,185,129,.14)!important;color:#047857;font-weight:600}
+tr.bs-warn>td.b-act{background:rgba(245,158,11,.16)!important;color:#b45309;font-weight:600}
+tr.bs-over>td{background:rgba(220,38,38,.07)}
+td.bs-ok-c{background:rgba(16,185,129,.14)!important;color:#047857}td.bs-warn-c{background:rgba(245,158,11,.16)!important;color:#b45309}td.bs-over-c{background:rgba(220,38,38,.16)!important;color:#b91c1c;font-weight:700}
+tr.bs-over>td.b-act{background:rgba(220,38,38,.16)!important;color:#b91c1c;font-weight:700;box-shadow:inset 0 0 0 1.5px #dc2626}
+tr[class*=bs-] input.b-actin{color:inherit;font-weight:inherit}
+.bdg{display:inline-block;font-size:.65rem;font-weight:700;padding:.03rem .4rem;border-radius:999px;white-space:nowrap;margin-top:1px}
+.bdg.ok{background:#d1fae5;color:#047857}.bdg.warn{background:#fef3c7;color:#b45309}.bdg.over{background:#fee2e2;color:#b91c1c}
 input[type=number].cell{-moz-appearance:textfield;appearance:textfield}
 input[type=number].cell::-webkit-outer-spin-button,input[type=number].cell::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .cell.q{border-color:var(--line);background:var(--bg)}
@@ -168,7 +182,7 @@ header#top{position:relative;z-index:35;background:color-mix(in srgb,var(--head)
 .pill{font-size:.7rem;font-weight:600;padding:.12rem .55rem;border-radius:999px;white-space:nowrap}
 /* tree-grid tiến độ */
 .tg{background:var(--surface);border:1px solid var(--line);border-radius:1rem;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04),0 6px 18px rgba(15,23,42,.05)}
-.tg-head,.tg-row{display:grid;grid-template-columns:minmax(0,3.4fr) minmax(7.5rem,1.2fr) 7.6rem 7.6rem 4.4rem;gap:.6rem;align-items:center;padding:.55rem 1rem}
+.tg-head,.tg-row{display:grid;grid-template-columns:minmax(0,3.2fr) minmax(9.5rem,1.3fr) 7.4rem 7.4rem 3.6rem 7.4rem 7.4rem 4.6rem 4.4rem;gap:.5rem;align-items:center;padding:.55rem 1rem}
 .tg-head{background:color-mix(in srgb,var(--ink) 5%,var(--surface));font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);border-bottom:1px solid var(--line)}
 .tg-row{border-bottom:1px solid var(--line);border-left:3px solid var(--dl,transparent);transition:background .15s}
 .tg-row:nth-child(even){background:color-mix(in srgb,var(--ink) 2.5%,var(--surface))}
@@ -187,7 +201,7 @@ header#top{position:relative;z-index:35;background:color-mix(in srgb,var(--head)
 .tg .note-in:hover,.tg .note-in:focus{border-color:var(--line);background:var(--bg)}
 .add-mini{display:inline-grid;place-items:center;width:1.45rem;height:1.45rem;border-radius:.45rem;color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,transparent);font-size:.8rem}
 .add-mini:hover{background:var(--brand);color:var(--brandtx)}
-@media(max-width:820px){.tg-head{display:none}.tg-row{grid-template-columns:minmax(0,1fr) auto}.tg-row>.c-name{grid-column:1;grid-row:1}.tg-row>.c-act{grid-column:2;grid-row:1}.tg-row>.c-prog,.tg-row>.c-sd,.tg-row>.c-ed{grid-column:1/-1}}
+@media(max-width:820px){.tg-head{display:none}.tg-row{grid-template-columns:minmax(0,1fr) auto}.tg-row>.c-name{grid-column:1;grid-row:1}.tg-row>.c-act{grid-column:2;grid-row:1}.tg-row>.c-prog,.tg-row>.c-sd,.tg-row>.c-ed,.tg-row>.c-d{grid-column:1/-1}}
 /* chi phí */
 tr.b-par td{background:color-mix(in srgb,var(--ink) 8%,var(--surface));font-weight:700;font-size:14.5px}
 tr.b-par .cell{font-weight:700;font-size:14.5px}
@@ -379,7 +393,7 @@ const TB={
   users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','role','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
   project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ren:{role:'access_level'},ord:['project_id']},
-  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start','actual_end','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
+  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start_date','actual_end_date','planned_days','actual_days','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
   budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','note','sort_order','section','price_usd','price_ccy','has_docs'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note','has_docs']},
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
@@ -388,7 +402,7 @@ const TB={
 };
 /* quyền trong dự án: viewer (chỉ xem) | editor (sửa task) | manager (quản lý dự án). 'owner' = người tạo dự án (Admin); 'member' là giá trị cũ = editor */
 const normRole=r=>({member:'editor',manager:'manager',owner:'owner',viewer:'viewer',editor:'editor'})[String(r||'').toLowerCase()]||'viewer';
-const DATEC=new Set(['start_date','end_date','due_date','actual_start','actual_end','approved_at','created_at','updated_at','imported_at']);
+const DATEC=new Set(['start_date','end_date','due_date','actual_start_date','actual_end_date','approved_at','created_at','updated_at','imported_at']);
 const CACHE={},SNAP={};Object.keys(TB).forEach(k=>{CACHE[k]=[];SNAP[k]=new Map()});
 const pkOf=(c,r)=>c.pk.map(f=>r[f]).join('|');
 function toDB(k,r){
@@ -522,7 +536,8 @@ async function loadTasks(pid){await Q;await fetchTable('tasks','project_id',[pid
 async function saveTask(t,patch){   // saveTask(obj) hoặc saveTask(id,{thay đổi})
   const id=typeof t==='string'?t:t.id,all=db.list('tasks'),now=new Date().toISOString();
   const has=all.some(x=>x.id===id);
-  return db.save('tasks',has?all.map(x=>x.id===id?{...x,...(typeof t==='string'?{}:t),...(patch||{}),updated_at:now}:x):[...all,{...t,updated_at:now}]);
+  const pdays=x=>x.start_date&&x.due_date?{...x,planned_days:Math.round((Date.parse(x.due_date)-Date.parse(x.start_date))/864e5)+1}:x;   // Số ngày KH = (Ngày KT KH - Ngày BĐ KH) + 1
+  return db.save('tasks',has?all.map(x=>x.id===id?pdays({...x,...(typeof t==='string'?{}:t),...(patch||{}),updated_at:now}):x):[...all,pdays({...t,updated_at:now})]);
 }
 async function deleteTask(id){
   const all=db.list('tasks'),t=all.find(x=>x.id===id);if(!t)return;
@@ -837,7 +852,7 @@ function viewProjects(){
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
   const shown=PJF==='all'?ps:ps.filter(p=>p.status===PJF);
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
-   ${adm?'<div class="flex gap-2"><button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button></div>':''}</div>
+   <div class="flex gap-2 flex-wrap"><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
     ${adm?kpi('Tổng ngân sách quản lý',fmtVND(totB),'Đã chi '+fmtVND(totA)+(totB?' ('+Math.round(totA/totB*100)+'%)':''),'fa-wallet','#2563eb'):kpi('Dự án của tôi',ps.length,'Được Admin gán','fa-folder-open','#2563eb')}
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
@@ -855,6 +870,7 @@ function viewProjects(){
   v.querySelectorAll('[data-perm]').forEach(b=>b.onclick=e=>{e.stopPropagation();permModal(b.dataset.perm)});
   v.querySelectorAll('[data-appr]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleApprove(b.dataset.appr)});
   if(adm){$('#newBtn').onclick=()=>projectForm()}
+  $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
   charts.forEach(c=>c.destroy());charts=[];
   if(typeof Chart==='undefined'||!st.length)return;
   const css=getComputedStyle(document.documentElement),cv=n=>css.getPropertyValue(n).trim();
@@ -949,7 +965,7 @@ function renderBell(){updateBadges();
   myProjects().forEach(p=>{const s=projStats(p.id);
     s.leaf.forEach(t=>{
       const base={pid:p.id,pn:p.name,title:t.name,src:srcOf(t),h:`#/p/${p.id}/progress/${t.id}`};
-      if(isDone(t))D.push({...base,k:'done',o:3,sub:'Hoàn thành'+(t.actual_end?' ngày '+fmtD(t.actual_end):''),ts:t.actual_end||t.updated_at||''});
+      if(isDone(t))D.push({...base,k:'done',o:3,sub:'Hoàn thành'+(t.actual_end_date?' ngày '+fmtD(t.actual_end_date):''),ts:t.actual_end_date||t.updated_at||''});
       else if(t.due_date&&t.due_date<today())A.push({...base,k:'over',o:0,sub:'Hạn: '+fmtD(t.due_date)+' · '+dlText(t)});
       else if(dlClass(t)==='soon')A.push({...base,k:'soon',o:1,sub:'Hạn: '+fmtD(t.due_date)+' · '+dlText(t)})});
     (canBudget(p.id)?overBudget(s):[]).forEach(b=>A.push({k:'bud',o:2,pid:p.id,pn:p.name,title:`${b.code?b.code+': ':''}${b.name}`,sub:'Chi vượt dự kiến '+fmtVND((b.actual_amount||0)-(b.planned_amount||0)),h:`#/p/${p.id}/budget/${b.id}`}))});
@@ -1103,10 +1119,20 @@ function bTotals(bd){
   return{roll,T,mt,infra:T.B_II,all,ratio:mt.planned?T.B_II.planned/mt.planned*100:0}}
 
 const NUMF=new Set(['quantity','price_usd','unit_price','actual_amount']);
-const nfmt=v=>v==null||v===''?'':(+v).toLocaleString('vi-VN',{maximumFractionDigits:2});
+const nfmt=v=>v==null||v===''?'':(+v).toLocaleString('en-US',{maximumFractionDigits:2});      // 125,000,000
+/* Helper nhập số: tự thêm dấu phẩy ngăn cách hàng nghìn khi gõ (oninput); unfmt bỏ dấu phẩy -> Number chuẩn trước khi tính / lưu */
+const unfmt=v=>{const n=Number(String(v??'').replace(/,/g,''));return isFinite(n)?n:0};
+function fmtInputLive(el){
+  const raw=el.value,pos=el.selectionStart??raw.length,digitsBefore=raw.slice(0,pos).replace(/[^\d.]/g,'').length;
+  let t=raw.replace(/[^\d.]/g,'');const di=t.indexOf('.');if(di>=0)t=t.slice(0,di+1)+t.slice(di+1).replace(/\./g,'');
+  const [ip,fp]=t.split('.');let out=ip.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fp!==undefined?'.'+fp:'');
+  el.value=out;let c=0,i=0;for(;i<out.length&&c<digitsBefore;i++)if(/[\d.]/.test(out[i]))c++;
+  try{el.setSelectionRange(i,i)}catch(e){}}
 function parseNum(s){
   s=String(s).trim().replace(/\s/g,'');if(!s)return null;
-  s=/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)?s.replace(/\./g,'').replace(',','.'):s.replace(',','.');
+  if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s))s=s.replace(/,/g,'');                       // 125,000,000 hoặc 1,234.56
+  else if(/^\d{1,3}(\.\d{3}){2,}(,\d+)?$/.test(s))s=s.replace(/\./g,'').replace(',','.');   // kiểu cũ 125.000.000
+  else s=s.replace(',','.');
   const n=Number(s);return isFinite(n)&&n>=0?n:NaN;
 }
 function nextCode(mine,sec,par){
@@ -1153,14 +1179,14 @@ function bRow({r,d,grp},v,hasKids,ed,sec){
   const dis=ed?'':'disabled',inp=(f,val,cls='')=>`<input class="cell ${cls}" data-f="${f}" value="${esc(val)}" ${dis} autocomplete="off">`;
   const calc=(k,val)=>`<span data-calc="${k}">${nfmt(val)}</span>`;
   const num=(f)=>grp?'':inp(f,nfmt(r[f]),'num');
-  const act=hasKids?calc('actual',v.actual):`<input type="number" min="0" step="1" inputmode="numeric" class="cell num" data-f="actual_amount" value="${r.actual_amount?Math.round(r.actual_amount):''}" placeholder="0" ${dis} autocomplete="off" aria-label="Thực tế phát sinh">`;
+  const act=(hasKids?calc('actual',v.actual):`<input type="text" inputmode="numeric" class="cell num b-actin" data-f="actual_amount" value="${r.actual_amount?nfmt(Math.round(r.actual_amount)):''}" placeholder="0" ${dis} autocomplete="off" aria-label="Thực tế phát sinh">`)+'<div data-bdg></div>';
   const docs=grp?'':`<select class="cell q" data-f="has_docs" ${dis} aria-label="Hồ sơ đính kèm"><option value="" ${!r.has_docs?'selected':''}>—</option><option ${r.has_docs==='Có'?'selected':''}>Có</option><option ${r.has_docs==='Không'?'selected':''}>Không</option></select>`;
   const canKid=ed&&(grp||sec==='B_II');
   return `<tr data-id="${r.id}" class="${grp?'b-par':''}">
    <td style="padding-left:${.2+d*.8}rem"><div class="flex items-center gap-0.5">${hasKids?`<button data-tg="${r.id}" class="ibtn" aria-label="Thu gọn hoặc mở rộng"><i class="fa-solid fa-chevron-${collapsed.has(r.id)?'right':'down'} text-xs"></i></button>`:'<span class="inline-block shrink-0" style="width:1.2rem"></span>'}${inp('code',r.code)}</div></td>
    <td>${inp('name',r.name)}</td><td>${grp?'':inp('unit',r.unit||'')}</td><td>${num('quantity')}</td>
    <td>${num('price_usd')}</td><td>${num('unit_price')}</td>
-   <td class="text-right">${calc('usd',v.usd)}</td><td class="text-right">${calc('planned',v.planned)}</td><td class="text-right">${act}</td>
+   <td class="text-right">${calc('usd',v.usd)}</td><td class="text-right">${calc('planned',v.planned)}</td><td class="text-right b-act">${act}</td>
    <td>${grp?'':inp('vendor',r.vendor||'')}</td><td>${docs}</td><td>${grp?'':inp('note',r.note||'')}</td>
    <td class="whitespace-nowrap">${ed?`${canKid?`<button data-act="addc" class="ibtn" aria-label="Thêm mục con"><i class="fa-solid fa-plus"></i></button>`:''}<button data-act="del" class="ibtn del" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`;
 }
@@ -1202,6 +1228,7 @@ function viewBudget(p,target){
     if(!(n>0)){e.target.value=nfmt(rateOf(p));toast('Tỷ giá phải là số lớn hơn 0');return}
     applyRate(p,n);e.target.value=nfmt(n);drawBudgetBody(p);toast('Đã cập nhật tỷ giá 1 USD = '+nfmt(n)+' VND',false)};
   body.addEventListener('focusin',e=>{if(e.target.matches('.cell.num'))e.target.select()});
+  body.addEventListener('input',e=>{if(e.target.matches('.cell.num[data-f]'))fmtInputLive(e.target)});     // gõ tới đâu, dấu phẩy tới đó
   body.onclick=e=>{
     const tg=e.target.closest('[data-tg]');if(tg){const i=tg.dataset.tg;collapsed.has(i)?collapsed.delete(i):collapsed.add(i);drawBudgetBody(p);return}
     const b=e.target.closest('[data-act]');if(!b||!ed)return;
@@ -1214,7 +1241,7 @@ function viewBudget(p,target){
   };
   body.onchange=e=>{
     const el=e.target;if(!el.matches('[data-f]')||!ed)return;
-    const id=el.closest('tr').dataset.id,r=commitCell(p,id,el.dataset.f,el.type==='number'?String(Math.max(0,Math.round(+el.value||0))):el.value);
+    const id=el.closest('tr').dataset.id,r=commitCell(p,id,el.dataset.f,el.value);
     if(r==='rerender'){drawBudgetBody(p);return}
     refreshBudgetCalcs(p,!r);
   };
@@ -1240,15 +1267,27 @@ function drawBudgetBody(p){
   refreshBudgetCalcs(p,true);
 }
 
+/* Trạng thái ngân sách: actual=0 -> trung tính | <=90% kế hoạch -> Trong hạn mức | 90-100% -> Sát ngân sách | >100% -> Vượt +X% */
+function bStat(planned,actual){
+  planned=planned||0;actual=actual||0;if(actual<=0)return{k:''};
+  if(planned<=0)return{k:'over',label:'🔥 Vượt (chưa có KH)'};
+  if(actual>planned)return{k:'over',label:'🔥 Vượt +'+Math.round((actual/planned-1)*100)+'%'};
+  if(actual>planned*0.9)return{k:'warn',label:'Sát ngân sách'};
+  return{k:'ok',label:'Trong hạn mức'}}
 function refreshBudgetCalcs(p,force){
   const bd=db.list('budget_items').filter(b=>b.project_id===p.id),T=bTotals(bd),roll=T.roll,by=Object.fromEntries(bd.map(b=>[b.id,b])),ae=document.activeElement,rate=rateOf(p);
   document.querySelectorAll('#bBody tr[data-id]').forEach(tr=>{
     const r=by[tr.dataset.id];if(!r)return;const v=roll[r.id];
     tr.querySelectorAll('[data-calc]').forEach(c=>{c.textContent=nfmt(v[c.dataset.calc])});
     tr.querySelectorAll('[data-f]').forEach(i=>{if(i===ae&&!force)return;const f=i.dataset.f;
-      if(i.tagName==='SELECT')i.value=r[f]||'';else i.value=i.type==='number'?(r[f]?Math.round(r[f]):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
+      if(i.tagName==='SELECT')i.value=r[f]||'';else i.value=f==='actual_amount'?(r[f]?nfmt(Math.round(r[f])):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
+    /* Y3: tô màu theo ngân sách: actual so với planned (kế hoạch) */
+    const st=bStat(v.planned,v.actual);tr.classList.remove('bs-ok','bs-warn','bs-over');if(st.k)tr.classList.add('bs-'+st.k);
+    const bg=tr.querySelector('[data-bdg]');if(bg)bg.innerHTML=st.k?`<span class="bdg ${st.k}">${st.label}</span>`:'';
   });
   const set=(sel,t)=>{const e=$(sel);if(e)e.textContent=t};
+  const stCls=(sel,pl,ac)=>{const e=$(sel);if(!e)return;const td=e.closest('td');if(!td)return;td.classList.remove('bs-ok-c','bs-warn-c','bs-over-c');const st=bStat(pl,ac);if(st.k)td.classList.add('bs-'+st.k+'-c');let bd=td.querySelector('[data-sbdg]');if(!bd){bd=document.createElement('div');bd.dataset.sbdg='';td.appendChild(bd)}bd.innerHTML=st.k?`<span class="bdg ${st.k}">${st.label}</span>`:''};
+  ['A_I','B_I','B_II','X'].forEach(k=>stCls(`[data-st="${k}:actual"]`,T.T[k].planned,T.T[k].actual));stCls('[data-t=actual]',T.all.planned,T.all.actual);
   ['A_I','B_I','B_II','X'].forEach(k=>{set(`[data-st="${k}:usd"]`,nfmt(T.T[k].usd));set(`[data-st="${k}:planned"]`,nfmt(T.T[k].planned));set(`[data-st="${k}:actual"]`,nfmt(T.T[k].actual))});
   set('[data-t=usd]',nfmt(T.all.usd));set('[data-t=planned]',nfmt(T.all.planned));set('[data-t=actual]',nfmt(T.all.actual));
   const money=(x)=>nfmt(Math.round(x.planned))+' VND',usd=x=>'≈ '+nfmt(x.usd)+' USD';
@@ -1485,6 +1524,104 @@ async function exportDuyTanBudget(project,budgetItems){
   }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
 }
 
+/* ===================== XUẤT BÁO CÁO TỔNG HỢP RA POWERPOINT (.pptx) =====================
+   Hàm độc lập: exportPortfolioPPTX(projects, allTasks, allBudgets). Dùng PptxGenJS 3.12.0 (CDN ở thẻ <script> đầu file).
+   Muốn đổi theo Template mẫu của Duy Tân: sửa khối "CẤU HÌNH GIAO DIỆN" (màu, font, kích thước) và 3 khối slide đánh dấu [SLIDE 1] / [SLIDE 2] / [SLIDE DỰ ÁN]. */
+async function exportPortfolioPPTX(projects,allTasks,allBudgets){
+  try{
+    if(!window.PptxGenJS)await loadJS('https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js');
+    projects=projects||[];if(!projects.length){toast('Chưa có dự án nào để xuất báo cáo');return}
+    /* ---------- CẤU HÌNH GIAO DIỆN (đổi theo template Duy Tân tại đây) ---------- */
+    const C={brand:'1F6F43',dark:'1E293B',orange:'EA580C',red:'DC2626',green:'16A34A',blue:'2563EB',mute:'64748B',line:'CBD5E1',card:'F1F5F9',white:'FFFFFF'};
+    const FONT='Calibri',W=13.33,Hh=7.5;
+    const money=n=>Math.round(n||0).toLocaleString('en-US');
+    const ty=n=>(n||0)>=1e9?((n/1e9).toFixed(2)+' tỷ'):(n||0)>=1e6?((n/1e6).toFixed(1)+' triệu'):money(n);
+    const dmy=d=>d?d.split('-').reverse().join('/'):'—';
+    const user=currentUser()||{},maker=user.full_name||user.email||'';
+    /* ---------- TÍNH SỐ LIỆU TỪNG DỰ ÁN ---------- */
+    const info=projects.map(p=>{
+      const tk=(allTasks||[]).filter(t=>t.project_id===p.id),bd=(allBudgets||[]).filter(b=>b.project_id===p.id);
+      const par=new Set(tk.map(t=>t.parent_id).filter(Boolean)),leaf=tk.filter(t=>!par.has(t.id));
+      const w=t=>t.duration_days||1,tw=leaf.reduce((s,t)=>s+w(t),0),pct=tw?Math.round(leaf.reduce((s,t)=>s+w(t)*(t.progress||0),0)/tw):0;
+      const overdue=leaf.filter(t=>t.status!=='done'&&t.due_date&&t.due_date<today());
+      const T=bTotals(bd),planned=T.all.planned,actual=T.all.actual;
+      const done=l=>l.filter(t=>t.status==='done'||(t.progress||0)>=100).length;
+      const pmp=leaf.filter(t=>srcOf(t)==='PMP'),bec=leaf.filter(t=>srcOf(t)==='BECOS');
+      const late=p.status!=='completed'&&(overdue.length>0||(p.end_date&&p.end_date<today()));
+      const bs=bStat(planned,actual);
+      return{p,leaf,pct,overdue,planned,actual,ratio:T.ratio,late,pmp,bec,donePmp:done(pmp),doneBec:done(bec),bs,disb:planned?actual/planned*100:0};
+    });
+    const totPlan=info.reduce((a,x)=>a+x.planned,0),totAct=info.reduce((a,x)=>a+x.actual,0),run=info.filter(x=>x.p.status!=='completed'),ontime=run.filter(x=>!x.late).length,lateTasks=info.reduce((a,x)=>a+x.overdue.length,0);
+    const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.title='Báo cáo tổng hợp tiến độ & chi phí dự án kỹ thuật';pptx.company='Duy Tân Recycling';
+    const header=(sl,txt,sub)=>{sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:W,h:0.95,fill:{color:C.brand}});
+      sl.addText(txt,{x:0.45,y:0.1,w:W-0.9,h:0.5,fontFace:FONT,fontSize:24,bold:true,color:C.white});
+      if(sub)sl.addText(sub,{x:0.45,y:0.55,w:W-0.9,h:0.32,fontFace:FONT,fontSize:12,color:'D1FAE5'});
+      sl.addText('Duy Tân Recycling · Báo cáo kỹ thuật',{x:0.45,y:Hh-0.38,w:6,h:0.3,fontFace:FONT,fontSize:9,color:C.mute});
+      sl.addText('Ngày '+dmy(today()),{x:W-3.45,y:Hh-0.38,w:3,h:0.3,fontFace:FONT,fontSize:9,color:C.mute,align:'right'})};
+    const card=(sl,x,y,w,h,label,val,sub,col)=>{sl.addShape(pptx.ShapeType.roundRect,{x,y,w,h,fill:{color:C.card},line:{color:C.line,width:0.75},rectRadius:0.08});
+      sl.addShape(pptx.ShapeType.rect,{x,y:y+0.12,w:0.07,h:h-0.24,fill:{color:col}});
+      sl.addText(label,{x:x+0.2,y:y+0.08,w:w-0.3,h:0.3,fontFace:FONT,fontSize:11,color:C.mute,bold:true});
+      sl.addText(val,{x:x+0.2,y:y+0.38,w:w-0.3,h:0.55,fontFace:FONT,fontSize:24,bold:true,color:col,fit:'shrink'});
+      if(sub)sl.addText(sub,{x:x+0.2,y:y+h-0.38,w:w-0.3,h:0.3,fontFace:FONT,fontSize:10,color:C.mute,fit:'shrink'})};
+
+    /* ---------- [SLIDE 1] TRANG BÌA ---------- */
+    const s1=pptx.addSlide();s1.background={color:C.brand};
+    s1.addShape(pptx.ShapeType.rect,{x:0,y:5.2,w:W,h:0.06,fill:{color:C.orange}});
+    s1.addText('BÁO CÁO TỔNG HỢP TIẾN ĐỘ & CHI PHÍ DỰ ÁN KỸ THUẬT - DUY TÂN RECYCLING',{x:0.8,y:1.6,w:W-1.6,h:1.9,fontFace:FONT,fontSize:34,bold:true,color:C.white,valign:'middle'});
+    s1.addText('Ngày xuất báo cáo: '+dmy(today()),{x:0.8,y:5.45,w:8,h:0.4,fontFace:FONT,fontSize:16,color:C.white});
+    s1.addText('Người lập: '+(maker||'—'),{x:0.8,y:5.9,w:8,h:0.4,fontFace:FONT,fontSize:16,color:C.white});
+    s1.addText(info.length+' dự án',{x:W-3.8,y:5.45,w:3,h:0.4,fontFace:FONT,fontSize:16,color:C.white,align:'right'});
+
+    /* ---------- [SLIDE 2] TỔNG QUAN DANH MỤC: 4 thẻ KPI + bảng tổng hợp ---------- */
+    const s2=pptx.addSlide();header(s2,'Tổng quan danh mục dự án','Số liệu tại ngày '+dmy(today()));
+    const cw=(W-0.9-0.3*3)/4;
+    card(s2,0.45,1.15,cw,1.25,'TỔNG NGÂN SÁCH',ty(totPlan)+' VND','Kế hoạch tất cả dự án',C.blue);
+    card(s2,0.45+(cw+0.3),1.15,cw,1.25,'THỰC CHI',ty(totAct)+' VND',totPlan?Math.round(totAct/totPlan*100)+'% ngân sách':'',totAct>totPlan&&totPlan?C.red:C.green);
+    card(s2,0.45+(cw+0.3)*2,1.15,cw,1.25,'DỰ ÁN ĐÚNG HẠN',ontime+'/'+run.length,(run.length-ontime)+' dự án có nguy cơ trễ',C.green);
+    card(s2,0.45+(cw+0.3)*3,1.15,cw,1.25,'VIỆC TRỄ HẠN',String(lateTasks),'Tổng các dự án',lateTasks?C.red:C.green);
+    const hd=t=>({text:t,options:{bold:true,color:C.white,fill:{color:C.dark},align:'center',fontFace:FONT,fontSize:11}});
+    const rows=[[hd('Mã DA'),hd('Tên dự án'),hd('Tiến độ %'),hd('Ngân sách duyệt (VND)'),hd('Thực chi (VND)'),hd('Trạng thái')]];
+    info.forEach(x=>{const stt=x.late?'Nguy cơ trễ':(STATUS[x.p.status]||['—'])[0];
+      rows.push([{text:x.p.code||'',options:{align:'center'}},{text:x.p.name||'',options:{align:'left'}},{text:x.pct+'%',options:{align:'center',bold:true,color:x.pct>=100?C.green:C.dark}},{text:money(x.planned),options:{align:'right'}},{text:money(x.actual),options:{align:'right',color:x.bs.k==='over'?C.red:C.dark,bold:x.bs.k==='over'}},{text:stt,options:{align:'center',bold:true,color:x.late?C.red:C.green}}])});
+    s2.addTable(rows,{x:0.45,y:2.65,w:W-0.9,colW:[1.3,4.4,1.3,2.2,2.2,1.53],fontFace:FONT,fontSize:11,border:{type:'solid',pt:0.5,color:C.line},valign:'middle',autoPage:true,autoPageRepeatHeader:true,newSlideStartY:1.15,rowH:0.34});
+
+    /* ---------- [SLIDE DỰ ÁN] MỖI DỰ ÁN 1 SLIDE ---------- */
+    info.forEach(x=>{
+      const sl=pptx.addSlide();
+      /* Header: tên, mã, thời gian, trạng thái */
+      header(sl,x.p.name||'',`Mã dự án: ${x.p.code||'—'}   ·   Thời gian: ${dmy(x.p.start_date)} → ${dmy(x.p.end_date)}   ·   Trạng thái: ${x.late?'Nguy cơ trễ':(STATUS[x.p.status]||['—'])[0]}`);
+      /* Khối trái: TÀI CHÍNH CAPEX */
+      sl.addShape(pptx.ShapeType.roundRect,{x:0.45,y:1.2,w:6.0,h:5.6,fill:{color:C.white},line:{color:C.line,width:1},rectRadius:0.08});
+      sl.addText('TÀI CHÍNH CAPEX',{x:0.65,y:1.3,w:5.6,h:0.4,fontFace:FONT,fontSize:15,bold:true,color:C.brand});
+      const budCol=x.bs.k==='over'?C.red:x.bs.k==='warn'?C.orange:C.green,budTxt=!x.actual?'Chưa phát sinh':x.bs.k==='over'?'VƯỢT NGÂN SÁCH':'TRONG NGÂN SÁCH';
+      const kv=[['Ngân sách duyệt',money(x.planned)+' VND'],['Thực chi',money(x.actual)+' VND'],['% Giải ngân',x.disb.toFixed(1)+'%'],['Tỷ lệ CP CSHT / Máy chính',x.ratio.toFixed(2)+'%']];
+      kv.forEach(([k,v],i)=>{const y=1.8+i*0.72;sl.addText(k,{x:0.65,y,w:2.6,h:0.5,fontFace:FONT,fontSize:12,color:C.mute,valign:'middle'});sl.addText(v,{x:3.0,y,w:3.3,h:0.5,fontFace:FONT,fontSize:16,bold:true,color:C.dark,align:'right',valign:'middle',fit:'shrink'})});
+      /* thanh giải ngân */
+      sl.addShape(pptx.ShapeType.rect,{x:0.65,y:4.8,w:5.6,h:0.28,fill:{color:'E2E8F0'}});
+      sl.addShape(pptx.ShapeType.rect,{x:0.65,y:4.8,w:Math.max(0.02,5.6*Math.min(100,x.disb)/100),h:0.28,fill:{color:budCol}});
+      sl.addText(budTxt,{x:0.65,y:5.3,w:5.6,h:0.55,fontFace:FONT,fontSize:20,bold:true,color:budCol,align:'center',valign:'middle'});
+      if(x.bs.label)sl.addText(x.bs.label.replace('🔥 ',''),{x:0.65,y:5.85,w:5.6,h:0.4,fontFace:FONT,fontSize:12,color:C.mute,align:'center'});
+      /* Khối phải: TIẾN ĐỘ THỰC THI */
+      sl.addShape(pptx.ShapeType.roundRect,{x:6.7,y:1.2,w:6.18,h:5.6,fill:{color:C.white},line:{color:C.line,width:1},rectRadius:0.08});
+      sl.addText('TIẾN ĐỘ THỰC THI',{x:6.9,y:1.3,w:5.8,h:0.4,fontFace:FONT,fontSize:15,bold:true,color:C.brand});
+      sl.addText(x.pct+'%',{x:6.9,y:1.7,w:1.9,h:0.8,fontFace:FONT,fontSize:38,bold:true,color:x.pct>=100?C.green:C.blue,valign:'middle'});
+      sl.addText([{text:`Check list: ${x.donePmp}/${x.pmp.length} đầu việc hoàn thành`,options:{breakLine:true}},{text:`Becos: ${x.doneBec}/${x.bec.length} đầu việc hoàn thành`,options:{breakLine:true}},{text:`Việc trễ hạn: ${x.overdue.length}`,options:{color:x.overdue.length?C.red:C.green,bold:true}}],{x:8.85,y:1.7,w:3.9,h:0.85,fontFace:FONT,fontSize:12,color:C.dark,valign:'middle'});
+      /* Top 5: trễ hạn trước, rồi ưu tiên cao, rồi hạn gần nhất */
+      const pr={urgent:0,high:1,medium:2,low:3},odSet=new Set(x.overdue.map(t=>t.id));
+      const top=x.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100).sort((a,b)=>(odSet.has(b.id)-odSet.has(a.id))||((pr[a.priority]??2)-(pr[b.priority]??2))||String(a.due_date||'9').localeCompare(String(b.due_date||'9'))).slice(0,5);
+      sl.addText('Top 5 đầu việc quan trọng / đang trễ hạn',{x:6.9,y:2.65,w:5.8,h:0.35,fontFace:FONT,fontSize:12,bold:true,color:C.dark});
+      const th=t=>({text:t,options:{bold:true,color:C.white,fill:{color:C.dark},align:'center',fontSize:10}});
+      const tr=[[th('Đầu việc'),th('Hạn'),th('Ngày KH'),th('Ngày TT'),th('%')]];
+      top.forEach(t=>{const pd=t.start_date&&t.due_date?daysBetween(t.start_date,t.due_date)+1:(t.planned_days??t.duration_days),ad=t.actual_days??(t.actual_start_date?daysBetween(t.actual_start_date,t.actual_end_date||today())+1:null),bad=odSet.has(t.id)||(ad!=null&&pd!=null&&ad>pd);
+        tr.push([{text:(t.wbs_code?t.wbs_code+' ':'')+(t.name||''),options:{align:'left',color:bad?C.red:C.dark}},{text:dmy(t.due_date),options:{align:'center',color:odSet.has(t.id)?C.red:C.dark}},{text:pd!=null?String(pd):'—',options:{align:'center'}},{text:ad!=null?String(ad):'—',options:{align:'center',bold:true,color:ad!=null&&pd!=null&&ad>pd?C.red:C.dark}},{text:(t.progress||0)+'%',options:{align:'center'}}])});
+      if(!top.length)tr.push([{text:'Không có đầu việc tồn đọng',options:{colspan:5,align:'center',color:C.green}}]);
+      sl.addTable(tr,{x:6.9,y:3.05,w:5.8,colW:[2.6,0.95,0.75,0.75,0.75],fontFace:FONT,fontSize:10,border:{type:'solid',pt:0.5,color:C.line},valign:'middle',rowH:0.5});
+    });
+    await pptx.writeFile({fileName:`Bao_cao_tong_hop_DuyTan_${today()}.pptx`});
+    toast('Đã xuất báo cáo PowerPoint',false);
+  }catch(e){console.error(e);toast('Xuất PowerPoint lỗi: '+(e.message||e))}
+}
+
 const addTo=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return iso(d)};
 const canTask=pid=>isAdmin()||['owner','manager','editor'].includes(roleOf(pid));
 const TST={todo:['Chưa làm','bg-slate-200 text-slate-800'],in_progress:['Đang làm','bg-blue-100 text-blue-800'],review:['Chờ duyệt','bg-purple-100 text-purple-800'],done:['Hoàn thành','bg-green-100 text-green-800']};
@@ -1535,7 +1672,7 @@ function schedule(nodes,by){
 function buildTasks(nodes,by,startISO,pid){
   const now=new Date().toISOString(),ids={},hk=new Set(nodes.map(n=>n.pkey));nodes.forEach(n=>ids[n.key]=uid());
   return nodes.map((n,i)=>{const lf=!hk.has(n.key),st=n.ae?'done':n.as?'in_progress':'todo';
-    return{id:ids[n.key],project_id:pid,parent_id:n.pkey!=null?ids[n.pkey]:null,wbs_code:n.code,name:n.name,owner_depts:n.owners,collab_depts:n.collab,duration_days:lf?n.e-n.s:null,start_date:addTo(startISO,n.s),due_date:addTo(startISO,Math.max(n.e-1,n.s)),actual_start:n.as,actual_end:n.ae,status:st,priority:'medium',progress:st==='done'?100:0,
+    return{id:ids[n.key],project_id:pid,parent_id:n.pkey!=null?ids[n.pkey]:null,wbs_code:n.code,name:n.name,owner_depts:n.owners,collab_depts:n.collab,duration_days:lf?n.e-n.s:null,start_date:addTo(startISO,n.s),due_date:addTo(startISO,Math.max(n.e-1,n.s)),actual_start_date:n.as,actual_end_date:n.ae,status:st,priority:'medium',progress:st==='done'?100:0,
       notes:[n.dep&&!n.ref?'Ràng buộc: '+n.dep:'',n.note].filter(Boolean).join('\n'),depends_on:n.ref&&ids[by[n.ref]?.key]?[ids[by[n.ref].key]]:[],checklist:n.checklist,sort_order:i+1,created_at:now,updated_at:now}})}
 
 async function importChecklist(p,file){
@@ -1609,7 +1746,7 @@ function addTask(pid,name,parentId,due,srcArg){
   let sd=today(),dd=due||addDays(7);
   if(par&&!due&&!tk.some(t=>t.parent_id===par.id)&&par.start_date&&par.due_date){sd=par.start_date;dd=par.due_date}
   if(dd<sd)sd=dd;
-  const t={id:uid(),project_id:pid,parent_id:parentId||null,wbs_code:nextWbs(tk,parentId),task_source:src,name,owner_depts:[],collab_depts:[],duration_days:daysBetween(sd,dd)+1,start_date:sd,due_date:dd,actual_start:null,actual_end:null,status:'todo',priority:'medium',progress:0,notes:'',depends_on:[],checklist:[],sort_order:Math.max(0,...tk.map(x=>x.sort_order||0))+1,created_at:now,updated_at:now};
+  const t={id:uid(),project_id:pid,parent_id:parentId||null,wbs_code:nextWbs(tk,parentId),task_source:src,name,owner_depts:[],collab_depts:[],duration_days:daysBetween(sd,dd)+1,start_date:sd,due_date:dd,actual_start_date:null,actual_end_date:null,status:'todo',priority:'medium',progress:0,notes:'',depends_on:[],checklist:[],sort_order:Math.max(0,...tk.map(x=>x.sort_order||0))+1,created_at:now,updated_at:now};
   db.save('tasks',[...all.map(x=>x.id===parentId?{...x,duration_days:null,updated_at:now}:x),t]);
   return t;
 }
@@ -1632,7 +1769,8 @@ function spSync(t,ch){
   }else if('progress' in ch){
     if(pg>=100)st='done';else if(pg>0&&st==='todo')st='in_progress';else if(pg===0&&st==='in_progress')st='todo';else if(st==='done')st='in_progress';
   }
-  return{status:st,progress:pg,actual_start:st==='todo'?null:(t.actual_start||today()),actual_end:st==='done'?(t.actual_end||today()):null};
+  const as=st==='todo'?null:(t.actual_start_date||today()),ae=st==='done'?(t.actual_end_date||today()):null;   // kéo % > 0 -> tự điền ngày BĐ thực tế = hôm nay (nếu đang trống)
+  return{status:st,progress:pg,actual_start_date:as,actual_end_date:ae,actual_days:as&&ae?daysBetween(as,ae)+1:(t.actual_days??null)};
 }
 const setStatus=(id,st)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{status:st}))};
 const setProgress=(id,pg)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{progress:pg}))};
@@ -1708,7 +1846,7 @@ function viewProgress(p,target){
    <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Master Gantt${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
    ${ed?`<div class="card p-3 mb-3"><div class="flex flex-wrap gap-2 items-center"><span class="lbl" style="color:#f59e0b"><i class="fa-solid fa-plus"></i> Khởi tạo nhanh</span><input id="pqName" class="inp" style="margin:0;flex:1;min-width:11rem" placeholder="Thêm đầu mục lớn: gõ tên rồi nhấn Enter" aria-label="Tên đầu mục mới"><input id="pqDue" type="date" class="inp" style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button id="pqAdd" class="btn" aria-label="Thêm đầu mục"><i class="fa-solid fa-plus"></i> Thêm việc</button></div><div id="pqErr" class="text-red-600 text-xs h-4 mt-1"></div></div>`:''}
    <div class="flex flex-wrap items-center gap-2 mb-3"><input id="pqSearch" class="inp" style="max-width:17rem;margin:0" placeholder="Tìm tên, mã WBS, bộ phận..." value="${esc(pq)}">${nd?`<button id="ndChip" class="text-xs px-2 py-1 rounded-full" style="background:${pnd?'#f59e0b':'#fef3c7'};color:#92400e">⚠ ${nd} việc thiếu thời lượng${pnd?' (đang lọc)':''}</button>`:''}</div>
-   <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>Bắt đầu</div><div>Kết thúc</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
+   <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>BĐ kế hoạch</div><div>KT kế hoạch</div><div title="Số ngày kế hoạch" class="text-center">Ngày KH</div><div>BĐ thực tế</div><div>KT thực tế</div><div title="Số ngày thực tế" class="text-center">Ngày TT</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
   document.querySelectorAll('#view [data-psub]').forEach(b=>b.onclick=()=>{PSUB=b.dataset.psub;EDIT=null;PADD=null;viewProgress(p)});
   if($('#bsSync'))$('#bsSync').onclick=()=>{const r=syncMasterToBecos(p);if(r)viewProgress(p)};
   const tree=$('#pTree'),redraw=()=>drawProgress(p);
@@ -1741,11 +1879,18 @@ function viewProgress(p,target){
   };
   tree.onkeydown=e=>{const row=e.target.closest('[data-addrow]');if(!row)return;
     if(e.key==='Enter'){e.preventDefault();doAdd(row)}else if(e.key==='Escape'){PADD=null;redraw()}};
-  tree.oninput=e=>{if(e.target.matches('[data-act=pg]'))e.target.closest('.tg-row').querySelector('[data-pgv]').textContent=e.target.value+'%'};
+  tree.oninput=e=>{if(e.target.matches('[data-act=pg]')){const pv=e.target.closest('.tg-row').querySelector('[data-pgv]');if(pv.tagName==='INPUT')pv.value=e.target.value;else pv.textContent=e.target.value+'%'}};
   tree.onchange=e=>{
     if(edFile(e))return;
     const el=e.target,card=el.closest('[data-id]'),id=card&&card.dataset.id,a=el.dataset.act;if(!a)return;
-    if(a==='pg'){setProgress(id,+el.value);redraw();renderBell()}
+    if(a==='pg'){setProgress(id,+el.value);redraw();renderBell()}   // luôn cho kéo, kể cả khi chưa tới ngày BĐ kế hoạch (vượt tiến độ)
+    else if(a==='pgn'){const v=Math.max(0,Math.min(100,Math.round(+el.value||0)));setProgress(id,v);redraw();renderBell()}
+    else if(a==='as'||a==='ae'){
+      const t=db.list('tasks').find(x=>x.id===id);if(!t)return;
+      const as=a==='as'?(el.value||null):t.actual_start_date,ae=a==='ae'?(el.value||null):t.actual_end_date;
+      if(as&&ae&&ae<as){toast('Ngày kết thúc thực tế phải sau hoặc bằng ngày bắt đầu thực tế.');redraw();return}
+      patchTask(id,{actual_start_date:as,actual_end_date:ae,...(as&&ae?{actual_days:daysBetween(as,ae)+1}:{})});redraw()}
+    else if(a==='ad'){const n=el.value===''?null:Math.max(0,Math.round(+el.value));patchTask(id,{actual_days:n});redraw()}
     else if(a==='pri'){patchTask(id,{priority:el.value});redraw()}
     else if(a==='note'){patchTask(id,{notes:el.value})}
     else if(a==='sd'||a==='ed'){
@@ -1754,11 +1899,18 @@ function viewProgress(p,target){
       let sd=t.start_date,dd=t.due_date;
       if(a==='sd'){sd=v;if(!dd||dd<sd)dd=sd}
       else{if(sd&&v<sd){toast('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');redraw();return}dd=v}
-      patchTask(id,{start_date:sd,due_date:dd,duration_days:daysBetween(sd,dd)+1});redraw();renderBell()}
+      patchTask(id,{start_date:sd,due_date:dd,duration_days:daysBetween(sd,dd)+1,planned_days:daysBetween(sd,dd)+1});redraw();renderBell()}
   };
   drawProgress(p);
 }
 
+/* ---- Số ngày kế hoạch / thực tế + Vượt tiến độ ---- */
+const plannedDays=t=>t.start_date&&t.due_date?daysBetween(t.start_date,t.due_date)+1:(t.planned_days??t.duration_days??null);
+const aheadOf=t=>t.start_date&&t.start_date>today()&&(t.progress||0)>0;           // chưa tới ngày BĐ kế hoạch mà đã có % -> làm vượt tiến độ
+function actDaysCell(t,ed){
+  const pd=plannedDays(t),ad=t.actual_days,over=ad!=null&&pd!=null&&ad>pd,good=ad!=null&&pd!=null&&ad<=pd&&t.status==='done';
+  const note=over?`<div class="text-[11px] font-semibold text-red-600">trễ ${ad-pd} ngày</div>`:good?`<div class="text-[11px] font-semibold text-green-600">${ad<pd?'sớm '+(pd-ad)+' ngày':'đúng hạn'}</div>`:'';
+  return `<input type="number" min="0" step="1" class="dd-in mono" data-act="ad" value="${ad??''}" placeholder="—" ${ed?'':'disabled'} style="${over?'color:#dc2626;font-weight:700':good?'color:#16a34a;font-weight:700':''}" aria-label="Số ngày thực tế">${note}`}
 function drawProgress(p){
   const tk=pRows(p),{k,R}=rollTasks(tk),ed=canTask(p.id),q=pq.trim().toLowerCase(),flat=!!(q||pnd);
   const sorted=id=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
@@ -1769,14 +1921,18 @@ function drawProgress(p){
      <div class="c-name flex flex-wrap items-center gap-1.5 min-w-0" style="padding-left:${flat?0:d*1.3}rem">
       ${!leaf&&!flat?`<button data-act="tg" class="ibtn" aria-label="Mở hoặc thu gọn"><i class="fa-solid fa-chevron-${open?'down':'right'} text-xs"></i></button>`:'<span class="inline-block" style="width:1.55rem"></span>'}
       <span class="mono text-xs" style="color:#f59e0b">${esc(t.wbs_code)}</span>
-      <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>
+      <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>${leaf&&aheadOf(t)?'<span class="chip-ahead bg-indigo-100 text-indigo-700" title="Đã làm trước ngày bắt đầu kế hoạch">⚡ Vượt tiến độ</span>':''}
       ${ed?`<button data-act="add" class="add-mini" aria-label="Thêm việc con"><i class="fa-solid fa-plus"></i></button>`:''}
       ${priSel(t,!ed)}
       <div class="basis-full" style="padding-left:${leaf||flat?1.55:1.55}rem"><textarea class="note-in" rows="1" data-act="note" placeholder="Ghi chú..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" ${ed?'':'disabled'}>${esc(t.notes)}</textarea></div>
      </div>
-     <div class="c-prog flex items-center gap-2">${leaf?`<input type="range" class="rng" min="0" max="100" step="5" value="${r.pg}" data-act="pg" ${ed?'':'disabled'} aria-label="Phần trăm hoàn thành">`:`<div class="flex-1">${bar(r.pg)}</div>`}<b class="mono text-xs w-10 text-right" data-pgv style="color:var(--brand)">${r.pg}%</b></div>
+     <div class="c-prog flex items-center gap-2">${leaf?`<input type="range" class="rng" min="0" max="100" step="5" value="${r.pg}" data-act="pg" ${ed?'':'disabled'} aria-label="Phần trăm hoàn thành">`:`<div class="flex-1">${bar(r.pg)}</div>`}${leaf?`<span class="pgn-w"><input type="number" class="pgn-in mono" min="0" max="100" step="1" value="${r.pg}" data-act="pgn" data-pgv ${ed?'':'disabled'} aria-label="Nhập phần trăm">%</span>`:`<b class="mono text-xs w-10 text-right" data-pgv style="color:var(--brand)">${r.pg}%</b>`}</div>
      <div class="c-sd text-xs">${leaf?`<input type="date" class="dt-in" data-act="sd" value="${t.start_date||''}" ${ed?'':'disabled'} aria-label="Ngày bắt đầu">`:`<div class="mono">${fmtD(r.s)}</div>`}</div>
      <div class="c-ed text-xs">${leaf?`<input type="date" class="dt-in" data-act="ed" value="${t.due_date||''}" ${ed?'':'disabled'} aria-label="Ngày kết thúc"><div class="mt-0.5">${dlChip(t)}</div>`:`<div class="mono">${fmtD(r.e)}</div><div class="text-mute mt-0.5">${kids.length} việc con</div>`}</div>
+     <div class="c-d text-xs text-center mono">${leaf?(plannedDays(t)??'—'):(r.s&&r.e?daysBetween(r.s,r.e)+1:'—')}</div>
+     <div class="c-d text-xs">${leaf?`<input type="date" class="dt-in" data-act="as" value="${t.actual_start_date||''}" ${ed?'':'disabled'} aria-label="Ngày bắt đầu thực tế">`:'<div class="text-mute">—</div>'}</div>
+     <div class="c-d text-xs">${leaf?`<input type="date" class="dt-in" data-act="ae" value="${t.actual_end_date||''}" ${ed?'':'disabled'} aria-label="Ngày kết thúc thực tế">`:'<div class="text-mute">—</div>'}</div>
+     <div class="c-d text-xs text-center">${leaf?actDaysCell(t,ed):'<div class="text-mute">—</div>'}</div>
      <div class="c-act text-right whitespace-nowrap">${ed?`<button data-act="edit" class="ibtn" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button><button data-act="del" class="ibtn del" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button>`:''}</div>
      ${editing?editorHTML(t,leaf):''}</div>`;
     if(PADD===t.id)h+=`<div class="tg-row tg-add" data-addrow="${t.id}"><div class="tg-full flex flex-wrap gap-2 items-center" style="padding-left:${flat?0:(d+1)*1.3}rem"><span class="mono text-xs" style="color:#f59e0b">↳</span><input class="inp" data-addname style="margin:0;flex:1;min-width:10rem" placeholder="Tên việc con · Enter để thêm · Esc để đóng" aria-label="Tên việc con"><input type="date" class="inp" data-adddue style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button class="btn" data-act="add-ok" aria-label="Thêm"><i class="fa-solid fa-plus"></i></button><button class="ibtn" data-act="add-x" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button><span data-adderr class="text-red-600 text-xs"></span></div></div>`;
@@ -1881,7 +2037,7 @@ function drawTodo(p){
     const rank={over:0,soon:1,ok:2,none:3,done:4};
     $('#tList').innerHTML=`<div class="kb flex flex-wrap gap-4 items-start">${KCOLS.map(([k,l])=>{
       const all=leaves.filter(t=>kcol(t)===k);
-      let c=k==='done'?all.slice().sort((a,b)=>(b.actual_end||'').localeCompare(a.actual_end||'')):all.slice().sort((a,b)=>rank[dlClass(a)]-rank[dlClass(b)]||byDue(a,b));
+      let c=k==='done'?all.slice().sort((a,b)=>(b.actual_end_date||'').localeCompare(a.actual_end_date||'')):all.slice().sort((a,b)=>rank[dlClass(a)]-rank[dlClass(b)]||byDue(a,b));
       const more=c.length>30?c.length-30:0;if(more)c=c.slice(0,30);
       return `<div class="card p-2 w-72 max-w-full shrink-0"><div class="flex justify-between items-center px-1 pb-2"><b class="text-sm">${l}</b><span class="pill" style="background:rgba(127,127,127,.15)">${all.length}</span></div>
        <div class="kb-col" data-st="${k}">${c.map(t=>card(t,true)).join('')||'<div class="text-xs text-mute px-1">Trống</div>'}${more?`<div class="text-xs text-mute px-1">… và ${more} việc nữa</div>`:''}</div></div>`}).join('')}</div>`;
@@ -1890,7 +2046,7 @@ function drawTodo(p){
   const open=leaves.filter(t=>t.status!=='done'),parts=[];
   DL_SEC.forEach(([k,l,c])=>{const items=open.filter(t=>dlClass(t)===k).sort(byDue);
     if(items.length)parts.push(`<div class="flex items-center gap-2 mt-4 mb-2 text-sm font-semibold" style="color:${c}"><span class="sw" style="background:${c}"></span>${l} (${items.length})</div>${items.map(t=>card(t)).join('')}`)});
-  if(tDone){const dn=leaves.filter(t=>t.status==='done').sort((a,b)=>(b.actual_end||'').localeCompare(a.actual_end||''));
+  if(tDone){const dn=leaves.filter(t=>t.status==='done').sort((a,b)=>(b.actual_end_date||'').localeCompare(a.actual_end_date||''));
     if(dn.length)parts.push(`<div class="flex items-center gap-2 mt-4 mb-2 text-sm font-semibold text-mute"><span class="sw" style="background:#16a34a"></span>Đã hoàn thành (${dn.length})</div>${dn.map(t=>card(t)).join('')}`)}
   $('#tList').innerHTML=parts.join('')||`<div class="text-mute p-4">${q?'Không có việc phù hợp.':'Không còn việc cần làm từ dự án. Việc mới tạo ở tab Tiến độ sẽ hiện ở đây.'}</div>`;
 }
@@ -1900,7 +2056,7 @@ const GL=16; /* rộng cột tên (rem) trên máy tính */
 const DN=s=>Math.round(Date.parse(s)/864e5);
 function actualOf(t){
   if(t.status==='todo')return null;
-  let s=t.actual_start,e=t.actual_end,est=false;
+  let s=t.actual_start_date,e=t.actual_end_date,est=false;
   if(t.status==='done'){if(!s){s=t.start_date||e;est=true}if(!e){e=t.due_date||s;est=true}}
   else{if(!s){s=t.start_date||today();est=true}e=today();if(e<s)e=s}
   if(!s||!e)return null;if(e<s)e=s;
@@ -2026,7 +2182,7 @@ function parseMasterGanttSheet(rows,pid){
     if(!grp&&ac){if(ac.e<td){st='done';pg=100}else{st='in_progress';const dp=pl?daysBetween(pl.s,pl.e)+1:0,da=daysBetween(ac.s,td<ac.e?td:ac.e)+1;pg=dp?Math.max(1,Math.min(99,Math.round(da/dp*100))):50}}
     return{id:x.id,project_id:pid,parent_id:x.par?x.par.id:null,wbs_code:x.code,name:x.name,owner_depts:x.own,collab_depts:[],
       duration_days:grp||!pl?null:daysBetween(pl.s,pl.e)+1,start_date:grp||!pl?null:pl.s,due_date:grp||!pl?null:pl.e,
-      actual_start:grp||!ac?null:ac.s,actual_end:grp||!ac?null:ac.e,status:grp?'in_progress':st,progress:grp?0:pg,priority:'medium',notes:'',depends_on:[],checklist:[],sort_order:i+1,created_at:now,updated_at:now}})}
+      actual_start_date:grp||!ac?null:ac.s,actual_end_date:grp||!ac?null:ac.e,status:grp?'in_progress':st,progress:grp?0:pg,priority:'medium',notes:'',depends_on:[],checklist:[],sort_order:i+1,created_at:now,updated_at:now}})}
 function parseMasterGeneric(rows,pid){
   let col=null;const out=[],byCode={},now=new Date().toISOString();
   for(const r of rows){
@@ -2036,7 +2192,7 @@ function parseMasterGeneric(rows,pid){
     const name=String(r[col.n]??'').replace(/\s+/g,' ').trim();if(!name)continue;
     const code=col.stt>=0?String(r[col.stt]??'').trim():'',sd=xlDate(r[col.a]),dd=xlDate(r[col.b]);
     let pg=col.pg>=0?parseFloat(r[col.pg]):0;if(isNaN(pg))pg=0;if(pg<=1&&pg>0&&String(r[col.pg]).indexOf('%')<0)pg*=100;pg=Math.max(0,Math.min(100,Math.round(pg)));
-    const t={id:uid(),project_id:pid,parent_id:null,wbs_code:code||String(out.length+1),name,start_date:sd,due_date:dd||sd,duration_days:sd&&dd?daysBetween(sd,dd)+1:null,status:pg>=100?'done':pg>0?'in_progress':'todo',progress:pg,actual_start:null,actual_end:null,priority:'medium',sort_order:out.length+1,created_at:now,updated_at:now};
+    const t={id:uid(),project_id:pid,parent_id:null,wbs_code:code||String(out.length+1),name,start_date:sd,due_date:dd||sd,duration_days:sd&&dd?daysBetween(sd,dd)+1:null,status:pg>=100?'done':pg>0?'in_progress':'todo',progress:pg,actual_start_date:null,actual_end_date:null,priority:'medium',sort_order:out.length+1,created_at:now,updated_at:now};
     out.push(t);if(code)byCode[code]=t}
   if(!col)return[];
   out.forEach(t=>{const m=String(t.wbs_code).match(/^(.+)\.\d+$/);if(m&&byCode[m[1]]&&byCode[m[1]]!==t)t.parent_id=byCode[m[1]].id});
@@ -2044,27 +2200,49 @@ function parseMasterGeneric(rows,pid){
   return out;
 }
 /* ===== Đồng bộ Master Gantt -> thẻ "Becos" (tasks.task_source = 'BECOS') =====
-   Chống trùng: so khớp theo TÊN hạng mục (không phân biệt hoa/thường, gộp khoảng trắng; trùng tên thì ưu tiên cùng mã STT).
-   Có rồi -> cập nhật ngày / % / trạng thái. Chưa có -> thêm mới. Không bao giờ xóa việc Becos có sẵn. */
+   UPSERT SẠCH theo: project_id (dự án đang mở) + task_source='BECOS' + ĐƯỜNG DẪN tên (nhóm cha › tên việc; không có thì khớp theo tên).
+   - Không tạo dự án / nhóm mới; mọi dòng chỉ gắn vào project_id hiện tại.
+   - Dòng đã có: cập nhật ngày kế hoạch; GIỮ NGUYÊN % tiến độ, trạng thái, ngày thực tế nếu đã có (chỉ điền khi trống).
+   - Tự dọn các dòng Becos bị nhân đôi (cùng đường dẫn): giữ 1 dòng (ưu tiên dòng có % / ngày thực tế), chuyển việc con sang dòng giữ lại.
+   - Không xóa việc Becos do người dùng tự thêm (không có trong Master). */
 function syncMasterToBecos(p,rows,silent){
   rows=rows||MG(p.id);
   if(!rows.length){if(!silent)toast('Chưa có Master Gantt. Vào tab Gantt > Master Gantt > Import Excel mẫu trước.');return null}
   const all=db.list('tasks'),becos=all.filter(t=>t.project_id===p.id&&srcOf(t)==='BECOS'),now=new Date().toISOString();
-  const nk=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase(),byName=new Map();
-  becos.forEach(t=>{const k=nk(t.name);if(!byName.has(k))byName.set(k,[]);byName.get(k).push(t)});
+  const nk=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const pathOf=list=>{const by=Object.fromEntries(list.map(x=>[x.id,x])),memo={};const f=(x,d)=>{if(memo[x.id]!=null)return memo[x.id];const par=d<30&&x.parent_id&&by[x.parent_id]&&by[x.parent_id]!==x?f(by[x.parent_id],d+1)+' › ':'';return memo[x.id]=par+nk(x.name)};list.forEach(x=>f(x,0));return memo};
+  const bPath=pathOf(becos),mPath=pathOf(rows),mSet=new Set(Object.values(mPath));
+  /* 1) Dọn trùng trong Becos hiện có */
+  const groups=new Map();becos.forEach(t=>{const k=bPath[t.id];if(!groups.has(k))groups.set(k,[]);groups.get(k).push(t)});
+  const dup=new Set(),reparent={};
+  const score=t=>(t.progress||0)*10+(t.actual_start_date?5:0)+(t.actual_end_date?5:0)+(t.notes?1:0);
+  groups.forEach(g=>{if(g.length<2)return;const keep=g.slice().sort((a,b)=>score(b)-score(a)||(a.sort_order||0)-(b.sort_order||0))[0];g.forEach(t=>{if(t!==keep){dup.add(t.id);reparent[t.id]=keep.id}})});
+  const live=becos.filter(t=>!dup.has(t.id));
+  const byPath=new Map(),byName=new Map();
+  live.forEach(t=>{const k=bPath[t.id];if(!byPath.has(k))byPath.set(k,[]);byPath.get(k).push(t);const n=nk(t.name);if(!byName.has(n))byName.set(n,[]);byName.get(n).push(t)});
+  /* 2) Khớp từng dòng Master với 1 dòng Becos */
   const src=[...rows].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)),used=new Set(),idMap={},hit={};
-  src.forEach(m=>{const c=byName.get(nk(m.name))||[],t=c.find(x=>!used.has(x.id)&&x.wbs_code===m.wbs_code)||c.find(x=>!used.has(x.id));
+  src.forEach(m=>{
+    const c1=(byPath.get(mPath[m.id])||[]).find(x=>!used.has(x.id));
+    const t=c1||(byName.get(nk(m.name))||[]).find(x=>!used.has(x.id)&&!mSet.has(bPath[x.id]));      // khớp tên chỉ khi dòng đó không thuộc đường dẫn khác của Master
     if(t){used.add(t.id);idMap[m.id]=t.id;hit[m.id]=t}else idMap[m.id]=uid()});
   let add=0,upd=0,same=0,base=Math.max(0,...becos.map(t=>t.sort_order||0));const patch={},fresh=[];
+  const pdOf=(a,b)=>a&&b?daysBetween(a,b)+1:null;
   src.forEach((m,i)=>{
-    const vals={start_date:m.start_date||null,due_date:m.due_date||null,duration_days:m.duration_days||null,actual_start:m.actual_start||null,actual_end:m.actual_end||null,status:m.status||'todo',progress:m.progress||0};
+    const sched={start_date:m.start_date||null,due_date:m.due_date||null,duration_days:m.duration_days||null,planned_days:pdOf(m.start_date,m.due_date)};
+    const prog={actual_start_date:m.actual_start_date||null,actual_end_date:m.actual_end_date||null,status:m.status||'todo',progress:m.progress||0,actual_days:pdOf(m.actual_start_date,m.actual_end_date)};
     const t=hit[m.id];
-    if(t){const ch=Object.keys(vals).some(k=>(t[k]??null)!==vals[k]);if(ch){patch[t.id]={...vals,updated_at:now};upd++}else same++}
-    else{add++;fresh.push({id:idMap[m.id],project_id:p.id,parent_id:m.parent_id?idMap[m.parent_id]||null:null,wbs_code:m.wbs_code||'',task_source:'BECOS',name:m.name,owner_depts:m.owner_depts||[],collab_depts:[],...vals,priority:m.priority||'medium',notes:'',depends_on:[],checklist:[],sort_order:base+i+1,created_at:now,updated_at:now})}});
-  if(add||upd)db.save('tasks',[...all.map(t=>patch[t.id]?{...t,...patch[t.id]}:t),...fresh]);
+    if(t){
+      const has=(t.progress||0)>0||!!t.actual_start_date||!!t.actual_end_date;                      // đã có tiến độ thực tế -> giữ nguyên
+      const vals=has?sched:{...sched,...prog};
+      if(Object.keys(vals).some(k=>(t[k]??null)!==vals[k])){patch[t.id]={...vals,updated_at:now};upd++}else same++}
+    else{add++;fresh.push({id:idMap[m.id],project_id:p.id,parent_id:m.parent_id?idMap[m.parent_id]||null:null,wbs_code:m.wbs_code||'',task_source:'BECOS',name:m.name,owner_depts:m.owner_depts||[],collab_depts:[],...sched,...prog,priority:m.priority||'medium',notes:'',depends_on:[],checklist:[],sort_order:base+i+1,created_at:now,updated_at:now})}});
+  if(add||upd||dup.size){
+    const next=all.filter(t=>!dup.has(t.id)).map(t=>{let x=patch[t.id]?{...t,...patch[t.id]}:t;if(x.parent_id&&reparent[x.parent_id])x={...x,parent_id:reparent[x.parent_id],updated_at:now};return x});
+    db.save('tasks',[...next,...fresh])}
   PINIT.delete(p.id+'|becos');
-  if(!silent)toast(`Đồng bộ xong: +${add} mới, ${upd} cập nhật, ${same} không đổi`,false);
-  renderBell();return{add,upd,same};
+  if(!silent)toast(`Đồng bộ xong: +${add} mới, ${upd} cập nhật, ${same} không đổi${dup.size?`, dọn ${dup.size} dòng trùng`:''}`,false);
+  renderBell();return{add,upd,same,dup:dup.size};
 }
 async function importMaster(p,file){
   try{
@@ -2072,7 +2250,7 @@ async function importMaster(p,file){
     const ws=(wb=>wb.Sheets[wb.SheetNames[0]])(XLSX.read(await file.arrayBuffer(),{type:'array'}));
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
     const gx=parseMasterGanttSheet(rows,p.id),pc=gx.length?{nodes:[]}:parseChecklist(rows);let kind,build;
-    if(gx.length){kind='Gantt Excel có dòng KH (kế hoạch) và TT (thực tế)';build=()=>gx;var info=`<li><b>${gx.length}</b> hạng mục · ${gx.filter(x=>x.actual_start).length} hạng mục có thời gian thực tế</li>`}
+    if(gx.length){kind='Gantt Excel có dòng KH (kế hoạch) và TT (thực tế)';build=()=>gx;var info=`<li><b>${gx.length}</b> hạng mục · ${gx.filter(x=>x.actual_start_date).length} hạng mục có thời gian thực tế</li>`}
     else if(pc.nodes.length){kind='Checklist PMP (tính lịch theo thời lượng)';const span=schedule(pc.nodes,pc.by);build=st=>buildTasks(pc.nodes,pc.by,st,p.id);
       var info=`<li><b>${pc.nodes.length}</b> dòng · tổng thời gian tính được <b>${span}</b> ngày</li>`}
     else{const g=parseMasterGeneric(rows,p.id);if(!g.length)throw new Error('Không nhận dạng được file. Cần bảng có cột Tên công việc, Ngày bắt đầu, Ngày kết thúc (hoặc checklist PMP có cột STT và Hạng mục công việc).');
@@ -2083,7 +2261,7 @@ async function importMaster(p,file){
       <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn" id="iRep">Lưu Master Gantt (thay bản cũ)</button></div>`);
     $('#iNo').onclick=closeModal;
     $('#iRep').onclick=()=>{const st=($('#mStart')&&$('#mStart').value)||p.start_date,out=build(st).map(r=>({...r,project_id:p.id,source_file:file.name,imported_at:new Date().toISOString()}));
-      db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';const sr=syncMasterToBecos(p,out,true);route();if(sr)toast(`Đã đồng bộ sang thẻ Becos: +${sr.add} mới, ${sr.upd} cập nhật`,false)};
+      db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';const sr=syncMasterToBecos(p,out,true);route();if(sr)toast(`Đã đồng bộ sang thẻ Becos: +${sr.add} mới, ${sr.upd} cập nhật${sr.dup?`, dọn ${sr.dup} dòng trùng`:''}`,false)};
   }catch(e){toast(e.message)}
 }
 async function exportMaster(p){
