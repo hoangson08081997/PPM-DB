@@ -1784,7 +1784,7 @@ const PEXP=new Set(),PINIT=new Set(),GOPEN=new Set(),GINIT=new Set(),PEND={};
 const leafFn=tk=>{const ps=new Set(tk.map(t=>t.parent_id));return t=>!ps.has(t.id)};
 const noDur=t=>(t.duration_days||0)<=0&&t.status!=='done';
 const taskRows=pid=>db.list('tasks').filter(t=>t.project_id===pid);
-/* Nguồn công việc: 'PMP' = thẻ "Check list" · 'BECOS' = thẻ "Becos" (đồng bộ từ Master Gantt) */
+/* Nguồn công việc: 'PMP' = thẻ "Check list" · 'BECOS' = thẻ "Becos" (đồng bộ từ Becos) */
 const srcOf=t=>t&&t.task_source==='BECOS'?'BECOS':'PMP';
 const SRC_NAME={PMP:'Check list',BECOS:'Becos'},SRC_CHIP={PMP:'background:#dbeafe;color:#1d4ed8',BECOS:'background:#ede9fe;color:#6d28d9'};
 const taskRowsSrc=(pid,src)=>taskRows(pid).filter(t=>srcOf(t)===src);
@@ -1910,9 +1910,9 @@ function viewProgress(p,target){
   if(!PINIT.has(p.id+'|'+PSUB)){PINIT.add(p.id+'|'+PSUB);if(tk.length<=40)tk.forEach(t=>PEXP.add(t.id))}
   if(target){let t=tk.find(x=>x.id===target);while(t&&t.parent_id){PEXP.add(t.parent_id);t=tk.find(x=>x.id===t.parent_id)}}
   $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-3" role="tablist" aria-label="Nguồn công việc">${[['pmp','Check list',cntPMP],['becos','Becos',cntBec]].map(([k,l,n])=>`<button role="tab" data-psub="${k}" aria-selected="${PSUB===k}" class="seg px-4 py-1.5 ${PSUB===k?'on':''}">${l} <span class="text-[11px] opacity-70">${n}</span></button>`).join('')}</div>
-   <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-bars-progress" style="color:var(--brand)"></i>${becos?'Becos · hạng mục từ Master Gantt':'Check list · tiến độ &amp; phân cấp công việc'}</h2>
-    <p class="text-mute text-xs">${becos?'Các hạng mục lấy từ Master Gantt (task_source = BECOS). Bấm <b>Đồng bộ từ Master Gantt</b> để cập nhật ngày / % mới nhất.':'Bấm <b>+</b> trên thẻ để thêm việc con (không giới hạn cấp). Kéo thanh trượt để cập nhật % hoàn thành. Dữ liệu ở thẻ này vẽ ra sơ đồ <b>Check list PMP</b> bên tab Gantt.'}</p></div>
-   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button><button id="pExp" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-file-excel mr-1"></i>📥 Xuất Excel Tiến độ</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Master Gantt${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
+   <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-bars-progress" style="color:var(--brand)"></i>${becos?'Becos · hạng mục từ Becos':'Check list · tiến độ &amp; phân cấp công việc'}</h2>
+    <p class="text-mute text-xs">${becos?'Các hạng mục lấy từ Becos (task_source = BECOS). Bấm <b>Đồng bộ từ Becos</b> để cập nhật ngày / % mới nhất.':'Bấm <b>+</b> trên thẻ để thêm việc con (không giới hạn cấp). Kéo thanh trượt để cập nhật % hoàn thành. Dữ liệu ở thẻ này vẽ ra sơ đồ <b>Check list PMP</b> bên tab Gantt.'}</p></div>
+   <div class="flex flex-wrap gap-2"><button id="pAll" class="btn-ghost">Mở rộng tất cả</button><button id="pNone" class="btn-ghost">Thu gọn tất cả</button><button id="pExp" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-file-excel mr-1"></i>📥 Xuất Excel Tiến độ</button>${!becos&&adm?'<button id="tImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Check list (Excel/CSV)</button>':''}${becos&&ed?`<button id="bsSync" class="btn btn-big"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ từ Becos${mgN?` <span class="text-[11px] opacity-80">(${mgN})</span>`:''}</button>`:''}</div></div>
    ${ed?`<div class="card p-3 mb-3"><div class="flex flex-wrap gap-2 items-center"><span class="lbl" style="color:#f59e0b"><i class="fa-solid fa-plus"></i> Khởi tạo nhanh</span><input id="pqName" class="inp" style="margin:0;flex:1;min-width:11rem" placeholder="Thêm đầu mục lớn: gõ tên rồi nhấn Enter" aria-label="Tên đầu mục mới"><input id="pqDue" type="date" class="inp" style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button id="pqAdd" class="btn" aria-label="Thêm đầu mục"><i class="fa-solid fa-plus"></i> Thêm việc</button></div><div id="pqErr" class="text-red-600 text-xs h-4 mt-1"></div></div>`:''}
    <div class="flex flex-wrap items-center gap-2 mb-3"><input id="pqSearch" class="inp" style="max-width:17rem;margin:0" placeholder="Tìm tên, mã WBS, bộ phận..." value="${esc(pq)}">${nd?`<button id="ndChip" class="text-xs px-2 py-1 rounded-full" style="background:${pnd?'#f59e0b':'#fef3c7'};color:#92400e">⚠ ${nd} việc thiếu thời lượng${pnd?' (đang lọc)':''}</button>`:''}</div>
    <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>BĐ kế hoạch</div><div>KT kế hoạch</div><div title="Số ngày kế hoạch" class="text-center">Ngày KH</div><div>BĐ thực tế</div><div>KT thực tế</div><div title="Số ngày thực tế" class="text-center">Ngày TT</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
@@ -1978,34 +1978,64 @@ function viewProgress(p,target){
 
 
 /* ===== Xuất Excel Tiến độ (thẻ đang mở: Check list hoặc Becos) — giữ cây cha-con, import ngược lại được bằng "Import Check list" ===== */
+/* ===================== XUẤT EXCEL CHECK LIST / BECOS (ExcelJS) — CẤU TRÚC KHỐI, SẴN SÀNG NHẬN FILE MẪU =====================
+   XL_TPL = toạ độ + style chuẩn (đổi theo biểu mẫu tại ĐÂY): dòng tiêu đề, dòng header bảng, dòng dữ liệu đầu, font, màu, cột.
+   exportProgressXLSX(p) chia 6 khối bằng comment:
+     [KHỐI 0] Chuẩn bị dữ liệu (làm phẳng cây WBS)    [KHỐI 1] HEADER & LOGO       [KHỐI 2] ĐỊNH DẠNG CỘT (độ rộng, tiêu đề cột)
+     [KHỐI 3] RENDER DÒNG DỮ LIỆU TỪNG CẤP WBS        [KHỐI 4] FOOTER / TỔNG KẾT   [KHỐI 5] IN ẤN & XUẤT FILE
+   Cột: key = khoá giá trị trong vals{} của khối 3; thêm/bớt/đổi thứ tự cột chỉ cần sửa XL_TPL.cols. */
+const XL_TPL={
+  font:'Times New Roman',sheetFreezeRow:4,
+  title:{cell:'A1',merge:'A1:M1',size:16,color:'FF1F4E79',height:28},
+  sub:{cell:'A2',merge:'A2:M2',size:11,color:'FF475569'},
+  logo:null,                                  // {base64:'...',ext:'png',tl:{col:0,row:0},ext2:{width:120,height:40}} khi có logo mẫu
+  headerRow:4,headerHeight:34,headerFill:'FF1F4E79',headerColor:'FFFFFFFF',
+  firstDataRow:5,
+  fillGroup:{0:'FFDAE3F5',n:'FFF1F5F9'},        // màu nền dòng nhóm: cấp 0 / các cấp sâu hơn
+  border:{style:'thin',color:{argb:'FF9CA3AF'}},
+  cols:[ // key, tiêu đề, độ rộng, căn lề, định dạng số/ngày
+    {key:'wbs',h:'STT',w:8,al:'center'},{key:'name',h:'Tên công việc',w:52,al:'left',wrap:true,indent:true},{key:'lvl',h:'Cấp độ',w:9,al:'center'},
+    {key:'pg',h:'Tiến độ (%)',w:11,al:'center',fmt:'0%'},{key:'status',h:'Trạng thái',w:15,al:'center'},
+    {key:'ps',h:'BĐ Kế hoạch',w:13,al:'center',fmt:'dd/mm/yyyy'},{key:'pe',h:'KT Kế hoạch',w:13,al:'center',fmt:'dd/mm/yyyy'},{key:'pd',h:'Thời gian KH (ngày)',w:14,al:'center'},
+    {key:'as',h:'Thực tế bắt đầu (BĐ TT)',w:16,al:'center',fmt:'dd/mm/yyyy'},{key:'ae',h:'Thực tế kết thúc (KT TT)',w:16,al:'center',fmt:'dd/mm/yyyy'},
+    {key:'ad',h:'Số ngày TT',w:11,al:'center'},{key:'diff',h:'Chênh lệch ngày',w:14,al:'center',fmt:'+0;-0;0'},{key:'note',h:'Ràng buộc / Ghi chú',w:42,al:'left',wrap:true}],
+  page:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}
+};
 async function exportProgressXLSX(p){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
+    const X=XL_TPL,F=X.font,box={top:X.border,bottom:X.border,left:X.border,right:X.border},NC=X.cols.length;
+    /* [KHỐI 0: CHUẨN BỊ DỮ LIỆU] làm phẳng cây WBS theo đúng sort_order (thứ tự file gốc) */
     const tk=pRows(p);if(!tk.length){toast('Thẻ này chưa có công việc để xuất');return}
     const {k,R}=rollTasks(tk),becos=PSUB==='becos',flat=[];
     const walk=(id,d)=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(t=>{flat.push({t,d,grp:!!k[t.id]});if(k[t.id])walk(t.id,d+1)});walk('root',0);
-    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet(becos?'Becos':'Check list',{views:[{state:'frozen',ySplit:4}]});
-    const F='Times New Roman',thin={style:'thin',color:{argb:'FF9CA3AF'}},box={top:thin,bottom:thin,left:thin,right:thin};
-    const HEAD=['STT','Tên công việc','Cấp độ','Tiến độ (%)','Trạng thái','BĐ Kế hoạch','KT Kế hoạch','Thời gian KH (ngày)','Thực tế bắt đầu (BĐ TT)','Thực tế kết thúc (KT TT)','Số ngày TT','Chênh lệch ngày','Ràng buộc / Ghi chú'];
-    [8,52,9,11,15,13,13,14,16,16,11,14,42].forEach((w,i)=>ws.getColumn(i+1).width=w);
-    ws.mergeCells('A1:M1');ws.getCell('A1').value=(becos?'BÁO CÁO TIẾN ĐỘ BECOS':'BÁO CÁO TIẾN ĐỘ CHECK LIST')+' · '+p.name;ws.getCell('A1').font={name:F,size:16,bold:true,color:{argb:'FF1F4E79'}};ws.getRow(1).height=28;
-    ws.mergeCells('A2:M2');ws.getCell('A2').value=`Mã dự án: ${p.code||''} · Ngày xuất: ${fmtD(today())}`;ws.getCell('A2').font={name:F,size:11,italic:true,color:{argb:'FF475569'}};
-    const hr=ws.getRow(4);hr.height=34;
-    HEAD.forEach((h,i)=>{const c=hr.getCell(i+1);c.value=h;c.font={name:F,size:11,bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F4E79'}};c.border=box;c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet(becos?'Becos':'Check list',{views:[{state:'frozen',ySplit:X.sheetFreezeRow}]});
+    /* [KHỐI 1: HEADER & LOGO] tiêu đề báo cáo, thông tin dự án, logo (nếu có) */
+    ws.mergeCells(X.title.merge);const tc=ws.getCell(X.title.cell);tc.value=(becos?'BÁO CÁO TIẾN ĐỘ BECOS':'BÁO CÁO TIẾN ĐỘ CHECK LIST')+' · '+p.name;tc.font={name:F,size:X.title.size,bold:true,color:{argb:X.title.color}};ws.getRow(1).height=X.title.height;
+    ws.mergeCells(X.sub.merge);const sc=ws.getCell(X.sub.cell);sc.value=`Mã dự án: ${p.code||''} · Ngày xuất: ${fmtD(today())}`;sc.font={name:F,size:X.sub.size,italic:true,color:{argb:X.sub.color}};
+    if(X.logo){const id=wb.addImage({base64:X.logo.base64,extension:X.logo.ext||'png'});ws.addImage(id,{tl:X.logo.tl,ext:X.logo.ext2})}
+    /* [KHỐI 2: ĐỊNH DẠNG CỘT] độ rộng + hàng tiêu đề bảng */
+    X.cols.forEach((c,i)=>ws.getColumn(i+1).width=c.w);
+    const hr=ws.getRow(X.headerRow);hr.height=X.headerHeight;
+    X.cols.forEach((c,i)=>{const cell=hr.getCell(i+1);cell.value=c.h;cell.font={name:F,size:11,bold:true,color:{argb:X.headerColor}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:X.headerFill}};cell.border=box;cell.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
+    /* [KHỐI 3: RENDER DÒNG DỮ LIỆU TỪNG CẤP WBS] mỗi dòng = 1 công việc; grp = nhóm cha (tô nền, in đậm), d = cấp (thụt lề) */
     const toD=v=>v?new Date(v+'T00:00:00Z'):null,TST_L={todo:'Chưa làm',in_progress:'Đang làm',review:'Chờ duyệt',done:'Hoàn thành'};
     flat.forEach(({t,d,grp},i)=>{
-      const r=R[t.id],row=ws.getRow(5+i),pd=grp?(r.s&&r.e?daysBetween(r.s,r.e)+1:null):plannedDays(t),ad=t.actual_days??(t.actual_start_date&&t.actual_end_date?daysBetween(t.actual_start_date,t.actual_end_date)+1:null);
+      const r=R[t.id],row=ws.getRow(X.firstDataRow+i),pd=grp?(r.s&&r.e?daysBetween(r.s,r.e)+1:null):plannedDays(t),ad=t.actual_days??(t.actual_start_date&&t.actual_end_date?daysBetween(t.actual_start_date,t.actual_end_date)+1:null);
       const stt=r.pg>=100?'done':r.pg>0?'in_progress':'todo',status=grp?stt:t.status;
-      const vals=[t.wbs_code,t.name,d+1,r.pg/100,TST_L[status]||status,toD(r.s),toD(r.e),pd,toD(t.actual_start_date),toD(t.actual_end_date),ad,ad!=null&&pd!=null?ad-pd:null,[t.notes,(t.depends_on||[]).length?'Ràng buộc: '+t.depends_on.map(x=>(tk.find(y=>y.id===x)||{}).wbs_code).filter(Boolean).join(', '):''].filter(Boolean).join(' | ')];
-      vals.forEach((v,c)=>{const cell=row.getCell(c+1);cell.value=v;cell.border=box;
+      const V={wbs:t.wbs_code,name:t.name,lvl:d+1,pg:r.pg/100,status:TST_L[status]||status,ps:toD(r.s),pe:toD(r.e),pd,as:toD(t.actual_start_date),ae:toD(t.actual_end_date),ad,diff:ad!=null&&pd!=null?ad-pd:null,
+        note:[t.notes,(t.depends_on||[]).length?'Ràng buộc: '+t.depends_on.map(x=>(tk.find(y=>y.id===x)||{}).wbs_code).filter(Boolean).join(', '):''].filter(Boolean).join(' | ')};
+      X.cols.forEach((c,ci)=>{const cell=row.getCell(ci+1);cell.value=V[c.key];cell.border=box;
         cell.font={name:F,size:11,bold:grp,color:{argb:'FF0F172A'}};
-        cell.alignment={vertical:'middle',wrapText:c===1||c===12,horizontal:c===1||c===12?'left':'center',indent:c===1?d:0};
-        if(grp)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:d===0?'FFDAE3F5':'FFF1F5F9'}};
-        if(c===3)cell.numFmt='0%';if([5,6,8,9].includes(c))cell.numFmt='dd/mm/yyyy'});
-      const dif=vals[11];if(dif!=null){const c=row.getCell(12);c.font={name:F,size:11,bold:true,color:{argb:dif>0?'FFDC2626':status==='done'?'FF16A34A':'FF0F172A'}};c.numFmt='+0;-0;0'}
+        cell.alignment={vertical:'middle',wrapText:!!c.wrap,horizontal:c.al,indent:c.indent?d:0};
+        if(grp)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:d===0?X.fillGroup[0]:X.fillGroup.n}};
+        if(c.fmt)cell.numFmt=c.fmt});
+      const dc=X.cols.findIndex(c=>c.key==='diff');if(dc>=0&&V.diff!=null){const c=row.getCell(dc+1);c.font={name:F,size:11,bold:true,color:{argb:V.diff>0?'FFDC2626':status==='done'?'FF16A34A':'FF0F172A'}}}
     });
-    ws.autoFilter={from:{row:4,column:1},to:{row:4,column:13}};
-    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+    /* [KHỐI 4: FOOTER / TỔNG KẾT] (trống — thêm dòng tổng, chữ ký, ghi chú cuối bảng theo biểu mẫu tại đây; dòng cuối dữ liệu = X.firstDataRow+flat.length-1) */
+    ws.autoFilter={from:{row:X.headerRow,column:1},to:{row:X.headerRow,column:NC}};
+    /* [KHỐI 5: IN ẤN & XUẤT FILE] */
+    ws.pageSetup={...X.page};
     const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
     a.href=URL.createObjectURL(blob);a.download=`TienDo_${becos?'Becos':'Checklist'}_${p.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }catch(e){console.error(e);toast('Xuất Excel lỗi: '+(e.message||e))}
@@ -2059,7 +2089,7 @@ function drawProgress(p,only){
     const walk=(id,d)=>sorted(id).forEach(t=>{const c=card(t,d);out.push(c.h);if(c.kids.length&&c.open)walk(t.id,d+1)});
     walk('root',0);
   }
-  const _h=out.join('');$('#pTree').innerHTML=_h||`<div class="text-mute p-4">${flat?'Không có việc phù hợp.':ed?(PSUB==='becos'?'Chưa có hạng mục Becos. Import Master Gantt ở tab Gantt (tự đồng bộ) hoặc bấm “Đồng bộ từ Master Gantt”.':'Chưa có công việc. Gõ tên ở ô phía trên rồi Enter để tạo đầu mục đầu tiên.'):'Chưa có công việc.'}</div>`;
+  const _h=out.join('');$('#pTree').innerHTML=_h||`<div class="text-mute p-4">${flat?'Không có việc phù hợp.':ed?(PSUB==='becos'?'Chưa có hạng mục Becos. Import Becos ở tab Gantt (tự đồng bộ) hoặc bấm “Đồng bộ từ Becos”.':'Chưa có công việc. Gõ tên ở ô phía trên rồi Enter để tạo đầu mục đầu tiên.'):'Chưa có công việc.'}</div>`;
   growNotes($('#pTree'));
 }
 /* đọc layout 1 lượt rồi mới ghi 1 lượt (tránh layout thrashing); ô ghi chú trống giữ chiều cao mặc định */
@@ -2211,10 +2241,10 @@ function viewGantt(p){
   const tk=GSRC(p),gk=p.id+GSUB,master=GSUB==='master',ed=canTask(p.id);
   if(!GINIT.has(gk)){GINIT.add(gk);if(tk.length<=40)tk.forEach(t=>GOPEN.add(t.id))}
   const sw=(c,l)=>`<span class="whitespace-nowrap"><span class="sw" style="background:${c}"></span>${l}</span>`;
-  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-2" role="group" aria-label="Loại Gantt">${[['project','Check list PMP'],['master','Master Gantt']].map(([k,l])=>`<button data-gsub="${k}" class="seg px-3 py-1.5 ${GSUB===k?'on':''}">${l}</button>`).join('')}</div>
-   <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div><h2 class="text-xl font-bold">${master?'Master Gantt':'Check list PMP'} · ${esc(p.name)}</h2>
+  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-2" role="group" aria-label="Loại Gantt">${[['project','Check list PMP'],['master','Becos']].map(([k,l])=>`<button data-gsub="${k}" class="seg px-3 py-1.5 ${GSUB===k?'on':''}">${l}</button>`).join('')}</div>
+   <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><div><h2 class="text-xl font-bold">${master?'Becos':'Check list PMP'} · ${esc(p.name)}</h2>
     <p class="text-mute text-xs">${master?'Biểu đồ tải từ file Excel mẫu. Sau khi import, các hạng mục tự đồng bộ sang thẻ <b>Becos</b> (tab Tiến độ).':'Vẽ từ các công việc ở thẻ <b>Check list</b> (tab Tiến độ, task_source = PMP). Bấm tên việc để mở đúng dòng trong tab Tiến độ.'}</p></div>
-   <div class="flex flex-wrap gap-2"><button id="gOpen" class="btn-ghost">Mở tất cả</button><button id="gClose" class="btn-ghost">Thu gọn</button>${master?`${ed?'<button id="mImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel mẫu</button>':''}${tk.length?'<button id="mExp" class="btn"><i class="fa-solid fa-file-export mr-1"></i>Export Master Gantt ra Excel (A3)</button>':''}${ed&&tk.length?'<button id="mDel" class="btn-ghost" style="color:#dc2626"><i class="fa-solid fa-trash mr-1"></i>Xóa Master</button>':''}`:''}</div></div>${master?'<input type="file" id="mFile" accept=".xlsx,.xls" class="hidden">':''}
+   <div class="flex flex-wrap gap-2"><button id="gOpen" class="btn-ghost">Mở tất cả</button><button id="gClose" class="btn-ghost">Thu gọn</button>${master?`${ed?'<button id="mImp" class="btn-ghost"><i class="fa-solid fa-file-import mr-1"></i>Import Excel mẫu</button>':''}${tk.length?'<button id="mExp" class="btn"><i class="fa-solid fa-file-export mr-1"></i>Export Becos ra Excel (A3)</button>':''}${ed&&tk.length?'<button id="mDel" class="btn-ghost" style="color:#dc2626"><i class="fa-solid fa-trash mr-1"></i>Xóa Becos</button>':''}`:''}</div></div>${master?'<input type="file" id="mFile" accept=".xlsx,.xls" class="hidden">':''}
    ${master?`<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">${sw('#FFC000','KH · Thời gian kế hoạch')}${sw('#00B0F0','TT · Thời gian thực tế')}${sw('#f87171','Trễ kế hoạch')}<span class="whitespace-nowrap"><span class="inline-block align-middle mr-1" style="width:2px;height:.8rem;background:#ef4444"></span>Hôm nay</span><span class="text-mute">· % hoàn thành là ước tính (thực tế / kế hoạch)</span></div>`:`
    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-2">${sw('#64748b','Kế hoạch (phần đậm = % hoàn thành)')}${sw('#f59e0b','Kế hoạch thiếu thời lượng')}
     <span class="text-mute">Thực tế:</span>${sw('#16a34a','xong đúng hạn')}${sw('#f59e0b','xong trễ')}${sw('#2563eb','đang làm')}${sw('#dc2626','đang trễ hạn')}
@@ -2226,7 +2256,7 @@ function viewGantt(p){
   if(master){
     if($('#mImp')){$('#mImp').onclick=()=>$('#mFile').click();$('#mFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importMaster(p,f)}}
     if($('#mExp'))$('#mExp').onclick=()=>exportMaster(p);
-    if($('#mDel'))$('#mDel').onclick=()=>ask('Xóa toàn bộ Master Gantt của dự án này? (Không ảnh hưởng tiến độ và chi phí dự án)',()=>{db.save('master_gantt',db.list('master_gantt').filter(r=>r.project_id!==p.id));viewGantt(p)});
+    if($('#mDel'))$('#mDel').onclick=()=>ask('Xóa toàn bộ Becos của dự án này? (Không ảnh hưởng tiến độ và chi phí dự án)',()=>{db.save('master_gantt',db.list('master_gantt').filter(r=>r.project_id!==p.id));viewGantt(p)});
   }
   $('#gtBox').onclick=e=>{
     const g=e.target.closest('[data-g]');if(g){const i=g.dataset.g;GOPEN.has(i)?GOPEN.delete(i):GOPEN.add(i);drawGantt(p);return}
@@ -2243,7 +2273,7 @@ function drawGantt(p){
   const box=$('#gtBox');if(!box)return;
   const rows=ganttRows(GSRC(p)),ds=[];
   rows.forEach(({r,a})=>{[r.s,r.e,a.s,a.e].forEach(x=>{if(x)ds.push(DN(x))})});
-  if(!rows.length||!ds.length){box.innerHTML=GSUB==='master'?'<div class="p-8 text-center text-mute"><i class="fa-solid fa-file-excel text-3xl mb-2" style="color:#16a34a"></i><div class="font-semibold text-ink mb-1">Chưa có Master Gantt</div>Bấm <b>Import Excel mẫu</b> để tải file kế hoạch tổng thể (định dạng checklist PMP hoặc bảng có cột Tên, Bắt đầu, Kết thúc, %).</div>':'<div class="p-6 text-mute">Chưa có công việc Check list nào có ngày. Hãy tạo hoặc import ở thẻ Check list (tab Tiến độ).</div>';return}
+  if(!rows.length||!ds.length){box.innerHTML=GSUB==='master'?'<div class="p-8 text-center text-mute"><i class="fa-solid fa-file-excel text-3xl mb-2" style="color:#16a34a"></i><div class="font-semibold text-ink mb-1">Chưa có Becos</div>Bấm <b>Import Excel mẫu</b> để tải file kế hoạch tổng thể (định dạng checklist PMP hoặc bảng có cột Tên, Bắt đầu, Kết thúc, %).</div>':'<div class="p-6 text-mute">Chưa có công việc Check list nào có ngày. Hãy tạo hoặc import ở thẻ Check list (tab Tiến độ).</div>';return}
   let lo=Math.min(...ds),hi=Math.max(...ds)+1;const td=DN(today());
   if(td>=lo-30&&td<=hi+30){lo=Math.min(lo,td);hi=Math.max(hi,td+1)}
   if(hi-lo<7)hi=lo+7;
@@ -2313,7 +2343,7 @@ function parseMasterGeneric(rows,pid){
   const par=new Set(out.map(t=>t.parent_id));out.forEach(t=>{if(par.has(t.id)){t.duration_days=null;t.start_date=null;t.due_date=null;t.progress=0;t.status='in_progress'}});
   return out;
 }
-/* ===== Đồng bộ Master Gantt -> thẻ "Becos" (tasks.task_source = 'BECOS') =====
+/* ===== Đồng bộ Becos -> thẻ "Becos" (tasks.task_source = 'BECOS') =====
    UPSERT SẠCH theo: project_id (dự án đang mở) + task_source='BECOS' + ĐƯỜNG DẪN tên (nhóm cha › tên việc; không có thì khớp theo tên).
    - Không tạo dự án / nhóm mới; mọi dòng chỉ gắn vào project_id hiện tại.
    - Dòng đã có: cập nhật ngày kế hoạch; GIỮ NGUYÊN % tiến độ, trạng thái, ngày thực tế nếu đã có (chỉ điền khi trống).
@@ -2321,7 +2351,7 @@ function parseMasterGeneric(rows,pid){
    - Không xóa việc Becos do người dùng tự thêm (không có trong Master). */
 function syncMasterToBecos(p,rows,silent){
   rows=rows||MG(p.id);
-  if(!rows.length){if(!silent)toast('Chưa có Master Gantt. Vào tab Gantt > Master Gantt > Import Excel mẫu trước.');return null}
+  if(!rows.length){if(!silent)toast('Chưa có Becos. Vào tab Gantt > Becos > Import Excel mẫu trước.');return null}
   const all=db.list('tasks'),becos=all.filter(t=>t.project_id===p.id&&srcOf(t)==='BECOS'),now=new Date().toISOString();
   const nk=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
   const pathOf=list=>{const by=Object.fromEntries(list.map(x=>[x.id,x])),memo={};const f=(x,d)=>{if(memo[x.id]!=null)return memo[x.id];const par=d<30&&x.parent_id&&by[x.parent_id]&&by[x.parent_id]!==x?f(by[x.parent_id],d+1)+' › ':'';return memo[x.id]=par+nk(x.name)};list.forEach(x=>f(x,0));return memo};
@@ -2340,7 +2370,7 @@ function syncMasterToBecos(p,rows,silent){
     const c1=(byPath.get(mPath[m.id])||[]).find(x=>!used.has(x.id));
     const t=c1||(byName.get(nk(m.name))||[]).find(x=>!used.has(x.id)&&!mSet.has(bPath[x.id]));      // khớp tên chỉ khi dòng đó không thuộc đường dẫn khác của Master
     if(t){used.add(t.id);idMap[m.id]=t.id;hit[m.id]=t}else idMap[m.id]=uid()});
-  let add=0,upd=0,same=0,base=Math.max(0,...becos.map(t=>t.sort_order||0));const patch={},fresh=[];
+  let add=0,upd=0,same=0;const patch={},fresh=[],N=src.length;   /* sort_order = vị trí dòng trong file Excel (1..N), áp cho CẢ dòng mới lẫn dòng đã có */
   const pdOf=(a,b)=>a&&b?daysBetween(a,b)+1:null;
   src.forEach((m,i)=>{
     const sched={start_date:m.start_date||null,due_date:m.due_date||null,duration_days:m.duration_days||null,planned_days:pdOf(m.start_date,m.due_date)};
@@ -2348,11 +2378,13 @@ function syncMasterToBecos(p,rows,silent){
     const t=hit[m.id];
     if(t){
       const has=(t.progress||0)>0||!!t.actual_start_date||!!t.actual_end_date;                      // đã có tiến độ thực tế -> giữ nguyên
-      const vals=has?sched:{...sched,...prog};
+      const ord={sort_order:i+1,wbs_code:m.wbs_code||t.wbs_code||'',parent_id:m.parent_id?(idMap[m.parent_id]||null):null};   // bảo toàn đúng thứ tự + cấu trúc cha-con của file
+      const vals={...(has?sched:{...sched,...prog}),...ord};
       if(Object.keys(vals).some(k=>(t[k]??null)!==vals[k])){patch[t.id]={...vals,updated_at:now};upd++}else same++}
-    else{add++;fresh.push({id:idMap[m.id],project_id:p.id,parent_id:m.parent_id?idMap[m.parent_id]||null:null,wbs_code:m.wbs_code||'',task_source:'BECOS',name:m.name,owner_depts:m.owner_depts||[],collab_depts:[],...sched,...prog,priority:m.priority||'medium',notes:'',depends_on:[],checklist:[],sort_order:base+i+1,created_at:now,updated_at:now})}});
+    else{add++;fresh.push({id:idMap[m.id],project_id:p.id,parent_id:m.parent_id?idMap[m.parent_id]||null:null,wbs_code:m.wbs_code||'',task_source:'BECOS',name:m.name,owner_depts:m.owner_depts||[],collab_depts:[],...sched,...prog,priority:m.priority||'medium',notes:'',depends_on:[],checklist:[],sort_order:i+1,created_at:now,updated_at:now})}});
   if(add||upd||dup.size){
-    const next=all.filter(t=>!dup.has(t.id)).map(t=>{let x=patch[t.id]?{...t,...patch[t.id]}:t;if(x.parent_id&&reparent[x.parent_id])x={...x,parent_id:reparent[x.parent_id],updated_at:now};return x});
+    const next=all.filter(t=>!dup.has(t.id)).map(t=>{let x=patch[t.id]?{...t,...patch[t.id]}:t;if(t.project_id===p.id&&srcOf(t)==='BECOS'&&!used.has(t.id)&&(t.sort_order||0)<=N)x={...x,sort_order:(t.sort_order||0)+N};   // việc Becos tự thêm: xếp sau các dòng của file
+      if(x.parent_id&&reparent[x.parent_id])x={...x,parent_id:reparent[x.parent_id],updated_at:now};return x});
     db.save('tasks',[...next,...fresh])}
   PINIT.delete(p.id+'|becos');
   if(!silent)toast(`Đồng bộ xong: +${add} mới, ${upd} cập nhật, ${same} không đổi${dup.size?`, dọn ${dup.size} dòng trùng`:''}`,false);
@@ -2369,10 +2401,10 @@ async function importMaster(p,file){
       var info=`<li><b>${pc.nodes.length}</b> dòng · tổng thời gian tính được <b>${span}</b> ngày</li>`}
     else{const g=parseMasterGeneric(rows,p.id);if(!g.length)throw new Error('Không nhận dạng được file. Cần bảng có cột Tên công việc, Ngày bắt đầu, Ngày kết thúc (hoặc checklist PMP có cột STT và Hạng mục công việc).');
       kind='Bảng có sẵn ngày bắt đầu / kết thúc';build=()=>g;var info=`<li><b>${g.length}</b> dòng đọc được</li>`}
-    modal(`<h3 class="font-bold text-lg mb-2">Import Master Gantt</h3><ul class="text-sm space-y-1 mb-3 list-disc pl-5"><li>File: <b>${esc(file.name)}</b></li><li>Nhận dạng: ${kind}</li>${info}
+    modal(`<h3 class="font-bold text-lg mb-2">Import Becos</h3><ul class="text-sm space-y-1 mb-3 list-disc pl-5"><li>File: <b>${esc(file.name)}</b></li><li>Nhận dạng: ${kind}</li>${info}
       <li class="text-mute">Dữ liệu này lưu riêng, <b>không</b> ảnh hưởng Tổng quan / Tiến độ / Chi phí.</li></ul>
       ${(!gx.length&&pc.nodes.length)?`<label class="block text-sm"><span class="text-mute text-xs">Ngày bắt đầu kế hoạch tổng thể</span><input type="date" id="mStart" value="${p.start_date}" class="inp"></label>`:''}
-      <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn" id="iRep">Lưu Master Gantt (thay bản cũ)</button></div>`);
+      <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="iNo">Hủy</button><button class="btn" id="iRep">Lưu Becos (thay bản cũ)</button></div>`);
     $('#iNo').onclick=closeModal;
     $('#iRep').onclick=()=>{const st=($('#mStart')&&$('#mStart').value)||p.start_date,out=build(st).map(r=>({...r,project_id:p.id,source_file:file.name,imported_at:new Date().toISOString()}));
       db.save('master_gantt',[...db.list('master_gantt').filter(r=>r.project_id!==p.id),...out]);GINIT.delete(p.id+'master');closeModal();GSUB='master';const sr=syncMasterToBecos(p,out,true);route();if(sr)toast(`Đã đồng bộ sang thẻ Becos: +${sr.add} mới, ${sr.upd} cập nhật${sr.dup?`, dọn ${sr.dup} dòng trùng`:''}`,false)};
@@ -2381,14 +2413,14 @@ async function importMaster(p,file){
 async function exportMaster(p){
   try{
     if(!window.ExcelJS)await loadJS(EXCELJS_URL);
-    const tk=MG(p.id);if(!tk.length){toast('Chưa có dữ liệu Master Gantt');return}
+    const tk=MG(p.id);if(!tk.length){toast('Chưa có dữ liệu Becos');return}
     const {k,R}=rollTasks(tk),flat=[];
     const walk=(id,d)=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(t=>{flat.push({t,d,grp:!!k[t.id],r:R[t.id]});if(k[t.id])walk(t.id,d+1)});walk('root',0);
-    const ds=[];flat.forEach(x=>{if(x.r.s)ds.push(DN(x.r.s));if(x.r.e)ds.push(DN(x.r.e))});if(!ds.length){toast('Master Gantt chưa có ngày');return}
+    const ds=[];flat.forEach(x=>{if(x.r.s)ds.push(DN(x.r.s));if(x.r.e)ds.push(DN(x.r.e))});if(!ds.length){toast('Becos chưa có ngày');return}
     let lo=Math.min(...ds),hi=Math.max(...ds);const days=hi-lo+1,byDay=days<=84;
     const wd=n=>(new Date(n*864e5).getUTCDay()+6)%7;if(!byDay)lo-=wd(lo);
     const cols=[];for(let d=lo;d<=hi;d+=byDay?1:7)cols.push({a:d,b:byDay?d:d+6});
-    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Master Gantt');
+    const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Becos');
     const FIX=6,T=cols.length,fill=a=>({type:'pattern',pattern:'solid',fgColor:{argb:a}});
     ws.columns=[{width:8},{width:44},{width:11},{width:11},{width:7},{width:7},...cols.map(()=>({width:byDay?3.2:3.6}))];
     ws.mergeCells(1,1,1,FIX+T);ws.getCell(1,1).value='MASTER GANTT - '+p.name.toUpperCase();ws.getCell(1,1).font={bold:true,size:16};
@@ -2408,9 +2440,9 @@ async function exportMaster(p){
         if(on)cell.fill=fill(bold?'FF475569':(r.pg>=100?'FF16A34A':'FF2563EB'));else if(td>=c.a&&td<=c.b)cell.fill=fill('FFFEE2E2')})});
     ws.views=[{state:'frozen',xSplit:FIX,ySplit:H2}];
     ws.pageSetup={paperSize:8,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3},printTitlesRow:`${H1}:${H2}`};
-    ws.headerFooter={oddFooter:'&LMaster Gantt - '+p.code+'&CTrang &P / &N&RIn khổ A3 ngang'};
+    ws.headerFooter={oddFooter:'&LBecos - '+p.code+'&CTrang &P / &N&RIn khổ A3 ngang'};
     const blob=new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);a.download=`MasterGantt_${p.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    a.href=URL.createObjectURL(blob);a.download=`Becos_${p.code}_${today()}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
   }catch(e){toast(e.message)}
 }
 
