@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.10.26-1620</title>
+<title>Technical PM · v26.10.26-1700</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -251,7 +251,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.26-1620</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.26-1700</span>
     <div class="flex-1"></div>
 
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
@@ -397,11 +397,12 @@ const TB={
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
   extra_tasks:{t:'extra_tasks',pk:['id'],cols:['id','project_id','title','note','done','created_by','created_at'],ord:['created_at','id'],txt:['title','note']},
-  master_gantt:{t:'master_gantt',pk:['id'],wrap:true,ord:['id']}
+  master_gantt:{t:'master_gantt',pk:['id'],wrap:true,ord:['id']},
+  pms_evaluations:{t:'pms_evaluations',pk:['user_id'],cols:['user_id','grade','score','kpi_pct','note','evaluated_by','evaluated_at','updated_at'],ord:['user_id'],txt:['note']}   // PMS: bảng riêng trên Supabase (supabase_pms.sql), KHÔNG lưu trong users.prefs
 };
 /* quyền trong dự án: viewer (chỉ xem) | editor (sửa task) | manager (quản lý dự án). 'owner' = người tạo dự án (Admin); 'member' là giá trị cũ = editor */
 const normRole=r=>({member:'editor',manager:'manager',owner:'owner',viewer:'viewer',editor:'editor'})[String(r||'').toLowerCase()]||'viewer';
-const DATEC=new Set(['start_date','end_date','due_date','actual_start_date','actual_end_date','approved_at','created_at','updated_at','imported_at']);
+const DATEC=new Set(['start_date','end_date','due_date','actual_start_date','actual_end_date','approved_at','created_at','updated_at','imported_at','evaluated_at']);
 /* Global State của dự án đang mở: dữ liệu chỉ tải 1 lần, đổi tab chỉ render lại từ đây. db.save cập nhật cục bộ (CACHE) ngay rồi mới gửi Supabase */
 let currentProjectData={project:null,tasks:[],budgets:[],members:[]};
 function syncCPD(){try{const pid=curPid;currentProjectData={project:CACHE.projects.find(x=>x.id===pid)||null,tasks:CACHE.tasks.filter(x=>x.project_id===pid),budgets:CACHE.budget_items.filter(x=>x.project_id===pid),members:CACHE.project_members.filter(x=>x.project_id===pid)}}catch(e){}}
@@ -482,16 +483,19 @@ function ingest(k,rows,col,vals){
   SNAP[k]=new Map(CACHE[k].map(r=>[pkOf(c,r),JSON.stringify(toDB(k,r))]));
   return rows;
 }
+/* PMS: tải không chặn — nếu bảng chưa tạo / chưa có Policy thì chỉ ghi nhớ lỗi (hiện ở trang Nhân sự & PMS), không làm hỏng việc tải dữ liệu chính */
+let PMS_ERR=null;
+async function loadPms(){PMS_ERR=null;try{await(isAdmin()?fetchTable('pms_evaluations'):fetchTable('pms_evaluations','user_id',[CUR.id]))}catch(e){PMS_ERR=e;console.error('PMS',e)}}
 /* Tải ĐỒNG THỜI toàn bộ dữ liệu cốt lõi ngay sau khi đăng nhập (trước khi vẽ trang chủ) để mọi con số tiến độ / thực chi / % hiển thị đủ ngay.
    Admin: 1 lượt Promise.all cho mọi bảng. Thành viên: lấy project_members trước (cần để biết dự án nào / vai trò nào), rồi 1 lượt Promise.all cho phần còn lại. */
 async function fetchAll(){
   const admin=isAdmin();
   if(admin){
-    await Promise.all([fetchTable('users'),fetchTable('project_members'),fetchTable('projects'),fetchTable('tasks'),fetchTable('budget_items'),fetchTable('extra_tasks'),fetchTable('notes'),fetchTable('master_gantt')]);
+    await Promise.all([fetchTable('users'),fetchTable('project_members'),fetchTable('projects'),fetchTable('tasks'),fetchTable('budget_items'),fetchTable('extra_tasks'),fetchTable('notes'),fetchTable('master_gantt'),loadPms()]);
   }else{
     await Promise.all([fetchTable('users'),fetchTable('project_members')]);
     const pids=[...new Set(CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id))],bp=pids.filter(id=>roleOf(id)==='manager');
-    await Promise.all([fetchTable('projects','id',pids),fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids)]);
+    await Promise.all([fetchTable('projects','id',pids),fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids),loadPms()]);
   }
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
   CACHE.projects.forEach(x=>LOADED.add(x.id));PF.state='done';syncCPD();
@@ -557,7 +561,7 @@ let CUR=null,SESS={},prefT;
 const session=()=>SESS;
 function patchSession(p){
   SESS={...SESS,...p};clearTimeout(prefT);
-  prefT=setTimeout(()=>{if(CUR)db.save('users',db.list('users').map(u=>u.id===CUR.id?{...u,prefs:{...SESS,...((u.prefs&&u.prefs.pms)?{pms:u.prefs.pms}:{})}}:u))},700);
+  prefT=setTimeout(()=>{if(CUR)db.save('users',db.list('users').map(u=>u.id===CUR.id?{...u,prefs:(({pms,...r})=>r)(SESS)}:u))},700);
 }
 
 function setTheme(t,keep){
@@ -2549,7 +2553,36 @@ function exportWord(p,q){
 let UQ='',UG='all';
 const UROLE_BADGE={viewer:'background:rgba(100,116,139,.15);color:#475569',editor:'background:rgba(37,99,235,.14);color:#1d4ed8',manager:'background:rgba(234,88,12,.15);color:#c2410c',owner:'background:rgba(234,88,12,.15);color:#c2410c'};
 const PMS_G=['A','B','C'],PMS_C={A:'#16a34a',B:'#2563eb',C:'#dc2626'};
-const pmsOf=u=>(u.prefs&&u.prefs.pms&&u.prefs.pms.grade)||'';
+/* ---- Ghi trực tiếp Supabase (không qua users.prefs). Lỗi RLS / thiếu bảng -> thông báo cụ thể ---- */
+function sbErr(e,ctx){
+  const m=String(e&&e.message||e||''),c=e&&e.code;
+  if(c==='42501'||/row-level security|permission denied|not allowed|rls/i.test(m))return`Supabase TỪ CHỐI QUYỀN (RLS) khi ${ctx}. Hãy chạy supabase_setup.sql + supabase_pms.sql trong SQL Editor để cấu hình Policy cho Admin (email Admin trong is_admin() phải trùng ADMIN_EMAIL).`;
+  if(c==='42P01'||c==='PGRST205'||c==='PGRST204'||/does not exist|schema cache|could not find/i.test(m))return`Supabase chưa có bảng/cột cần thiết (${ctx}). Chạy supabase_pms.sql trong SQL Editor rồi tải lại trang.`;
+  if(c==='23503')return`Không thể ${ctx}: người dùng hoặc dự án không còn tồn tại (vi phạm khóa ngoại).`;
+  return`Lỗi Supabase khi ${ctx}: ${m||'không rõ nguyên nhân'}`}
+function setCache(k,rows){CACHE[k]=structuredClone(rows);SNAP[k]=new Map(rows.map(r=>[pkOf(TB[k],r),JSON.stringify(toDB(k,r))]));syncCPD()}
+const needAdmin=()=>{if(!isAdmin())throw Object.assign(new Error('Chỉ tài khoản Admin mới được thao tác.'),{code:'42501'})};
+const pmsRow=uid_=>db.list('pms_evaluations').find(x=>x.user_id===uid_)||null;
+const pmsOf=u=>(pmsRow(u.id)||{}).grade||'';
+/* Phân bổ dự án: upsert (project_id,user_id,access_level) + delete trực tiếp bảng project_members */
+async function saveAssignments(uid_,next){
+  needAdmin();await Q;
+  const cur=db.list('project_members').filter(m=>m.user_id===uid_),keep=new Set(next.map(r=>r.project_id));
+  const ups=next.filter(r=>{const o=cur.find(m=>m.project_id===r.project_id);return!o||o.role!==r.role}),del=cur.filter(m=>!keep.has(m.project_id)).map(m=>m.project_id);
+  if(ups.length){const{error}=await sb.from('project_members').upsert(ups.map(r=>toDB('project_members',r)),{onConflict:'project_id,user_id'});if(error)throw error}
+  if(del.length){const{data,error}=await sb.from('project_members').delete().eq('user_id',uid_).in('project_id',del).select('project_id');if(error)throw error;
+    if(!data||data.length<del.length)throw Object.assign(new Error('row-level security: không gỡ được quyền ('+(data?data.length:0)+'/'+del.length+')'),{code:'42501'})}
+  setCache('project_members',[...db.list('project_members').filter(m=>m.user_id!==uid_),...next]);
+  return{ups:ups.length,del:del.length}}
+/* Đánh giá PMS: upsert / delete trực tiếp bảng pms_evaluations */
+async function savePms(uid_,ev){
+  needAdmin();await Q;
+  if(!ev){const{data,error}=await sb.from('pms_evaluations').delete().eq('user_id',uid_).select('user_id');if(error)throw error;
+    if(pmsRow(uid_)&&(!data||!data.length))throw Object.assign(new Error('row-level security: không xóa được đánh giá'),{code:'42501'});
+    setCache('pms_evaluations',db.list('pms_evaluations').filter(x=>x.user_id!==uid_));return null}
+  const now=new Date().toISOString(),old=pmsRow(uid_),row={user_id:uid_,grade:ev.grade,score:ev.score,kpi_pct:ev.kpi,note:ev.note||'',evaluated_by:CUR&&CUR.id||null,evaluated_at:old&&old.evaluated_at||now,updated_at:now};
+  const{error}=await sb.from('pms_evaluations').upsert(toDB('pms_evaluations',row),{onConflict:'user_id'});if(error)throw error;
+  setCache('pms_evaluations',[...db.list('pms_evaluations').filter(x=>x.user_id!==uid_),row]);return row}
 /* Chỉ số PMS của 1 nhân sự: dự án chủ trì (manager/owner), tổng CAPEX phụ trách, % task hoàn thành (trên các dự án tham gia) */
 function pmsStats(u,pm,PS){
   const mine=pm.filter(m=>m.user_id===u.id),lead=mine.filter(m=>['manager','owner'].includes(normRole(m.role)));
@@ -2563,30 +2596,50 @@ function usersTable(){
   const us=db.list('users').filter(u=>(!q||nk0((u.full_name||'')+' '+(u.email||'')).includes(q))&&(UG==='all'||(UG==='none'?!pmsOf(u):pmsOf(u)===UG))).sort((a,b)=>(isAdminRow(b)-isAdminRow(a))||String(a.email).localeCompare(String(b.email)));
   if(!us.length)return '<div class="text-mute p-4">Không có nhân sự phù hợp.</div>';
   const mv=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' tr';
-  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Nhân sự</th><th class="px-3 py-2">Vai trò</th><th class="px-3 py-2">Dự án tham gia</th><th class="px-3 py-2 text-center">Chủ trì</th><th class="px-3 py-2 text-right">CAPEX phụ trách</th><th class="px-3 py-2" style="min-width:9rem">KPI hoàn thành task</th><th class="px-3 py-2 text-center">PMS</th><th class="px-3 py-2"></th></tr></thead><tbody>
-  ${us.map(u=>{const adm=isAdminRow(u),st=pmsStats(u,pm,PS),g=pmsOf(u);
+  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Nhân sự</th><th class="px-3 py-2">Vai trò</th><th class="px-3 py-2">Dự án tham gia</th><th class="px-3 py-2 text-center">Chủ trì</th><th class="px-3 py-2 text-right">CAPEX phụ trách</th><th class="px-3 py-2" style="min-width:9rem">KPI hoàn thành task</th><th class="px-3 py-2">Đánh giá PMS</th><th class="px-3 py-2"></th></tr></thead><tbody>
+  ${us.map(u=>{const adm=isAdminRow(u),st=pmsStats(u,pm,PS),ev=pmsRow(u.id),g=ev&&ev.grade;
    return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="flex items-center gap-2 min-w-0"><span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span><div class="min-w-0"><div class="font-semibold truncate">${esc(u.full_name||'—')}</div><div class="text-xs text-mute truncate" title="${esc(u.email)}">${esc(u.email)}</div></div></div></td>
    <td class="px-3 py-2 whitespace-nowrap">${adm?'<span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:rgba(220,38,38,.12);color:#b91c1c">Admin</span>':'<span class="text-xs text-mute">Chuyên viên</span>'}</td>
    <td class="px-3 py-2">${adm?'<span class="text-xs text-mute">Toàn quyền tất cả dự án</span>':st.mine.length?`<div class="flex flex-wrap gap-1">${st.mine.map(m=>({m,p:ps.find(x=>x.id===m.project_id)})).filter(x=>x.p).map(({m,p})=>`<span class="text-xs rounded-lg px-2 py-0.5 whitespace-nowrap" style="${UROLE_BADGE[normRole(m.role)]||UROLE_BADGE.viewer}" title="${esc(p.name)} — ${roleLbl(normRole(m.role))}"><b class="mono">${esc(p.code)}</b> · ${roleLbl(normRole(m.role))}</span>`).join('')}</div>`:'<span class="text-xs text-mute">Chưa tham gia dự án nào</span>'}</td>
    <td class="px-3 py-2 text-center mono">${adm?'—':st.lead}</td>
    <td class="px-3 py-2 text-right mono whitespace-nowrap">${adm?'—':mv(st.capex)}</td>
    <td class="px-3 py-2">${adm?'—':st.kpi==null?'<span class="text-xs text-mute">Chưa có task</span>':`<div class="flex items-center gap-2"><b class="mono w-10">${st.kpi}%</b><div class="flex-1">${bar(st.kpi,st.kpi>=80?'#16a34a':st.kpi>=50?'#2563eb':'#dc2626')}</div></div><div class="text-[10px] text-mute">${st.done}/${st.tot} việc · gợi ý <b>${st.sug}</b></div>`}</td>
-   <td class="px-3 py-2 text-center">${adm?'—':`<select data-pms="${u.id}" class="cell q font-bold" style="width:4.2rem;color:${PMS_C[g]||'inherit'}" aria-label="Điểm PMS của ${esc(u.email)}"><option value="">—</option>${PMS_G.map(x=>`<option value="${x}" ${g===x?'selected':''}>${x}</option>`).join('')}</select>`}</td>
-   <td class="px-3 py-2 text-right">${adm?'':`<button type="button" data-assign="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)">⚙️ Phân bổ dự án</button>`}</td></tr>`}).join('')}</tbody></table></div>`}
+   <td class="px-3 py-2">${adm?'—':g?`<div class="flex items-center gap-2"><span class="w-8 h-8 rounded-lg grid place-items-center text-white font-extrabold" style="background:${PMS_C[g]||'#64748b'}">${esc(g)}</span><div class="text-xs"><b class="mono">${ev.score??'—'}</b>/100${ev.note?`<div class="text-mute truncate" style="max-width:9rem" title="${esc(ev.note)}">${esc(ev.note)}</div>`:''}</div></div>`:'<span class="text-xs text-mute">Chưa chấm</span>'}</td>
+   <td class="px-3 py-2 text-right whitespace-nowrap">${adm?'':`<button type="button" data-pmsedit="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1.5 mr-1" style="background:rgba(37,99,235,.1);color:#1d4ed8;border:1px solid rgba(37,99,235,.3)">✍️ Chấm PMS</button><button type="button" data-assign="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1.5" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)">⚙️ Phân bổ dự án</button>`}</td></tr>`}).join('')}</tbody></table></div>`}
 function viewUsers(){
   if(!isAdmin()){go('#/projects');return}
   const n=db.list('users').filter(u=>!isAdminRow(u)).length;
-  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">👥 Nhân sự &amp; Đánh giá PMS</h2><p class="text-mute text-sm">${n} chuyên viên · ${db.list('projects').length} dự án. Phân bổ dự án, đổi quyền và chấm điểm hiệu suất A / B / C.</p></div>
+  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">👥 Nhân sự &amp; Đánh giá PMS</h2><p class="text-mute text-sm">${n} chuyên viên · ${db.list('projects').length} dự án. Dữ liệu ghi trực tiếp lên Supabase: bảng <b>project_members</b> và <b>pms_evaluations</b>.</p></div>
    <div class="flex gap-2 flex-wrap"><select id="uG" class="inp" style="margin:0;width:auto" aria-label="Lọc theo điểm PMS"><option value="all">PMS: Tất cả</option>${PMS_G.map(x=>`<option value="${x}" ${UG===x?'selected':''}>PMS: ${x}</option>`).join('')}<option value="none" ${UG==='none'?'selected':''}>Chưa chấm</option></select>
-   <input id="uQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm tên / email..." value="${esc(UQ)}" aria-label="Tìm nhân sự"></div></div><div id="uTable">${usersTable()}</div>`;
-  $('#view').onclick=e=>{const b=e.target.closest('[data-assign]');if(b)assignModal(b.dataset.assign)};
-  $('#view').onchange=async e=>{const el=e.target.closest('[data-pms]');if(!el)return;
-    const id=el.dataset.pms,g=el.value,now=new Date().toISOString();
-    const ok=await db.save('users',db.list('users').map(u=>u.id===id?{...u,prefs:{...(u.prefs&&typeof u.prefs==='object'?u.prefs:{}),pms:g?{grade:g,by:CUR&&CUR.id,at:now}:null}}:u));
-    if(ok)toast(g?`Đã chấm PMS ${g}`:'Đã xóa điểm PMS',false);else toast('Lưu điểm PMS thất bại');$('#uTable').innerHTML=usersTable()};
+   <input id="uQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm tên / email..." value="${esc(UQ)}" aria-label="Tìm nhân sự"></div></div>
+   ${PMS_ERR?`<div class="rounded-xl p-3 mb-3 text-sm" style="background:rgba(220,38,38,.1);color:#b91c1c;border:1px solid rgba(220,38,38,.3)">⚠️ ${esc(sbErr(PMS_ERR,'tải bảng pms_evaluations'))}</div>`:''}<div id="uTable">${usersTable()}</div>`;
+  $('#view').onclick=e=>{let b;if(b=e.target.closest('[data-assign]'))assignModal(b.dataset.assign);else if(b=e.target.closest('[data-pmsedit]'))pmsModal(b.dataset.pmsedit)};
   $('#uQ').oninput=debounce(e=>{UQ=e.target.value;$('#uTable').innerHTML=usersTable()},200);
   $('#uG').onchange=e=>{UG=e.target.value;$('#uTable').innerHTML=usersTable()}}
-/* Modal tập trung: tích chọn nhiều dự án + đổi quyền cho 1 nhân sự */
+/* Modal chấm PMS: xếp hạng A/B/C + điểm 0-100 + ghi chú -> pms_evaluations */
+function pmsModal(uid_){
+  const u=db.list('users').find(x=>x.id===uid_);if(!u||!isAdmin())return;
+  const pm=db.list('project_members'),cache={},ps=db.list('projects'),st=pmsStats(u,pm,id=>cache[id]||(cache[id]=ps.some(p=>p.id===id)?projStats(id):null)),ev=pmsRow(uid_);
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-md p-5 max-h-[90vh] overflow-auto">
+   <div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">✍️ Đánh giá PMS</h3><button id="pvX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+   <div class="text-sm mb-1"><b>${esc(u.full_name||u.email)}</b> <span class="text-mute">· ${esc(u.email)}</span></div>
+   <div class="text-xs text-mute mb-3">KPI hoàn thành task: <b>${st.kpi==null?'—':st.kpi+'%'}</b> (${st.done}/${st.tot} việc) · Gợi ý xếp hạng: <b>${st.sug||'—'}</b></div>
+   <div class="text-xs font-semibold text-mute uppercase mb-1">Xếp hạng</div><div class="flex gap-2 mb-3" id="pvG">${PMS_G.map(x=>`<button type="button" data-g="${x}" class="flex-1 rounded-xl py-2 font-extrabold text-lg border-2" style="border-color:${(ev&&ev.grade===x)?PMS_C[x]:'transparent'};background:${(ev&&ev.grade===x)?PMS_C[x]:'rgba(127,127,127,.14)'};color:${(ev&&ev.grade===x)?'#fff':'inherit'}">${x}</button>`).join('')}</div>
+   <label class="text-xs font-semibold text-mute uppercase">Điểm PMS (0 – 100)</label><input id="pvS" type="number" min="0" max="100" step="1" class="inp" value="${ev&&ev.score!=null?ev.score:(st.kpi??'')}" placeholder="Ví dụ 85">
+   <label class="text-xs font-semibold text-mute uppercase">Ghi chú đánh giá</label><textarea id="pvN" rows="3" class="inp" placeholder="Nhận xét hiệu suất, điểm mạnh / cần cải thiện...">${esc(ev?ev.note:'')}</textarea>
+   <div id="pvErr" class="text-xs mt-1 min-h-[1rem]" style="color:#dc2626"></div>
+   <div class="flex justify-between gap-2 mt-3"><button class="btn-ghost" id="pvDel" type="button" ${ev?'':'disabled'} style="color:#dc2626">Xóa đánh giá</button><span class="flex gap-2"><button class="btn-ghost" id="pvNo" type="button">Hủy</button><button class="btn" id="pvOk" type="button"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu</button></span></div></div></div>`;
+  let g=ev?ev.grade:'';const m=$('#modal');
+  m.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{g=b.dataset.g;m.querySelectorAll('[data-g]').forEach(x=>{const on=x.dataset.g===g;x.style.background=on?PMS_C[g]:'rgba(127,127,127,.14)';x.style.color=on?'#fff':'inherit';x.style.borderColor=on?PMS_C[g]:'transparent'})});
+  $('#pvX').onclick=$('#pvNo').onclick=closeModal;
+  const run=async(fn,okMsg)=>{const b1=$('#pvOk'),b2=$('#pvDel');b1.disabled=b2.disabled=true;
+    try{await fn();toast(okMsg,false);closeModal();$('#uTable').innerHTML=usersTable()}
+    catch(e){console.error(e);const msg=sbErr(e,'lưu đánh giá PMS');$('#pvErr').textContent=msg;toast(msg);b1.disabled=false;b2.disabled=!ev}};
+  $('#pvOk').onclick=()=>{const sc=$('#pvS').value===''?null:Math.max(0,Math.min(100,Math.round(+$('#pvS').value)));
+    if(!g){$('#pvErr').textContent='Hãy chọn xếp hạng A, B hoặc C.';return}
+    run(()=>savePms(uid_,{grade:g,score:sc,kpi:st.kpi,note:$('#pvN').value.trim()}),'Đã lưu đánh giá PMS '+g)};
+  $('#pvDel').onclick=()=>run(()=>savePms(uid_,null),'Đã xóa đánh giá PMS')}
+/* Modal tập trung: tích chọn nhiều dự án + đổi quyền cho 1 nhân sự -> project_members */
 function assignModal(uid_){
   const u=db.list('users').find(x=>x.id===uid_);if(!u||!isAdmin())return;
   const ps=db.list('projects').slice().sort((a,b)=>String(a.code).localeCompare(String(b.code))),mine=new Map(db.list('project_members').filter(m=>m.user_id===uid_).map(m=>[m.project_id,m.role]));
@@ -2598,20 +2651,19 @@ function assignModal(uid_){
    <div class="rounded-xl border border-line overflow-auto" style="max-height:min(55vh,26rem)">${ps.length?ps.map(p=>{const on=mine.has(p.id);return `<label class="flex items-center gap-3 px-3 py-2 border-b border-line last:border-0 cursor-pointer" data-arow="${p.id}"><input type="checkbox" data-ck="${p.id}" ${on?'checked':''} style="width:1rem;height:1rem">
     <span class="min-w-0 flex-1"><span class="mono text-[10px] rounded px-1.5" style="background:rgba(127,127,127,.16)">${esc(p.code)}</span> <span class="text-sm font-medium" title="${esc(p.name)}">${esc(p.name)}</span></span>
     <select data-rl="${p.id}" class="cell q" style="width:auto;font-size:.75rem" ${on?'':'disabled'} aria-label="Quyền tại ${esc(p.name)}">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${disp(on?mine.get(p.id):'viewer')===k?'selected':''}>${v[0]}</option>`).join('')}</select></label>`}).join(''):'<div class="p-4 text-sm text-mute text-center">Chưa có dự án nào.</div>'}</div>
-   <div class="text-xs text-mute mt-2">${Object.values(PERM_ROLE).map(v=>`<b>${v[0]}</b>: ${v[1]}`).join(' · ')}</div>
-   <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="asNo" type="button">Hủy</button><button class="btn" id="asSave" type="button"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu phân bổ</button></div></div></div>`;
+   <div class="text-xs text-mute mt-2">${Object.values(PERM_ROLE).map(v=>`<b>${v[0]}</b>: ${v[1]}`).join(' · ')}</div><div id="asErr" class="text-xs mt-1 min-h-[1rem]" style="color:#dc2626"></div>
+   <div class="flex justify-end gap-2 mt-3"><button class="btn-ghost" id="asNo" type="button">Hủy</button><button class="btn" id="asSave" type="button"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu phân bổ</button></div></div></div>`;
   const m=$('#modal'),upd=()=>{$('#asN').textContent=m.querySelectorAll('[data-ck]:checked').length};
   m.querySelectorAll('[data-ck]').forEach(c=>c.onchange=()=>{m.querySelector(`[data-rl="${c.dataset.ck}"]`).disabled=!c.checked;upd()});
   $('#asAll').onclick=()=>{m.querySelectorAll('[data-ck]').forEach(c=>{c.checked=true;c.onchange()})};
   $('#asNone').onclick=()=>{m.querySelectorAll('[data-ck]').forEach(c=>{c.checked=false;c.onchange()})};
   $('#asX').onclick=$('#asNo').onclick=closeModal;
   $('#asSave').onclick=async()=>{
-    const b=$('#asSave');b.disabled=true;
-    const rest=db.list('project_members').filter(x=>x.user_id!==uid_),next=[];
+    const b=$('#asSave');b.disabled=true;const next=[];
     m.querySelectorAll('[data-ck]').forEach(c=>{if(!c.checked)return;const pid=c.dataset.ck,sel=m.querySelector(`[data-rl="${pid}"]`).value,old=mine.get(pid);
       next.push({project_id:pid,user_id:uid_,role:old!=null&&disp(old)===sel?old:sel})});   // giữ nguyên quyền cũ nếu không đổi (vd. owner)
-    const ok=await db.save('project_members',[...rest,...next]);
-    if(ok){toast(`Đã lưu phân bổ: ${next.length} dự án`,false);closeModal();viewUsers();renderSide(curPid)}else{b.disabled=false;toast('Lưu phân bổ thất bại')}}}
+    try{const r=await saveAssignments(uid_,next);toast(`Đã lưu phân bổ (${next.length} dự án; +${r.ups} cập nhật, −${r.del} gỡ)`,false);closeModal();viewUsers();renderSide(curPid)}
+    catch(e){console.error(e);const msg=sbErr(e,'phân bổ dự án (project_members)');$('#asErr').textContent=msg;toast(msg);b.disabled=false}}}
 function renderView(name,pid,target){
   $('#view').onclick=null;$('#view').onchange=null;   // gỡ listener ủy quyền của view trước
   renderBell();
