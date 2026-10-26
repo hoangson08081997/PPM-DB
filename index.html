@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.10.26-1550</title>
+<title>Technical PM · v26.10.26-1620</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -251,7 +251,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.26-1550</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.26-1620</span>
     <div class="flex-1"></div>
 
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
@@ -289,7 +289,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
       <div id="sideProj"></div>
       <nav class="space-y-1">
         <a class="nav-item" data-route="projects" href="#/projects"><i class="fa-solid fa-folder-tree w-5"></i>Danh sách dự án</a>
-        <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-user-group w-5"></i>Nhân sự &amp; Phân quyền</a>
+        <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-users w-5"></i>Nhân sự &amp; PMS</a>
         <div class="text-xs uppercase tracking-wide px-3 pt-4 pb-1 opacity-60" style="color:var(--sidetx)">Dự án của bạn</div>
         <div id="sideProjects" class="space-y-1"></div>
       </nav>
@@ -557,7 +557,7 @@ let CUR=null,SESS={},prefT;
 const session=()=>SESS;
 function patchSession(p){
   SESS={...SESS,...p};clearTimeout(prefT);
-  prefT=setTimeout(()=>{if(CUR)db.save('users',db.list('users').map(u=>u.id===CUR.id?{...u,prefs:SESS}:u))},700);
+  prefT=setTimeout(()=>{if(CUR)db.save('users',db.list('users').map(u=>u.id===CUR.id?{...u,prefs:{...SESS,...((u.prefs&&u.prefs.pms)?{pms:u.prefs.pms}:{})}}:u))},700);
 }
 
 function setTheme(t,keep){
@@ -859,17 +859,17 @@ function pjSortRank(x){return pjEmpty(x.s)?3:x.eff==='active'?0:x.eff==='complet
 let PJV=(()=>{try{return localStorage.getItem('pjv')||'grid'}catch(e){return'grid'}})(),PJQ='';
 const nk0=s=>String(s||'').toLowerCase();
 function pjTable(rows,adm){
-  const mv=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN');
-  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))">
-   <th class="px-3 py-2">Mã</th><th class="px-3 py-2">Dự án</th><th class="px-3 py-2">Trạng thái</th><th class="px-3 py-2" style="min-width:8rem">Tiến độ</th>${adm?'<th class="px-3 py-2 text-right">NS duyệt (tr)</th><th class="px-3 py-2 text-right">Thực chi (tr)</th>':''}<th class="px-3 py-2 text-center">Trễ</th><th class="px-3 py-2">Việc tiếp theo</th><th class="px-3 py-2"></th></tr></thead><tbody>
-   ${rows.map(({p,s,eff})=>{const st=STATUS[eff],nx=pjNext(s),over=s.planned&&s.actual>s.planned;
-    return `<tr class="border-t border-line hover:bg-black/5 cursor-pointer" data-open="${p.id}"><td class="px-3 py-2 mono text-xs">${esc(p.code)}</td><td class="px-3 py-2 font-semibold max-w-[16rem] truncate" title="${esc(p.name)}">${esc(p.name)}</td>
-    <td class="px-3 py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${st[1]}">${st[0]}</span></td>
-    <td class="px-3 py-2"><div class="flex items-center gap-2"><b class="mono text-xs w-9">${s.pct}%</b><div class="flex-1">${bar(s.pct)}</div></div></td>
-    ${adm?`<td class="px-3 py-2 mono text-right">${mv(s.planned)}</td><td class="px-3 py-2 mono text-right ${over?'text-red-600 font-bold':''}">${mv(s.actual)}</td>`:''}
-    <td class="px-3 py-2 text-center">${s.overdue.length?`<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">${s.overdue.length}</span>`:'<span class="text-mute">—</span>'}</td>
-    <td class="px-3 py-2 text-xs max-w-[16rem] truncate" title="${nx?esc(nx.name):''}">${nx?esc(nx.name)+(nx.due_date?` <span class="text-mute">· ${fmtD(nx.due_date)}</span>`:''):'<span class="text-mute">—</span>'}</td>
-    <td class="px-3 py-2 text-right"><span class="text-xs font-semibold rounded-lg px-2 py-1" style="background:rgba(127,127,127,.14)">Vào →</span></td></tr>`}).join('')}</tbody></table></div>`}
+  const mv=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN'),showB=rows.some(x=>canBudget(x.p.id)),th='px-4 py-3 font-semibold';
+  return `<div class="bg-surface border border-line rounded-2xl overflow-auto shadow-lg"><table class="w-full" style="font-size:.95rem"><thead><tr class="text-left text-xs uppercase tracking-wide text-mute" style="background:color-mix(in srgb,var(--ink) 5%,var(--surface))">
+   <th class="${th}">Mã DA</th><th class="${th}">Tên dự án</th><th class="${th}">Trạng thái</th><th class="${th}" style="min-width:11rem">Tiến độ (%)</th>${showB?`<th class="${th} text-right">Ngân sách duyệt</th><th class="${th} text-right">Thực chi</th>`:''}<th class="${th} text-center">Việc trễ hạn</th><th class="${th} text-right">Thao tác</th></tr></thead><tbody>
+   ${rows.map(({p,s,eff})=>{const st=STATUS[eff],cb=canBudget(p.id),over=s.planned&&s.actual>s.planned,mg=isMgr(p.id),col=over?'#dc2626':s.actual?'#16a34a':'';
+    return `<tr class="border-t border-line hover:bg-black/5 cursor-pointer" style="height:4.25rem" data-open="${p.id}"><td class="px-4 py-4 mono text-xs font-semibold whitespace-nowrap">${esc(p.code)}</td>
+    <td class="px-4 py-4 font-semibold" style="max-width:20rem"><div class="truncate" title="${esc(p.name)}">${esc(p.name)}</div>${p.client?`<div class="text-xs text-mute truncate">${esc(p.client)}</div>`:''}</td>
+    <td class="px-4 py-4"><span class="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${st[1]}">${st[0]}</span></td>
+    <td class="px-4 py-4"><div class="flex items-center gap-3"><b class="mono w-11">${s.pct}%</b><div class="flex-1">${bar(s.pct)}</div></div></td>
+    ${showB?(cb?`<td class="px-4 py-4 mono text-right whitespace-nowrap">${mv(s.planned)} tr</td><td class="px-4 py-4 mono text-right whitespace-nowrap font-bold" style="${col?'color:'+col:''}">${mv(s.actual)} tr${over?' <i class="fa-solid fa-arrow-up text-xs" title="Vượt ngân sách"></i>':''}</td>`:'<td class="px-4 py-4 text-right text-mute"><i class="fa-solid fa-lock"></i></td><td class="px-4 py-4 text-right text-mute"><i class="fa-solid fa-lock"></i></td>'):''}
+    <td class="px-4 py-4 text-center">${s.overdue.length?`<span class="text-sm font-bold px-3 py-1 rounded-full bg-red-100 text-red-700">${s.overdue.length}</span>`:'<span class="text-xs font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700">0</span>'}</td>
+    <td class="px-4 py-4 text-right whitespace-nowrap"><span class="inline-flex items-center gap-1">${mg?`<button type="button" data-perm="${p.id}" class="p-2 rounded-lg text-mute hover:text-brand" title="Phân bổ / phân quyền" aria-label="Phân bổ"><i class="fa-solid fa-user-group"></i></button><button type="button" data-edit="${p.id}" class="p-2 rounded-lg text-mute hover:text-brand" title="Sửa" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button>`:''}<button type="button" data-open="${p.id}" class="text-sm font-semibold rounded-lg px-3 py-1.5" style="background:rgba(127,127,127,.14)">Vào →</button></span></td></tr>`}).join('')}</tbody></table></div>`}
 function pjList(){   // vùng danh sách (lưới / bảng) — vẽ lại riêng khi gõ tìm kiếm hoặc đổi chế độ xem, không đụng biểu đồ
   const adm=isAdmin(),ps=myProjects(),q=nk0(PJQ).trim();
   let rows=ps.map(p=>{const s=projStats(p.id);return{p,s,eff:effStatus(p,s)}});
@@ -877,9 +877,6 @@ function pjList(){   // vùng danh sách (lưới / bảng) — vẽ lại riên
   rows=rows.filter(x=>(PJF==='all'||x.eff===PJF)&&(!q||nk0(x.p.name+' '+x.p.code+' '+(x.p.client||'')).includes(q)));
   const empty=`<div class="text-mute">${q?'Không có dự án khớp "'+esc(PJQ)+'".':ps.length?'Không có dự án nào ở trạng thái này.':adm?'Chưa có dự án. Bấm "Dự án mới".':'Bạn chưa được gán vào dự án nào. Hãy nhờ Admin thêm email của bạn.'}</div>`;
   $('#pjList').innerHTML=!rows.length?empty:PJV==='table'?pjTable(rows,adm):`<div class="pjwrap"><div class="pjgrid">${rows.map(x=>card(x.p)).join('')}</div></div>`}
-function pjLateTop(ps){   // Top 6 việc trễ hạn / sắp đến hạn của mọi dự án (trễ nhiều nhất trước, rồi hạn gần nhất)
-  const out=[];ps.forEach(p=>{if(p.status==='completed')return;projStats(p.id).leaf.forEach(t=>{if(t.status==='done'||(t.progress||0)>=100||!t.due_date)return;const d=daysBetween(today(),t.due_date);if(d<=7)out.push({p,t,d})})});
-  return out.sort((a,b)=>a.d-b.d).slice(0,6)}
 function viewProjects(){
   const adm=isAdmin();autoSyncStatus(myProjects());
   const ps=myProjects(),st=ps.map(p=>{const s=projStats(p.id);return{p,s,eff:effStatus(p,s)}});
@@ -887,9 +884,10 @@ function viewProjects(){
   const act=st.filter(x=>x.eff==='active').length;
   const totB=st.reduce((a,x)=>a+x.s.planned,0),totA=st.reduce((a,x)=>a+x.s.actual,0);
   const late=st.filter(x=>x.eff!=='completed'&&projLate(x.p,x.s)).length,run=st.filter(x=>x.eff!=='completed').length,ontime=run-late;
-  const ovT=st.reduce((a,x)=>a+x.s.overdue.length,0),lateTop=pjLateTop(ps);
+  const ovT=st.reduce((a,x)=>a+x.s.overdue.length,0);
+  /* Biểu đồ: chỉ dự án có số liệu (tất cả trống mới vẽ hết), sắp xếp giảm dần theo ngân sách (Admin) / tiến độ (người khác) */
+  const bs0=st.filter(x=>x.s.planned>0||x.s.actual>0||x.s.pct>0),bs=(bs0.length?bs0:st).slice().sort(adm?((a,b)=>(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct):((a,b)=>b.s.pct-a.s.pct)),chH=Math.max(150,bs.length*(adm?46:32)+70);
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
-  const lateRows=lateTop.map(({p,t,d})=>`<button type="button" data-goto="${p.id}/${t.id}" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-black/5"><span class="min-w-0 flex-1"><span class="block text-sm font-medium truncate" title="${esc(t.name)}">${esc(t.name)}</span><span class="inline-block mono text-[10px] rounded px-1.5 mt-0.5" style="background:rgba(127,127,127,.16)" title="${esc(p.name)}">${esc(p.code)}</span></span><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${d<0?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'}">${d<0?'trễ '+(-d)+' ngày':d===0?'hôm nay':'còn '+d+' ngày'}</span></button>`).join('');
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
    <div class="flex gap-2 flex-wrap"><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
@@ -897,8 +895,7 @@ function viewProjects(){
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
     ${kpi('Dự án đúng hạn',ontime+'/'+run,late+' dự án có nguy cơ trễ','fa-circle-check','#7c3aed')}
     ${kpi('Việc trễ hạn',ovT,'Tổng các dự án','fa-triangle-exclamation',ovT?'#dc2626':'#059669')}</div>
-   <div class="grid gap-3 lg:grid-cols-3"><div class="card bg-surface border border-line rounded-2xl p-3 lg:col-span-2 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ)':'Tiến độ hoàn thành theo dự án (%)'}</div><div style="position:relative;height:210px"><canvas id="pjBar"></canvas></div></div>
-   <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="flex items-center justify-between mb-1"><div class="text-sm font-semibold">🔥 Việc trễ hạn &amp; Sắp đến hạn (Top 6)</div><span class="text-xs text-mute">${lateTop.length}</span></div><div id="pjLate" class="space-y-0.5" style="min-height:210px">${lateRows||'<div class="text-sm text-mute p-4 text-center"><i class="fa-solid fa-circle-check text-2xl mb-2" style="color:#059669"></i><br>Không có việc trễ hoặc sắp đến hạn trong 7 ngày tới.</div>'}</div></div></div></div>
+   <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ) — giảm dần':'Tiến độ hoàn thành theo dự án (%) — giảm dần'}</div><div style="position:relative;height:${chH}px"><canvas id="pjBar"></canvas></div></div></div>
    <div class="flex items-center gap-2 mb-3 border-b border-line" id="pjTabs"><div class="flex gap-1 overflow-x-auto flex-1 min-w-0">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
     <div class="relative shrink-0 pb-1"><i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-mute" style="margin-top:-2px"></i><input id="pjQ" type="search" class="inp" style="margin:0;padding:.3rem .6rem .3rem 1.7rem;width:11rem" placeholder="Tìm dự án..." value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"></div>
     <button id="pjView" class="btn-ghost shrink-0 mb-1" title="Chuyển Thẻ (Grid) ⇄ Bảng (Table)" aria-label="Đổi chế độ xem"><i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span></button></div>
@@ -909,7 +906,6 @@ function viewProjects(){
     const g=sel=>e.target.closest(sel);let el;
     if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
     if(el=g('#pjView')){PJV=PJV==='table'?'grid':'table';try{localStorage.setItem('pjv',PJV)}catch(x){}el.innerHTML=`<i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span>`;pjList();return}
-    if(el=g('[data-goto]')){go(`#/p/${el.dataset.goto.split('/')[0]}/progress/${el.dataset.goto.split('/')[1]}`);return}
     if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
     if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
     if(el=g('[data-perm]')){e.stopPropagation();permModal(el.dataset.perm);return}
@@ -924,11 +920,10 @@ function viewProjects(){
   Chart.defaults.color=cv('--mute');Chart.defaults.borderColor=cv('--line');
   const sh=n=>n.length>16?n.slice(0,15)+'…':n;
   /* Biểu đồ: chỉ vẽ dự án có số liệu (nếu tất cả đều trống mới vẽ hết) */
-  const bs0=st.filter(x=>x.s.planned>0||x.s.actual>0||x.s.pct>0),bs=(bs0.length?bs0:st).slice().sort((a,b)=>(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct);
   const fm=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' tr';
-  charts.push(new Chart($('#pjBar'),{type:'bar',data:{labels:bs.map(x=>sh(x.p.name)),datasets:adm?[{label:'Kế hoạch',data:bs.map(x=>Math.round(x.s.planned/1e6)),backgroundColor:'#94a3b8',borderRadius:4},{label:'Thực chi',data:bs.map(x=>Math.round(x.s.actual/1e6)),backgroundColor:cv('--brand'),borderRadius:4}]:[{label:'Hoàn thành %',data:bs.map(x=>x.s.pct),backgroundColor:cv('--brand'),borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}},tooltip:{callbacks:{title:i=>bs[i[0].dataIndex].p.name,label:()=>null,
-      afterBody:i=>{const x=bs[i[0].dataIndex];return[`Mã: ${x.p.code||'—'}`,...(adm?[`Kế hoạch: ${fm(x.s.planned)}`,`Thực chi: ${fm(x.s.actual)}`]:[]),`Tiến độ: ${x.s.pct}%`]}}}},scales:{y:{beginAtZero:true}}}}));
+  charts.push(new Chart($('#pjBar'),{type:'bar',data:{labels:bs.map(x=>(x.p.code?x.p.code+' · ':'')+sh(x.p.name)),datasets:adm?[{label:'Kế hoạch',data:bs.map(x=>Math.round(x.s.planned/1e6)),backgroundColor:'#94a3b8',borderRadius:4,barThickness:14},{label:'Thực chi',data:bs.map(x=>Math.round(x.s.actual/1e6)),backgroundColor:cv('--brand'),borderRadius:4,barThickness:14}]:[{label:'Hoàn thành %',data:bs.map(x=>x.s.pct),backgroundColor:cv('--brand'),borderRadius:4,barThickness:16}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}},tooltip:{callbacks:{title:i=>bs[i[0].dataIndex].p.name,label:()=>null,
+      afterBody:i=>{const x=bs[i[0].dataIndex];return[`Mã: ${x.p.code||'—'}`,...(adm?[`Kế hoạch: ${fm(x.s.planned)}`,`Thực chi: ${fm(x.s.actual)}`]:[]),`Tiến độ: ${x.s.pct}%`]}}}},scales:{x:{beginAtZero:true,max:adm?undefined:100},y:{ticks:{autoSkip:false}}}}}));
 }
 function delProject(id){
   const p=db.list('projects').find(x=>x.id===id);
@@ -1085,7 +1080,7 @@ function route(keep){
   $('#bnav').classList.toggle('off',!inP);$('#view').classList.toggle('has-bnav',inP);
   if(inP)document.querySelectorAll('#bnav .bn-tab').forEach(a=>{a.href=`#/p/${pid}/${a.dataset.tab}`;a.classList.toggle('active',a.dataset.tab===name)});
   const tl=Object.fromEntries(TABS);
-  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+(name==='users'?' / Nhân sự &amp; Phân quyền':'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
+  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+(name==='users'?' / Nhân sự &amp; PMS':'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
   if(inP)$('#projSw').onchange=e=>go(`#/p/${e.target.value}/${name}`);
   const v=$('#view'),sc=v.scrollTop;
   renderView(name,pid,target);
@@ -2551,26 +2546,46 @@ function exportWord(p,q){
 }
 
 /* ===================== NHÂN SỰ & PHÂN QUYỀN (#/users — chỉ Admin) ===================== */
-let UQ='';
+let UQ='',UG='all';
 const UROLE_BADGE={viewer:'background:rgba(100,116,139,.15);color:#475569',editor:'background:rgba(37,99,235,.14);color:#1d4ed8',manager:'background:rgba(234,88,12,.15);color:#c2410c',owner:'background:rgba(234,88,12,.15);color:#c2410c'};
+const PMS_G=['A','B','C'],PMS_C={A:'#16a34a',B:'#2563eb',C:'#dc2626'};
+const pmsOf=u=>(u.prefs&&u.prefs.pms&&u.prefs.pms.grade)||'';
+/* Chỉ số PMS của 1 nhân sự: dự án chủ trì (manager/owner), tổng CAPEX phụ trách, % task hoàn thành (trên các dự án tham gia) */
+function pmsStats(u,pm,PS){
+  const mine=pm.filter(m=>m.user_id===u.id),lead=mine.filter(m=>['manager','owner'].includes(normRole(m.role)));
+  let done=0,tot=0,capex=0;
+  mine.forEach(m=>{const s=PS(m.project_id);if(!s)return;tot+=s.leaf.length;done+=s.leaf.filter(t=>t.status==='done'||(t.progress||0)>=100).length});
+  lead.forEach(m=>{const s=PS(m.project_id);if(s)capex+=s.planned});
+  const kpi=tot?Math.round(done/tot*100):null;
+  return{mine,lead:lead.length,capex,kpi,done,tot,sug:kpi==null?'':kpi>=80?'A':kpi>=50?'B':'C'}}
 function usersTable(){
-  const q=nk0(UQ).trim(),ps=db.list('projects'),pm=db.list('project_members');
-  const us=db.list('users').filter(u=>!q||nk0((u.full_name||'')+' '+(u.email||'')).includes(q)).sort((a,b)=>(isAdminRow(b)-isAdminRow(a))||String(a.email).localeCompare(String(b.email)));
+  const q=nk0(UQ).trim(),ps=db.list('projects'),pm=db.list('project_members'),cache={},PS=id=>cache[id]||(cache[id]=ps.some(p=>p.id===id)?projStats(id):null);
+  const us=db.list('users').filter(u=>(!q||nk0((u.full_name||'')+' '+(u.email||'')).includes(q))&&(UG==='all'||(UG==='none'?!pmsOf(u):pmsOf(u)===UG))).sort((a,b)=>(isAdminRow(b)-isAdminRow(a))||String(a.email).localeCompare(String(b.email)));
   if(!us.length)return '<div class="text-mute p-4">Không có nhân sự phù hợp.</div>';
-  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Nhân sự</th><th class="px-3 py-2">Vai trò</th><th class="px-3 py-2">Dự án đang tham gia</th><th class="px-3 py-2 text-center">Số DA</th><th class="px-3 py-2"></th></tr></thead><tbody>
-  ${us.map(u=>{const adm=isAdminRow(u),mine=pm.filter(m=>m.user_id===u.id).map(m=>({m,p:ps.find(x=>x.id===m.project_id)})).filter(x=>x.p);
+  const mv=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' tr';
+  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Nhân sự</th><th class="px-3 py-2">Vai trò</th><th class="px-3 py-2">Dự án tham gia</th><th class="px-3 py-2 text-center">Chủ trì</th><th class="px-3 py-2 text-right">CAPEX phụ trách</th><th class="px-3 py-2" style="min-width:9rem">KPI hoàn thành task</th><th class="px-3 py-2 text-center">PMS</th><th class="px-3 py-2"></th></tr></thead><tbody>
+  ${us.map(u=>{const adm=isAdminRow(u),st=pmsStats(u,pm,PS),g=pmsOf(u);
    return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="flex items-center gap-2 min-w-0"><span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span><div class="min-w-0"><div class="font-semibold truncate">${esc(u.full_name||'—')}</div><div class="text-xs text-mute truncate" title="${esc(u.email)}">${esc(u.email)}</div></div></div></td>
    <td class="px-3 py-2 whitespace-nowrap">${adm?'<span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:rgba(220,38,38,.12);color:#b91c1c">Admin</span>':'<span class="text-xs text-mute">Chuyên viên</span>'}</td>
-   <td class="px-3 py-2">${adm?'<span class="text-xs text-mute">Toàn quyền tất cả dự án</span>':mine.length?`<div class="flex flex-wrap gap-1">${mine.map(({m,p})=>`<span class="text-xs rounded-lg px-2 py-0.5 whitespace-nowrap" style="${UROLE_BADGE[normRole(m.role)]||UROLE_BADGE.viewer}" title="${esc(p.name)} — ${roleLbl(normRole(m.role))}"><b class="mono">${esc(p.code)}</b> · ${roleLbl(normRole(m.role))}</span>`).join('')}</div>`:'<span class="text-xs text-mute">Chưa tham gia dự án nào</span>'}</td>
-   <td class="px-3 py-2 text-center mono">${adm?'—':mine.length}</td>
+   <td class="px-3 py-2">${adm?'<span class="text-xs text-mute">Toàn quyền tất cả dự án</span>':st.mine.length?`<div class="flex flex-wrap gap-1">${st.mine.map(m=>({m,p:ps.find(x=>x.id===m.project_id)})).filter(x=>x.p).map(({m,p})=>`<span class="text-xs rounded-lg px-2 py-0.5 whitespace-nowrap" style="${UROLE_BADGE[normRole(m.role)]||UROLE_BADGE.viewer}" title="${esc(p.name)} — ${roleLbl(normRole(m.role))}"><b class="mono">${esc(p.code)}</b> · ${roleLbl(normRole(m.role))}</span>`).join('')}</div>`:'<span class="text-xs text-mute">Chưa tham gia dự án nào</span>'}</td>
+   <td class="px-3 py-2 text-center mono">${adm?'—':st.lead}</td>
+   <td class="px-3 py-2 text-right mono whitespace-nowrap">${adm?'—':mv(st.capex)}</td>
+   <td class="px-3 py-2">${adm?'—':st.kpi==null?'<span class="text-xs text-mute">Chưa có task</span>':`<div class="flex items-center gap-2"><b class="mono w-10">${st.kpi}%</b><div class="flex-1">${bar(st.kpi,st.kpi>=80?'#16a34a':st.kpi>=50?'#2563eb':'#dc2626')}</div></div><div class="text-[10px] text-mute">${st.done}/${st.tot} việc · gợi ý <b>${st.sug}</b></div>`}</td>
+   <td class="px-3 py-2 text-center">${adm?'—':`<select data-pms="${u.id}" class="cell q font-bold" style="width:4.2rem;color:${PMS_C[g]||'inherit'}" aria-label="Điểm PMS của ${esc(u.email)}"><option value="">—</option>${PMS_G.map(x=>`<option value="${x}" ${g===x?'selected':''}>${x}</option>`).join('')}</select>`}</td>
    <td class="px-3 py-2 text-right">${adm?'':`<button type="button" data-assign="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)">⚙️ Phân bổ dự án</button>`}</td></tr>`}).join('')}</tbody></table></div>`}
 function viewUsers(){
   if(!isAdmin()){go('#/projects');return}
   const n=db.list('users').filter(u=>!isAdminRow(u)).length;
-  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">👥 Nhân sự &amp; Phân quyền</h2><p class="text-mute text-sm">${n} chuyên viên · ${db.list('projects').length} dự án. Phân bổ và đổi quyền (Viewer / Editor / Manager) cho từng người ở một nơi.</p></div>
-   <input id="uQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm tên / email..." value="${esc(UQ)}" aria-label="Tìm nhân sự"></div><div id="uTable">${usersTable()}</div>`;
+  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">👥 Nhân sự &amp; Đánh giá PMS</h2><p class="text-mute text-sm">${n} chuyên viên · ${db.list('projects').length} dự án. Phân bổ dự án, đổi quyền và chấm điểm hiệu suất A / B / C.</p></div>
+   <div class="flex gap-2 flex-wrap"><select id="uG" class="inp" style="margin:0;width:auto" aria-label="Lọc theo điểm PMS"><option value="all">PMS: Tất cả</option>${PMS_G.map(x=>`<option value="${x}" ${UG===x?'selected':''}>PMS: ${x}</option>`).join('')}<option value="none" ${UG==='none'?'selected':''}>Chưa chấm</option></select>
+   <input id="uQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm tên / email..." value="${esc(UQ)}" aria-label="Tìm nhân sự"></div></div><div id="uTable">${usersTable()}</div>`;
   $('#view').onclick=e=>{const b=e.target.closest('[data-assign]');if(b)assignModal(b.dataset.assign)};
-  $('#uQ').oninput=debounce(e=>{UQ=e.target.value;$('#uTable').innerHTML=usersTable()},200)}
+  $('#view').onchange=async e=>{const el=e.target.closest('[data-pms]');if(!el)return;
+    const id=el.dataset.pms,g=el.value,now=new Date().toISOString();
+    const ok=await db.save('users',db.list('users').map(u=>u.id===id?{...u,prefs:{...(u.prefs&&typeof u.prefs==='object'?u.prefs:{}),pms:g?{grade:g,by:CUR&&CUR.id,at:now}:null}}:u));
+    if(ok)toast(g?`Đã chấm PMS ${g}`:'Đã xóa điểm PMS',false);else toast('Lưu điểm PMS thất bại');$('#uTable').innerHTML=usersTable()};
+  $('#uQ').oninput=debounce(e=>{UQ=e.target.value;$('#uTable').innerHTML=usersTable()},200);
+  $('#uG').onchange=e=>{UG=e.target.value;$('#uTable').innerHTML=usersTable()}}
 /* Modal tập trung: tích chọn nhiều dự án + đổi quyền cho 1 nhân sự */
 function assignModal(uid_){
   const u=db.list('users').find(x=>x.id===uid_);if(!u||!isAdmin())return;
@@ -2598,7 +2613,7 @@ function assignModal(uid_){
     const ok=await db.save('project_members',[...rest,...next]);
     if(ok){toast(`Đã lưu phân bổ: ${next.length} dự án`,false);closeModal();viewUsers();renderSide(curPid)}else{b.disabled=false;toast('Lưu phân bổ thất bại')}}}
 function renderView(name,pid,target){
-  $('#view').onclick=null;   // gỡ listener ủy quyền của view trước
+  $('#view').onclick=null;$('#view').onchange=null;   // gỡ listener ủy quyền của view trước
   renderBell();
   if(name==='projects')return viewProjects();
   if(name==='users')return viewUsers();
