@@ -180,7 +180,7 @@ header#top{position:relative;z-index:35;background:color-mix(in srgb,var(--head)
 .tg{background:var(--surface);border:1px solid var(--line);border-radius:1rem;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04),0 6px 18px rgba(15,23,42,.05)}
 .tg-head,.tg-row{display:grid;grid-template-columns:minmax(0,3.2fr) minmax(9.5rem,1.3fr) 7.4rem 7.4rem 3.6rem 7.4rem 7.4rem 4.6rem 4.4rem;gap:.5rem;align-items:center;padding:.55rem 1rem}
 .tg-head{background:color-mix(in srgb,var(--ink) 5%,var(--surface));font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);border-bottom:1px solid var(--line)}
-.tg-row{border-bottom:1px solid var(--line);border-left:3px solid var(--dl,transparent);transition:background .15s}
+.tg-row{content-visibility:auto;contain-intrinsic-size:auto 3.6rem;border-bottom:1px solid var(--line);border-left:3px solid var(--dl,transparent);transition:background .15s}
 .tg-row:nth-child(even){background:color-mix(in srgb,var(--ink) 2.5%,var(--surface))}
 .tg-row:hover{background:color-mix(in srgb,var(--brand) 7%,var(--surface))}
 .tg-row.grp{border-left-color:var(--brand);font-weight:600}
@@ -381,6 +381,7 @@ const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const ADMIN_EMAIL='hoangson1231997@gmail.com';   // đổi thành email Admin của bạn (và đổi cả trong file SQL)
 const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{flowType:'pkce',persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
 const lc=x=>String(x||'').trim().toLowerCase();
+const debounce=(fn,ms=300)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
 const $=s=>document.querySelector(s);
 const initials=n=>n.split(' ').map(w=>w[0]).slice(-2).join('').toUpperCase();
 const uid=()=>crypto.randomUUID();
@@ -538,7 +539,6 @@ function buildTree(rows){
 const descOf=(rows,id)=>{const out=new Set([id]);let ch=true;while(ch){ch=false;rows.forEach(r=>{if(r.parent_id&&out.has(r.parent_id)&&!out.has(r.id)){out.add(r.id);ch=true}})}return out};
 
 /* ---- API CRUD (async/await) ---- */
-async function loadProjects(){await Q;return withLoad('Đang tải dữ liệu...',async()=>{await fetchAll();return myProjects()})}
 async function addProject(row){
   const now=new Date().toISOString(),p={id:uid(),currency:'VND',...row,created_by:CUR.id,created_at:now,updated_at:now};
   await db.save('projects',[...db.list('projects'),p]);
@@ -557,28 +557,11 @@ async function approveProject(pid){
   const now=new Date().toISOString(),ap=!p.approved;
   await updateProject(pid,{approved:ap,approved_by:ap?CUR.id:null,approved_at:ap?now:null});return ap;
 }
-async function loadTasks(pid){await Q;await fetchTable('tasks','project_id',[pid]);return buildTree(CACHE.tasks.filter(t=>t.project_id===pid))}
 async function saveTask(t,patch){   // saveTask(obj) hoặc saveTask(id,{thay đổi})
   const id=typeof t==='string'?t:t.id,all=db.list('tasks'),now=new Date().toISOString();
   const has=all.some(x=>x.id===id);
   const pdays=x=>x.start_date&&x.due_date?{...x,planned_days:Math.round((Date.parse(x.due_date)-Date.parse(x.start_date))/864e5)+1}:x;   // Số ngày KH = (Ngày KT KH - Ngày BĐ KH) + 1
   return db.save('tasks',has?all.map(x=>x.id===id?pdays({...x,...(typeof t==='string'?{}:t),...(patch||{}),updated_at:now}):x):[...all,pdays({...t,updated_at:now})]);
-}
-async function deleteTask(id){
-  const all=db.list('tasks'),t=all.find(x=>x.id===id);if(!t)return;
-  const ids=descOf(all.filter(x=>x.project_id===t.project_id),id);
-  await db.save('tasks',all.filter(x=>!ids.has(x.id)));
-  await db.save('attachments',db.list('attachments').filter(a=>!ids.has(a.task_id)));
-}
-async function loadBudgets(pid){await Q;if(!canBudget(pid))return[];await fetchTable('budget_items','project_id',[pid]);return buildTree(CACHE.budget_items.filter(b=>b.project_id===pid))}
-async function saveBudget(b,patch){
-  const id=typeof b==='string'?b:b.id,all=db.list('budget_items'),has=all.some(x=>x.id===id);
-  return db.save('budget_items',has?all.map(x=>x.id===id?{...x,...(typeof b==='string'?{}:b),...(patch||{})}:x):[...all,b]);
-}
-async function deleteBudget(id){
-  const all=db.list('budget_items'),b=all.find(x=>x.id===id);if(!b)return;
-  const ids=descOf(all.filter(x=>x.project_id===b.project_id),id);
-  return db.save('budget_items',all.filter(x=>!ids.has(x.id)));
 }
 
 /* ---- Cài đặt giao diện (theme/phông/màu/chế độ xem Todo) lưu trong users.prefs ---- */
@@ -888,12 +871,14 @@ function viewProjects(){
    <div class="flex gap-1 mb-3 border-b border-line overflow-x-auto" id="pjTabs">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
    <div class="pjwrap"><div class="pjgrid">${shown.map(card).join('')||`<div class="text-mute">${ps.length?'Không có dự án nào ở trạng thái này.':adm?'Chưa có dự án. Bấm "Dự án mới".':'Bạn chưa được gán vào dự án nào. Hãy nhờ Admin thêm email của bạn.'}</div>`}</div></div>`;
   const v=$('#view');
-  v.querySelectorAll('[data-pjf]').forEach(b=>b.onclick=()=>{PJF=b.dataset.pjf;viewProjects()});
-  v.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>go(`#/p/${el.dataset.open}/overview`));
-  v.querySelectorAll('[data-edit]').forEach(b=>b.onclick=e=>{e.stopPropagation();projectForm(b.dataset.edit)});
-  v.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();delProject(b.dataset.del)});
-  v.querySelectorAll('[data-perm]').forEach(b=>b.onclick=e=>{e.stopPropagation();permModal(b.dataset.perm)});
-  v.querySelectorAll('[data-appr]').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleApprove(b.dataset.appr)});
+  v.onclick=e=>{   // Event Delegation: 1 listener cho cả danh sách dự án
+    const g=sel=>e.target.closest(sel);let el;
+    if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
+    if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
+    if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
+    if(el=g('[data-perm]')){e.stopPropagation();permModal(el.dataset.perm);return}
+    if(el=g('[data-appr]')){e.stopPropagation();toggleApprove(el.dataset.appr);return}
+    if(el=g('[data-open]'))go(`#/p/${el.dataset.open}/overview`)};
   if(adm){$('#newBtn').onclick=()=>projectForm()}
   $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
   charts.forEach(c=>c.destroy());charts=[];
@@ -1009,7 +994,6 @@ let curHash=location.hash||'#/projects';
 function go(h){curHash=h;['bellMenu','userMenu'].forEach(x=>$('#'+x).classList.add('hidden'));try{if(location.hash!==h)location.hash=h}catch(e){}route()}
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#/"]');if(a){e.preventDefault();go(a.getAttribute('href'))}});
 window.addEventListener('hashchange',()=>{if(location.hash&&location.hash!==curHash){curHash=location.hash;currentUser()&&route()}});
-const BACK='<a href="#/projects" class="inline-block text-sm text-mute hover:text-brand mb-2"><i class="fa-solid fa-arrow-left mr-1"></i>Danh sách dự án</a>';
 const XLSX_URL='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',EXCELJS_URL='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
 const loadJS=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Không tải được thư viện (cần kết nối mạng)'));document.head.appendChild(s)});
 
@@ -1269,7 +1253,8 @@ function viewBudget(p,target){
     const el=e.target;if(!el.matches('[data-f]')||!ed)return;
     const id=el.closest('tr').dataset.id,r=commitCell(p,id,el.dataset.f,el.value);
     if(r==='rerender'){drawBudgetBody(p);return}
-    refreshBudgetCalcs(p,!r);
+    const aff=new Set();let x=db.list('budget_items').find(y=>y.id===id);const all=db.list('budget_items'),by=Object.fromEntries(all.map(y=>[y.id,y]));while(x){aff.add(x.id);x=x.parent_id&&by[x.parent_id]}
+    refreshBudgetCalcs(p,!r,aff);
   };
   body.onkeydown=e=>{
     if(e.target.matches('[data-badd]')){if(e.key==='Enter'){e.preventDefault();doBAdd()}else if(e.key==='Escape'){BADD=null;drawBudgetBody(p)}return}
@@ -1308,17 +1293,19 @@ function pillHTML(st){
     warn:['bg-amber-50 text-amber-700 border border-amber-200','<span class="relative flex h-2 w-2"><span class="pill-dot animate-pulse relative inline-flex rounded-full h-2 w-2 bg-amber-400" style="color:#f59e0b"></span></span>'],
     over:['bg-rose-50 text-rose-600 border border-rose-300 shadow-sm','<span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span><span class="pill-dot relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" style="color:#f43f5e"></span></span>']}[st.k];
   return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${m[0]}">${m[1]}${st.label}</span>`}
-function refreshBudgetCalcs(p,force){
+function refreshBudgetCalcs(p,force,only){
   const bd=db.list('budget_items').filter(b=>b.project_id===p.id),T=bTotals(bd),roll=T.roll,by=Object.fromEntries(bd.map(b=>[b.id,b])),ae=document.activeElement,rate=rateOf(p);
-  document.querySelectorAll('#bBody tr[data-id]').forEach(tr=>{
+  /* only = tập dòng bị ảnh hưởng (dòng vừa sửa + các nhóm cha): chỉ cập nhật đích danh các dòng đó */
+  const trs=only?[...only].map(i=>document.querySelector(`#bBody tr[data-id="${i}"]`)).filter(Boolean):document.querySelectorAll('#bBody tr[data-id]');
+  trs.forEach(tr=>{
     const r=by[tr.dataset.id];if(!r)return;const v=roll[r.id];
-    tr.querySelectorAll('[data-calc]').forEach(c=>{c.textContent=nfmt(v[c.dataset.calc])});
+    tr.querySelectorAll('[data-calc]').forEach(c=>{const t=nfmt(v[c.dataset.calc]);if(c.textContent!==t)c.textContent=t});
     tr.querySelectorAll('[data-f]').forEach(i=>{if(i===ae&&!force)return;const f=i.dataset.f;
-      if(i.tagName==='SELECT')i.value=r[f]||'';else i.value=f==='actual_amount'?(r[f]?nfmt(Math.round(r[f])):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'')});
+      const nv=i.tagName==='SELECT'?(r[f]||''):f==='actual_amount'?(r[f]?nfmt(Math.round(r[f])):''):NUMF.has(f)?nfmt(r[f]):(r[f]??'');if(i.value!==String(nv))i.value=nv});
     /* Y3: tô màu theo ngân sách: actual so với planned (kế hoạch) */
     const st=bStat(v.planned,v.actual);tr.classList.remove('bs-ok','bs-warn','bs-over');if(st.k)tr.classList.add('bs-'+st.k);
     const ta=tr.querySelector('td.b-act');if(ta){ta.classList.remove(...STC_ALL.split(' '));if(st.k)ta.classList.add(...STC[st.k].split(' '))}
-    const bg=tr.querySelector('[data-bdg]');if(bg)bg.innerHTML=pillHTML(st);
+    const bg=tr.querySelector('[data-bdg]');if(bg){const h=pillHTML(st);if(bg._h!==h){bg._h=h;bg.innerHTML=h}}
   });
   const set=(sel,t)=>{const e=$(sel);if(e)e.textContent=t};
   const stCls=(sel,pl,ac)=>{const e=$(sel);if(!e)return;const td=e.closest('td');if(!td)return;td.classList.remove(...STC_ALL.split(' '));const st=bStat(pl,ac);if(st.k)td.classList.add(...STC[st.k].split(' '));let bd=td.querySelector('[data-sbdg]');if(!bd){bd=document.createElement('div');bd.dataset.sbdg='';td.appendChild(bd)}bd.innerHTML=pillHTML(st)};
@@ -1661,8 +1648,6 @@ const addTo=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);ret
 const canTask=pid=>isAdmin()||['owner','manager','editor'].includes(roleOf(pid));
 const TST={todo:['Chưa làm','bg-slate-200 text-slate-800'],in_progress:['Đang làm','bg-blue-100 text-blue-800'],review:['Chờ duyệt','bg-purple-100 text-purple-800'],done:['Hoàn thành','bg-green-100 text-green-800']};
 const PRI={low:['Thấp','text-mute'],medium:['Trung cấp',''],high:['Cao','text-amber-600 font-semibold'],urgent:['Nguy cấp','text-red-600 font-semibold']};
-const dOver=t=>Math.round((Date.parse(today())-Date.parse(t.due_date))/864e5);
-const isOver=(t,leaf)=>leaf&&t.status!=='done'&&t.due_date&&t.due_date<today();
 
 function parseChecklist(rows){
   const num=v=>{const n=typeof v==='number'?v:parseFloat(v);return isNaN(n)?null:n};
@@ -1746,7 +1731,6 @@ function rollTasks(tk){
   (k.root||[]).forEach(f);return{k,R}}
 
 /* ===== Công việc: hàm dùng chung ===== */
-const SORT_URL='https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js';
 const QUILL_URL='https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js';
 const SOON=3;
 let EDIT=null,PADD=null,tq='',pq='',pnd=false,tDone=false;
@@ -1807,8 +1791,6 @@ function spSync(t,ch){
   const as=st==='todo'?null:(t.actual_start_date||today()),ae=st==='done'?(t.actual_end_date||today()):null;   // kéo % > 0 -> tự điền ngày BĐ thực tế = hôm nay (nếu đang trống)
   return{status:st,progress:pg,actual_start_date:as,actual_end_date:ae,actual_days:as&&ae?daysBetween(as,ae)+1:(t.actual_days??null)};
 }
-const setStatus=(id,st)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{status:st}))};
-const setProgress=(id,pg)=>{const t=db.list('tasks').find(x=>x.id===id);if(t)patchTask(id,spSync(t,{progress:pg}))};
 /* Kéo % ở đầu mục cha: áp cho cả nhánh con (trạng thái, ngày BĐ thực tế = hôm nay nếu trống) và lưu 1 lần lên Supabase */
 function setProgressTree(id,pg){
   const all=db.list('tasks'),t0=all.find(x=>x.id===id);if(!t0)return;
@@ -1890,11 +1872,13 @@ function viewProgress(p,target){
    <div class="tg"><div class="tg-head"><div>Tên công việc</div><div>Tiến độ</div><div>BĐ kế hoạch</div><div>KT kế hoạch</div><div title="Số ngày kế hoạch" class="text-center">Ngày KH</div><div>BĐ thực tế</div><div>KT thực tế</div><div title="Số ngày thực tế" class="text-center">Ngày TT</div><div class="text-right">Hành động</div></div><div id="pTree"></div></div><input type="file" id="tFile" accept=".xlsx,.xls,.csv" class="hidden">`;
   document.querySelectorAll('#view [data-psub]').forEach(b=>b.onclick=()=>{PSUB=b.dataset.psub;EDIT=null;PADD=null;viewProgress(p)});
   if($('#bsSync'))$('#bsSync').onclick=()=>{const r=syncMasterToBecos(p);if(r)viewProgress(p)};
-  const tree=$('#pTree'),redraw=()=>drawProgress(p);
+  const tree=$('#pTree'),redraw=only=>drawProgress(p,only);
+  /* tập dòng bị ảnh hưởng khi sửa 1 việc: chính nó (+ nhánh con nếu kéo %) + các cấp cha (vì % / ngày cha là tổng hợp) */
+  const aff=(id,desc)=>{const all=pRows(p),by=Object.fromEntries(all.map(t=>[t.id,t])),st=new Set();if(desc)descOf(all,id).forEach(x=>st.add(x));let x=by[id];while(x){st.add(x.id);x=x.parent_id&&by[x.parent_id]}return st.size>80?null:st};
   const addRoot=()=>{const nm=$('#pqName').value.trim();if(!nm){$('#pqErr').textContent='Nhập tên đầu mục trước khi thêm';return}
     $('#pqErr').textContent='';const t=addTask(p.id,nm,null,$('#pqDue').value||null,PSRC());$('#pqName').value='';$('#pqDue').value='';PEXP.add(t.id);redraw();flashEl(tree,t.id);renderBell();$('#pqName').focus()};
   if(ed){$('#pqAdd').onclick=addRoot;$('#pqName').onkeydown=e=>{if(e.key==='Enter')addRoot()}}
-  $('#pqSearch').oninput=e=>{pq=e.target.value;redraw()};
+  const dbRedraw=debounce(()=>redraw(),300);$('#pqSearch').oninput=e=>{pq=e.target.value;dbRedraw()};
   const chip=$('#ndChip');if(chip)chip.onclick=()=>{pnd=!pnd;viewProgress(p)};
   $('#pAll').onclick=()=>{pRows(p).forEach(t=>PEXP.add(t.id));redraw()};
   $('#pNone').onclick=()=>{pRows(p).forEach(t=>PEXP.delete(t.id));redraw()};
@@ -1925,23 +1909,23 @@ function viewProgress(p,target){
   tree.onchange=e=>{
     if(edFile(e))return;
     const el=e.target,card=el.closest('[data-id]'),id=card&&card.dataset.id,a=el.dataset.act;if(!a)return;
-    if(a==='pg'){setProgressTree(id,+el.value);redraw();renderBell()}   // luôn cho kéo, kể cả khi chưa tới ngày BĐ kế hoạch (vượt tiến độ)
-    else if(a==='pgn'){const v=Math.max(0,Math.min(100,Math.round(+el.value||0)));setProgressTree(id,v);redraw();renderBell()}
+    if(a==='pg'){setProgressTree(id,+el.value);redraw(aff(id,true));renderBell()}   // luôn cho kéo, kể cả khi chưa tới ngày BĐ kế hoạch (vượt tiến độ)
+    else if(a==='pgn'){const v=Math.max(0,Math.min(100,Math.round(+el.value||0)));setProgressTree(id,v);redraw(aff(id,true));renderBell()}
     else if(a==='as'||a==='ae'){
       const t=db.list('tasks').find(x=>x.id===id);if(!t)return;
       const as=a==='as'?(el.value||null):t.actual_start_date,ae=a==='ae'?(el.value||null):t.actual_end_date;
-      if(as&&ae&&ae<as){toast('Ngày kết thúc thực tế phải sau hoặc bằng ngày bắt đầu thực tế.');redraw();return}
-      patchTask(id,{actual_start_date:as,actual_end_date:ae,...(as&&ae?{actual_days:daysBetween(as,ae)+1}:{})});redraw()}
-    else if(a==='ad'){const n=el.value===''?null:Math.max(0,Math.round(+el.value));patchTask(id,{actual_days:n});redraw()}
-    else if(a==='pri'){patchTask(id,{priority:el.value});redraw()}
+      if(as&&ae&&ae<as){toast('Ngày kết thúc thực tế phải sau hoặc bằng ngày bắt đầu thực tế.');redraw(aff(id));return}
+      patchTask(id,{actual_start_date:as,actual_end_date:ae,...(as&&ae?{actual_days:daysBetween(as,ae)+1}:{})});redraw(aff(id))}
+    else if(a==='ad'){const n=el.value===''?null:Math.max(0,Math.round(+el.value));patchTask(id,{actual_days:n});redraw(aff(id))}
+    else if(a==='pri'){patchTask(id,{priority:el.value});redraw(aff(id))}
     else if(a==='note'){patchTask(id,{notes:el.value})}
     else if(a==='sd'||a==='ed'){
       const t=db.list('tasks').find(x=>x.id===id),v=el.value;
-      if(!t||!v){redraw();return}
+      if(!t||!v){redraw(aff(id));return}
       let sd=t.start_date,dd=t.due_date;
       if(a==='sd'){sd=v;if(!dd||dd<sd)dd=sd}
-      else{if(sd&&v<sd){toast('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');redraw();return}dd=v}
-      patchTask(id,{start_date:sd,due_date:dd,duration_days:daysBetween(sd,dd)+1,planned_days:daysBetween(sd,dd)+1});redraw();renderBell()}
+      else{if(sd&&v<sd){toast('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');redraw(aff(id));return}dd=v}
+      patchTask(id,{start_date:sd,due_date:dd,duration_days:daysBetween(sd,dd)+1,planned_days:daysBetween(sd,dd)+1});redraw(aff(id));renderBell()}
   };
   drawProgress(p);
 }
@@ -1988,7 +1972,7 @@ function actDaysCell(t,ed){
   const pd=plannedDays(t),ad=t.actual_days,over=ad!=null&&pd!=null&&ad>pd,good=ad!=null&&pd!=null&&ad<=pd&&t.status==='done';
   const note=over?`<div class="text-[11px] font-semibold text-red-600">trễ ${ad-pd} ngày</div>`:good?`<div class="text-[11px] font-semibold text-green-600">${ad<pd?'sớm '+(pd-ad)+' ngày':'đúng hạn'}</div>`:'';
   return `<input type="number" min="0" step="1" class="dd-in mono" data-act="ad" value="${ad??''}" placeholder="—" ${ed?'':'disabled'} style="${over?'color:#dc2626;font-weight:700':good?'color:#16a34a;font-weight:700':''}" aria-label="Số ngày thực tế">${note}`}
-function drawProgress(p){
+function drawProgress(p,only){
   const tk=pRows(p),{k,R}=rollTasks(tk),ed=canTask(p.id),q=pq.trim().toLowerCase(),flat=!!(q||pnd);
   const sorted=id=>(k[id]||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
   const card=(t,d)=>{
@@ -2015,6 +1999,12 @@ function drawProgress(p){
     if(PADD===t.id)h+=`<div class="tg-row tg-add" data-addrow="${t.id}"><div class="tg-full flex flex-wrap gap-2 items-center" style="padding-left:${flat?0:(d+1)*1.3}rem"><span class="mono text-xs" style="color:#f59e0b">↳</span><input class="inp" data-addname style="margin:0;flex:1;min-width:10rem" placeholder="Tên việc con · Enter để thêm · Esc để đóng" aria-label="Tên việc con"><input type="date" class="inp" data-adddue style="margin:0;width:9.5rem" aria-label="Hạn (không bắt buộc)"><button class="btn" data-act="add-ok" aria-label="Thêm"><i class="fa-solid fa-plus"></i></button><button class="ibtn" data-act="add-x" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button><span data-adderr class="text-red-600 text-xs"></span></div></div>`;
     return{h,kids,open};
   };
+  if(only){   // Target DOM Update: chỉ thay đúng các dòng bị ảnh hưởng, không vẽ lại cả bảng
+    const byId=Object.fromEntries(tk.map(t=>[t.id,t])),depth=t=>{let d=0,x=t;while(x.parent_id&&byId[x.parent_id]){x=byId[x.parent_id];d++}return d},tree=$('#pTree'),swaps=[];let ok=true;
+    for(const id of only){const t=byId[id];if(!t)continue;if(PADD===id||(EDIT&&EDIT.id===id)){ok=false;break}
+      const el=tree.querySelector(`.tg-row[data-id="${id}"]`);if(el)swaps.push([el,t])}
+    if(ok){swaps.forEach(([el,t])=>{const tp=document.createElement('template');tp.innerHTML=card(t,flat?0:depth(t)).h;const n=tp.content.firstElementChild;el.replaceWith(n);growNotes(n)});return}
+  }
   const out=[];
   if(flat){
     tk.filter(t=>(!pnd||(!k[t.id]&&noDur(t)))&&(!q||`${t.wbs_code} ${t.name} ${(t.owner_depts||[]).join(' ')}`.toLowerCase().includes(q)))
@@ -2026,7 +2016,8 @@ function drawProgress(p){
   const _h=out.join('');$('#pTree').innerHTML=_h||`<div class="text-mute p-4">${flat?'Không có việc phù hợp.':ed?(PSUB==='becos'?'Chưa có hạng mục Becos. Import Master Gantt ở tab Gantt (tự đồng bộ) hoặc bấm “Đồng bộ từ Master Gantt”.':'Chưa có công việc. Gõ tên ở ô phía trên rồi Enter để tạo đầu mục đầu tiên.'):'Chưa có công việc.'}</div>`;
   growNotes($('#pTree'));
 }
-function growNotes(root){root.querySelectorAll('textarea.note-in').forEach(a=>{a.style.height='auto';a.style.height=Math.max(a.scrollHeight,27)+'px'})}
+/* đọc layout 1 lượt rồi mới ghi 1 lượt (tránh layout thrashing); ô ghi chú trống giữ chiều cao mặc định */
+function growNotes(root){const l=(root.matches&&root.matches('textarea.note-in')?[root]:[...root.querySelectorAll('textarea.note-in')]).filter(a=>a.value);l.forEach(a=>a.style.height='auto');const h=l.map(a=>a.scrollHeight);l.forEach((a,i)=>a.style.height=Math.max(h[i],27)+'px')}
 
 /* ===== Tab VIỆC CẦN LÀM: Khu vực 1 (từ Tiến độ, chỉ xem) + Khu vực 2 (việc ngoài / phát sinh) ===== */
 const DL_SEC=[['over','Trễ hạn','#dc2626'],['soon','Sắp hết hạn (trong '+SOON+' ngày)','#ea580c'],['ok','Còn thời hạn','#16a34a'],['none','Chưa đặt hạn','#94a3b8']];
@@ -2054,7 +2045,7 @@ function viewTodo(p){
     ${canTask(p.id)?`<div class="card p-3 mb-3"><div class="flex gap-2"><input id="xqName" class="inp" style="margin:0;flex:2" placeholder="Thêm nhanh việc vặt / phát sinh... (Enter để lưu)" aria-label="Tên việc phát sinh"><input id="xqNote" class="inp" style="margin:0;flex:1" placeholder="Ghi chú ngắn (tùy chọn)..." aria-label="Ghi chú ngắn"><button id="xqAdd" class="btn" aria-label="Thêm việc"><i class="fa-solid fa-plus"></i> Thêm</button></div><div id="xqErr" class="text-red-600 text-xs h-4 mt-1"></div></div>`:''}
     <div id="xList"></div></section>`;
   document.querySelectorAll('#view .seg[data-v]').forEach(b=>b.onclick=()=>{patchSession({todoView:b.dataset.v});viewTodo(p)});
-  $('#tqSearch').oninput=e=>{tq=e.target.value;drawTodo(p)};
+  const dbTodo=debounce(()=>drawTodo(p),300);$('#tqSearch').oninput=e=>{tq=e.target.value;dbTodo()};
   const d=$('#tqDone');if(d)d.onchange=e=>{tDone=e.target.checked;drawTodo(p)};
   $('#tList').onclick=e=>{const c=e.target.closest('[data-go]');if(c)go(`#/p/${p.id}/progress/${c.dataset.go}`)};
   if(canTask(p.id)){
@@ -2424,6 +2415,7 @@ function exportWord(p,q){
 }
 
 function renderView(name,pid,target){
+  $('#view').onclick=null;   // gỡ listener ủy quyền của view trước
   renderBell();
   if(name==='projects')return viewProjects();
   const p=myProjects().find(x=>x.id===pid);
