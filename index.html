@@ -283,11 +283,12 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 
   <div class="flex flex-1 min-h-0">
     <div id="overlay" class="hidden fixed inset-0 bg-black/40 z-[26] md:hidden"></div>
-    <aside id="side" class="fixed md:static inset-y-0 left-0 z-30 w-60 shrink-0 bg-side border-r border-line p-3 pt-16 md:pt-3 -translate-x-full md:translate-x-0 transition-transform overflow-y-auto">
+    <aside id="side" class="fixed md:static inset-y-0 left-0 z-30 w-64 shrink-0 bg-side border-r border-line p-3 pt-16 md:pt-3 -translate-x-full md:translate-x-0 transition-transform overflow-y-auto">
       <a href="#/projects" class="flex items-center gap-2 px-1 pb-4 pt-1 font-bold text-lg" style="color:#fff"><span class="logo-sq"><i class="fa-solid fa-gears"></i></span>Tech<span style="color:var(--brand)">PM</span></a>
       <div id="sideProj"></div>
       <nav class="space-y-1">
         <a class="nav-item" data-route="projects" href="#/projects"><i class="fa-solid fa-folder-tree w-5"></i>Danh sách dự án</a>
+        <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-user-group w-5"></i>Nhân sự &amp; Phân quyền</a>
         <div class="text-xs uppercase tracking-wide px-3 pt-4 pb-1 opacity-60" style="color:var(--sidetx)">Dự án của bạn</div>
         <div id="sideProjects" class="space-y-1"></div>
       </nav>
@@ -726,11 +727,11 @@ function toast(msg,bad=true){
 }
 
 function card(p){
-  const st=STATUS[p.status],adm=canBudget(p.id),mg=isMgr(p.id),root=isAdmin(),s=projStats(p.id),mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
+  const adm=canBudget(p.id),mg=isMgr(p.id),root=isAdmin(),s=projStats(p.id),st=STATUS[effStatus(p,s)],nxt=pjNext(s),mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
   const done=s.leaf.filter(t=>t.status==='done').length,us=db.list('users');
   const own=us.find(u=>u.id===p.created_by)||us.find(u=>u.id===(mem.find(m=>m.role==='owner')||{}).user_id)||us.find(u=>isAdmin(u));
   const mv=n=>n>=1e6?[Math.round(n/1e6).toLocaleString('vi-VN'),'tr']:[Math.round(n||0).toLocaleString('vi-VN'),n?'đ':''];
-  const stat=(l,v,sub,cls='')=>`<div class="rounded-xl border border-line px-3 py-2 min-w-0"><div class="text-[10px] font-semibold tracking-wide uppercase text-mute truncate">${l}</div><div class="mono text-lg font-bold text-ink whitespace-nowrap overflow-hidden ${cls}">${v}<span class="text-xs font-normal text-mute ml-0.5">${sub}</span></div></div>`;
+  const stat=(l,v,sub,cls='')=>`<div class="rounded-xl px-3 py-2 min-w-0" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><div class="text-[10px] font-semibold tracking-wide uppercase text-mute truncate">${l}</div><div class="mono text-lg font-bold text-ink whitespace-nowrap overflow-hidden ${cls}">${v}<span class="text-xs font-normal text-mute ml-0.5">${sub}</span></div></div>`;
   const ap=p.approved?['✓ Đã duyệt','bg-green-100 text-green-700']:['Chờ duyệt','bg-yellow-100 text-yellow-700'];
   const spent=mv(s.actual),plan=mv(s.planned),over=s.planned&&s.actual>s.planned;
   const sub=p.client||p.description||'';
@@ -739,13 +740,13 @@ function card(p){
     <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${st[1]}">${st[0]}</span></div>
    <div class="min-w-0"><div class="text-lg font-semibold text-ink leading-snug truncate" title="${esc(p.name)}">${esc(p.name)}</div>
     ${sub?`<div class="text-sm text-mute truncate mt-0.5" title="${esc(sub)}"><i class="fa-solid fa-building mr-1.5"></i>${esc(sub)}</div>`:`<div class="text-sm text-mute mt-0.5"><i class="fa-regular fa-calendar mr-1.5"></i>${fmtD(p.start_date)} → ${fmtD(p.end_date)}</div>`}</div>
-   <div class="border-t border-line"></div>
    <div class="grid grid-cols-3 gap-2">
     ${stat('Tiến độ',s.pct+'%','')}
     ${adm?stat('Thực chi',spent[0],spent[1],over?'text-red-600':''):stat('Thực chi','<i class="fa-solid fa-lock text-sm text-mute"></i>','')}
     ${stat('Đầu việc',done,'/'+s.leaf.length)}</div>
    <div><div class="flex justify-between text-xs text-mute"><span>Tiến độ tổng thể</span><b class="mono text-ink">${s.pct}%</b></div>${bar(s.pct)}</div>
-   <div class="border-t border-line pt-2 flex items-center justify-between gap-2 min-h-[1.75rem]">
+   <div class="text-xs text-mute truncate" title="${nxt?esc(nxt.name):''}">📌 Việc tiếp theo: ${nxt?`<b class="text-ink">${esc(nxt.name)}</b>${nxt.due_date?' · '+fmtD(nxt.due_date):''}`:'<span>Không còn việc tồn đọng</span>'}</div>
+   <div class="flex items-center justify-between gap-2 min-h-[1.75rem]">
     ${adm?`<span class="mono text-xs text-mute truncate">NS duyệt: <b class="text-ink">${plan[0]}${plan[1]?' '+plan[1]:''} đ</b></span>`:`<span class="text-xs text-mute"><i class="fa-solid fa-lock mr-1"></i>Ngân sách chỉ Admin xem</span>`}
     ${late?`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">${late} trễ hạn</span>`:`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Không trễ hạn</span>`}</div>
    <div class="border-t border-line pt-3 flex flex-wrap items-center justify-between gap-2">
@@ -836,15 +837,58 @@ async function toggleApprove(pid){
 let PJF='all';
 const PJTABS=[['all','Tất cả'],['active','Đang triển khai'],['planning','Kế hoạch'],['completed','Hoàn thành'],['on_hold','Tạm dừng']];
 function projLate(p,s){return p.status!=='completed'&&(s.overdue.length>0||(p.end_date&&p.end_date<today()))}
+/* ---- Trạng thái hiệu lực: dự án 'planning' đã có số liệu thì coi là đang triển khai (và tự lưu), đạt 100% thì gợi ý Hoàn thành ---- */
+const AUTOST=new Set();                                          // mỗi dự án chỉ tự cập nhật 1 lần / phiên (tránh vòng lặp ghi)
+function effStatus(p,s){
+  if(p.status!=='planning')return p.status;
+  if(s.pct>=100)return 'completed';
+  if(s.pct>0||s.actual>0)return 'active';
+  return 'planning'}
+function autoSyncStatus(ps){
+  const fix=ps.filter(p=>p.status==='planning'&&!AUTOST.has(p.id)&&isMgr(p.id)).filter(p=>{const s=projStats(p.id);return s.pct<100&&(s.pct>0||s.actual>0)});
+  if(!fix.length)return false;
+  fix.forEach(p=>AUTOST.add(p.id));const ids=new Set(fix.map(p=>p.id)),now=new Date().toISOString();
+  db.save('projects',db.list('projects').map(p=>ids.has(p.id)?{...p,status:'active',updated_at:now}:p)).catch(console.error);
+  return true}
+/* Việc tiếp theo của dự án: việc lá chưa xong, hạn gần nhất (cùng hạn: ưu tiên đang làm) */
+const pjNext=s=>s.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100).sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))||((b.status==='in_progress')-(a.status==='in_progress')))[0]||null;
+const pjEmpty=s=>!s.pct&&!s.planned&&!s.actual;
+/* Sắp xếp: đang triển khai + có số liệu lên đầu, dự án trống (0% / 0đ) xuống cuối */
+function pjSortRank(x){return pjEmpty(x.s)?3:x.eff==='active'?0:x.eff==='completed'?2:1}
+let PJV=(()=>{try{return localStorage.getItem('pjv')||'grid'}catch(e){return'grid'}})(),PJQ='';
+const nk0=s=>String(s||'').toLowerCase();
+function pjTable(rows,adm){
+  const mv=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN');
+  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))">
+   <th class="px-3 py-2">Mã</th><th class="px-3 py-2">Dự án</th><th class="px-3 py-2">Trạng thái</th><th class="px-3 py-2" style="min-width:8rem">Tiến độ</th>${adm?'<th class="px-3 py-2 text-right">NS duyệt (tr)</th><th class="px-3 py-2 text-right">Thực chi (tr)</th>':''}<th class="px-3 py-2 text-center">Trễ</th><th class="px-3 py-2">Việc tiếp theo</th><th class="px-3 py-2"></th></tr></thead><tbody>
+   ${rows.map(({p,s,eff})=>{const st=STATUS[eff],nx=pjNext(s),over=s.planned&&s.actual>s.planned;
+    return `<tr class="border-t border-line hover:bg-black/5 cursor-pointer" data-open="${p.id}"><td class="px-3 py-2 mono text-xs">${esc(p.code)}</td><td class="px-3 py-2 font-semibold max-w-[16rem] truncate" title="${esc(p.name)}">${esc(p.name)}</td>
+    <td class="px-3 py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${st[1]}">${st[0]}</span></td>
+    <td class="px-3 py-2"><div class="flex items-center gap-2"><b class="mono text-xs w-9">${s.pct}%</b><div class="flex-1">${bar(s.pct)}</div></div></td>
+    ${adm?`<td class="px-3 py-2 mono text-right">${mv(s.planned)}</td><td class="px-3 py-2 mono text-right ${over?'text-red-600 font-bold':''}">${mv(s.actual)}</td>`:''}
+    <td class="px-3 py-2 text-center">${s.overdue.length?`<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">${s.overdue.length}</span>`:'<span class="text-mute">—</span>'}</td>
+    <td class="px-3 py-2 text-xs max-w-[16rem] truncate" title="${nx?esc(nx.name):''}">${nx?esc(nx.name)+(nx.due_date?` <span class="text-mute">· ${fmtD(nx.due_date)}</span>`:''):'<span class="text-mute">—</span>'}</td>
+    <td class="px-3 py-2 text-right"><span class="text-xs font-semibold rounded-lg px-2 py-1" style="background:rgba(127,127,127,.14)">Vào →</span></td></tr>`}).join('')}</tbody></table></div>`}
+function pjList(){   // vùng danh sách (lưới / bảng) — vẽ lại riêng khi gõ tìm kiếm hoặc đổi chế độ xem, không đụng biểu đồ
+  const adm=isAdmin(),ps=myProjects(),q=nk0(PJQ).trim();
+  let rows=ps.map(p=>{const s=projStats(p.id);return{p,s,eff:effStatus(p,s)}});
+  rows.sort((a,b)=>pjSortRank(a)-pjSortRank(b)||(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct||String(a.p.name).localeCompare(String(b.p.name),'vi'));
+  rows=rows.filter(x=>(PJF==='all'||x.eff===PJF)&&(!q||nk0(x.p.name+' '+x.p.code+' '+(x.p.client||'')).includes(q)));
+  const empty=`<div class="text-mute">${q?'Không có dự án khớp "'+esc(PJQ)+'".':ps.length?'Không có dự án nào ở trạng thái này.':adm?'Chưa có dự án. Bấm "Dự án mới".':'Bạn chưa được gán vào dự án nào. Hãy nhờ Admin thêm email của bạn.'}</div>`;
+  $('#pjList').innerHTML=!rows.length?empty:PJV==='table'?pjTable(rows,adm):`<div class="pjwrap"><div class="pjgrid">${rows.map(x=>card(x.p)).join('')}</div></div>`}
+function pjLateTop(ps){   // Top 6 việc trễ hạn / sắp đến hạn của mọi dự án (trễ nhiều nhất trước, rồi hạn gần nhất)
+  const out=[];ps.forEach(p=>{if(p.status==='completed')return;projStats(p.id).leaf.forEach(t=>{if(t.status==='done'||(t.progress||0)>=100||!t.due_date)return;const d=daysBetween(today(),t.due_date);if(d<=7)out.push({p,t,d})})});
+  return out.sort((a,b)=>a.d-b.d).slice(0,6)}
 function viewProjects(){
-  const adm=isAdmin(),ps=myProjects(),st=ps.map(p=>({p,s:projStats(p.id)}));
-  const cnt=k=>k==='all'?ps.length:ps.filter(p=>p.status===k).length;
-  const act=ps.filter(p=>p.status==='active').length;
+  const adm=isAdmin();autoSyncStatus(myProjects());
+  const ps=myProjects(),st=ps.map(p=>{const s=projStats(p.id);return{p,s,eff:effStatus(p,s)}});
+  const cnt=k=>k==='all'?ps.length:st.filter(x=>x.eff===k).length;
+  const act=st.filter(x=>x.eff==='active').length;
   const totB=st.reduce((a,x)=>a+x.s.planned,0),totA=st.reduce((a,x)=>a+x.s.actual,0);
-  const late=st.filter(x=>x.p.status!=='completed'&&projLate(x.p,x.s)).length,run=st.filter(x=>x.p.status!=='completed').length,ontime=run-late;
-  const ovT=st.reduce((a,x)=>a+x.s.overdue.length,0);
+  const late=st.filter(x=>x.eff!=='completed'&&projLate(x.p,x.s)).length,run=st.filter(x=>x.eff!=='completed').length,ontime=run-late;
+  const ovT=st.reduce((a,x)=>a+x.s.overdue.length,0),lateTop=pjLateTop(ps);
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
-  const shown=PJF==='all'?ps:ps.filter(p=>p.status===PJF);
+  const lateRows=lateTop.map(({p,t,d})=>`<button type="button" data-goto="${p.id}/${t.id}" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-black/5"><span class="min-w-0 flex-1"><span class="block text-sm font-medium truncate" title="${esc(t.name)}">${esc(t.name)}</span><span class="inline-block mono text-[10px] rounded px-1.5 mt-0.5" style="background:rgba(127,127,127,.16)" title="${esc(p.name)}">${esc(p.code)}</span></span><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${d<0?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'}">${d<0?'trễ '+(-d)+' ngày':d===0?'hôm nay':'còn '+d+' ngày'}</span></button>`).join('');
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
    <div class="flex gap-2 flex-wrap"><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
@@ -852,19 +896,25 @@ function viewProjects(){
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
     ${kpi('Dự án đúng hạn',ontime+'/'+run,late+' dự án có nguy cơ trễ','fa-circle-check','#7c3aed')}
     ${kpi('Việc trễ hạn',ovT,'Tổng các dự án','fa-triangle-exclamation',ovT?'#dc2626':'#059669')}</div>
-   <div class="grid gap-3 lg:grid-cols-3"><div class="card bg-surface border border-line rounded-2xl p-3 lg:col-span-2 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ)':'Tiến độ hoàn thành theo dự án (%)'}</div><div style="position:relative;height:190px"><canvas id="pjBar"></canvas></div></div>
-   <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="text-sm font-semibold mb-1">Đúng hạn / Trễ hạn</div><div style="position:relative;height:190px"><canvas id="pjDo"></canvas></div></div></div></div>
-   <div class="flex gap-1 mb-3 border-b border-line overflow-x-auto" id="pjTabs">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
-   <div class="pjwrap"><div class="pjgrid">${shown.map(card).join('')||`<div class="text-mute">${ps.length?'Không có dự án nào ở trạng thái này.':adm?'Chưa có dự án. Bấm "Dự án mới".':'Bạn chưa được gán vào dự án nào. Hãy nhờ Admin thêm email của bạn.'}</div>`}</div></div>`;
+   <div class="grid gap-3 lg:grid-cols-3"><div class="card bg-surface border border-line rounded-2xl p-3 lg:col-span-2 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ)':'Tiến độ hoàn thành theo dự án (%)'}</div><div style="position:relative;height:210px"><canvas id="pjBar"></canvas></div></div>
+   <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="flex items-center justify-between mb-1"><div class="text-sm font-semibold">🔥 Việc trễ hạn &amp; Sắp đến hạn (Top 6)</div><span class="text-xs text-mute">${lateTop.length}</span></div><div id="pjLate" class="space-y-0.5" style="min-height:210px">${lateRows||'<div class="text-sm text-mute p-4 text-center"><i class="fa-solid fa-circle-check text-2xl mb-2" style="color:#059669"></i><br>Không có việc trễ hoặc sắp đến hạn trong 7 ngày tới.</div>'}</div></div></div></div>
+   <div class="flex items-center gap-2 mb-3 border-b border-line" id="pjTabs"><div class="flex gap-1 overflow-x-auto flex-1 min-w-0">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
+    <div class="relative shrink-0 pb-1"><i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-mute" style="margin-top:-2px"></i><input id="pjQ" type="search" class="inp" style="margin:0;padding:.3rem .6rem .3rem 1.7rem;width:11rem" placeholder="Tìm dự án..." value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"></div>
+    <button id="pjView" class="btn-ghost shrink-0 mb-1" title="Chuyển Thẻ (Grid) ⇄ Bảng (Table)" aria-label="Đổi chế độ xem"><i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span></button></div>
+   <div id="pjList"></div>`;
+  pjList();
   const v=$('#view');
   v.onclick=e=>{   // Event Delegation: 1 listener cho cả danh sách dự án
     const g=sel=>e.target.closest(sel);let el;
     if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
+    if(el=g('#pjView')){PJV=PJV==='table'?'grid':'table';try{localStorage.setItem('pjv',PJV)}catch(x){}el.innerHTML=`<i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span>`;pjList();return}
+    if(el=g('[data-goto]')){go(`#/p/${el.dataset.goto.split('/')[0]}/progress/${el.dataset.goto.split('/')[1]}`);return}
     if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
     if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
     if(el=g('[data-perm]')){e.stopPropagation();permModal(el.dataset.perm);return}
     if(el=g('[data-appr]')){e.stopPropagation();toggleApprove(el.dataset.appr);return}
     if(el=g('[data-open]'))go(`#/p/${el.dataset.open}/overview`)};
+  $('#pjQ').oninput=debounce(e=>{PJQ=e.target.value;pjList()},200);
   if(adm){$('#newBtn').onclick=()=>projectForm()}
   $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
   charts.forEach(c=>c.destroy());charts=[];
@@ -872,8 +922,12 @@ function viewProjects(){
   const css=getComputedStyle(document.documentElement),cv=n=>css.getPropertyValue(n).trim();
   Chart.defaults.color=cv('--mute');Chart.defaults.borderColor=cv('--line');
   const sh=n=>n.length>16?n.slice(0,15)+'…':n;
-  charts.push(new Chart($('#pjBar'),{type:'bar',data:{labels:st.map(x=>sh(x.p.name)),datasets:adm?[{label:'Kế hoạch',data:st.map(x=>Math.round(x.s.planned/1e6)),backgroundColor:'#94a3b8',borderRadius:4},{label:'Thực chi',data:st.map(x=>Math.round(x.s.actual/1e6)),backgroundColor:cv('--brand'),borderRadius:4}]:[{label:'Hoàn thành %',data:st.map(x=>x.s.pct),backgroundColor:cv('--brand'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},scales:{y:{beginAtZero:true}}}}));
-  charts.push(new Chart($('#pjDo'),{type:'doughnut',data:{labels:['Đúng hạn','Trễ hạn','Hoàn thành'],datasets:[{data:[ontime,late,ps.length-run],backgroundColor:['#059669','#dc2626','#2563eb'],borderColor:cv('--surface')}]},options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{position:'right',labels:{boxWidth:10}}}}}));
+  /* Biểu đồ: chỉ vẽ dự án có số liệu (nếu tất cả đều trống mới vẽ hết) */
+  const bs0=st.filter(x=>x.s.planned>0||x.s.actual>0||x.s.pct>0),bs=(bs0.length?bs0:st).slice().sort((a,b)=>(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct);
+  const fm=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' tr';
+  charts.push(new Chart($('#pjBar'),{type:'bar',data:{labels:bs.map(x=>sh(x.p.name)),datasets:adm?[{label:'Kế hoạch',data:bs.map(x=>Math.round(x.s.planned/1e6)),backgroundColor:'#94a3b8',borderRadius:4},{label:'Thực chi',data:bs.map(x=>Math.round(x.s.actual/1e6)),backgroundColor:cv('--brand'),borderRadius:4}]:[{label:'Hoàn thành %',data:bs.map(x=>x.s.pct),backgroundColor:cv('--brand'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}},tooltip:{callbacks:{title:i=>bs[i[0].dataIndex].p.name,label:()=>null,
+      afterBody:i=>{const x=bs[i[0].dataIndex];return[`Mã: ${x.p.code||'—'}`,...(adm?[`Kế hoạch: ${fm(x.s.planned)}`,`Thực chi: ${fm(x.s.actual)}`]:[]),`Tiến độ: ${x.s.pct}%`]}}}},scales:{y:{beginAtZero:true}}}}));
 }
 function delProject(id){
   const p=db.list('projects').find(x=>x.id===id);
@@ -996,8 +1050,10 @@ function applyFont(n){
 }
 
 function renderSide(pid){
-  document.querySelectorAll('.nav-item[data-route]').forEach(a=>a.classList.toggle('active',!pid));
-  $('#sideProjects').innerHTML=myProjects().map(p=>`<a class="nav-item ${p.id===pid?'active':''}" href="#/p/${p.id}/overview"><i class="fa-solid fa-diagram-project w-5"></i><span class="truncate">${esc(p.name)}</span></a>`).join('')
+  const onUsers=/^#?\/?users/.test(curHash);
+  document.querySelectorAll('.nav-item[data-route]').forEach(a=>a.classList.toggle('active',!pid&&(a.dataset.route==='users')===onUsers));
+  const nu=$('#navUsers');if(nu)nu.classList.toggle('hidden',!isAdmin());
+  $('#sideProjects').innerHTML=myProjects().map(p=>`<a class="nav-item ${p.id===pid?'active':''}" href="#/p/${p.id}/overview" title="${esc(p.code?p.code+' · ':'')+esc(p.name)}"><i class="fa-solid fa-diagram-project w-5 shrink-0"></i><span class="min-w-0 flex flex-col leading-tight"><span class="mono text-[10px] opacity-60 truncate">${esc(p.code||'')}</span><span class="truncate">${esc(p.name)}</span></span></a>`).join('')
     ||'<div class="text-xs px-3 opacity-60" style="color:var(--sidetx)">Chưa có dự án</div>';
 }
 
@@ -1006,7 +1062,8 @@ function route(keep){
   flushNotes();
   const parts=(curHash.replace(/^#\/?/,'')||'projects').split('/');
   const pid=parts[0]==='p'?parts[1]:null;
-  let name=pid?(parts[2]||'overview'):'projects';name=TAB_ALIAS[name]||name;
+  let name=pid?(parts[2]||'overview'):(parts[0]==='users'?'users':'projects');name=TAB_ALIAS[name]||name;
+  if(name==='users'&&!isAdmin()){go('#/projects');return}
   if(pid&&(!TABS.some(t=>t[0]===name)||(name==='budget'&&!canBudget(pid))))name='overview';
   const target=parts[3],pr=pid?myProjects().find(x=>x.id===pid):null;
   if(pid&&!pr){go('#/projects');return}
@@ -1027,7 +1084,7 @@ function route(keep){
   $('#bnav').classList.toggle('off',!inP);$('#view').classList.toggle('has-bnav',inP);
   if(inP)document.querySelectorAll('#bnav .bn-tab').forEach(a=>{a.href=`#/p/${pid}/${a.dataset.tab}`;a.classList.toggle('active',a.dataset.tab===name)});
   const tl=Object.fromEntries(TABS);
-  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
+  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+(name==='users'?' / Nhân sự &amp; Phân quyền':'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
   if(inP)$('#projSw').onchange=e=>go(`#/p/${e.target.value}/${name}`);
   const v=$('#view'),sc=v.scrollTop;
   renderView(name,pid,target);
@@ -2492,10 +2549,58 @@ function exportWord(p,q){
   a.href=URL.createObjectURL(blob);a.download=`GhiChu_${p.code}_${today()}.doc`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 
+/* ===================== NHÂN SỰ & PHÂN QUYỀN (#/users — chỉ Admin) ===================== */
+let UQ='';
+const UROLE_BADGE={viewer:'background:rgba(100,116,139,.15);color:#475569',editor:'background:rgba(37,99,235,.14);color:#1d4ed8',manager:'background:rgba(234,88,12,.15);color:#c2410c',owner:'background:rgba(234,88,12,.15);color:#c2410c'};
+function usersTable(){
+  const q=nk0(UQ).trim(),ps=db.list('projects'),pm=db.list('project_members');
+  const us=db.list('users').filter(u=>!q||nk0((u.full_name||'')+' '+(u.email||'')).includes(q)).sort((a,b)=>(isAdminRow(b)-isAdminRow(a))||String(a.email).localeCompare(String(b.email)));
+  if(!us.length)return '<div class="text-mute p-4">Không có nhân sự phù hợp.</div>';
+  return `<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Nhân sự</th><th class="px-3 py-2">Vai trò</th><th class="px-3 py-2">Dự án đang tham gia</th><th class="px-3 py-2 text-center">Số DA</th><th class="px-3 py-2"></th></tr></thead><tbody>
+  ${us.map(u=>{const adm=isAdminRow(u),mine=pm.filter(m=>m.user_id===u.id).map(m=>({m,p:ps.find(x=>x.id===m.project_id)})).filter(x=>x.p);
+   return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="flex items-center gap-2 min-w-0"><span class="w-8 h-8 rounded-full text-white grid place-items-center text-[11px] font-bold overflow-hidden shrink-0" style="background:${u.avatar_color||'#64748b'}">${avatarHTML(u)}</span><div class="min-w-0"><div class="font-semibold truncate">${esc(u.full_name||'—')}</div><div class="text-xs text-mute truncate" title="${esc(u.email)}">${esc(u.email)}</div></div></div></td>
+   <td class="px-3 py-2 whitespace-nowrap">${adm?'<span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background:rgba(220,38,38,.12);color:#b91c1c">Admin</span>':'<span class="text-xs text-mute">Chuyên viên</span>'}</td>
+   <td class="px-3 py-2">${adm?'<span class="text-xs text-mute">Toàn quyền tất cả dự án</span>':mine.length?`<div class="flex flex-wrap gap-1">${mine.map(({m,p})=>`<span class="text-xs rounded-lg px-2 py-0.5 whitespace-nowrap" style="${UROLE_BADGE[normRole(m.role)]||UROLE_BADGE.viewer}" title="${esc(p.name)} — ${roleLbl(normRole(m.role))}"><b class="mono">${esc(p.code)}</b> · ${roleLbl(normRole(m.role))}</span>`).join('')}</div>`:'<span class="text-xs text-mute">Chưa tham gia dự án nào</span>'}</td>
+   <td class="px-3 py-2 text-center mono">${adm?'—':mine.length}</td>
+   <td class="px-3 py-2 text-right">${adm?'':`<button type="button" data-assign="${u.id}" class="text-xs font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap" style="background:rgba(249,115,22,.12);color:#ea580c;border:1px solid rgba(249,115,22,.35)">⚙️ Phân bổ dự án</button>`}</td></tr>`}).join('')}</tbody></table></div>`}
+function viewUsers(){
+  if(!isAdmin()){go('#/projects');return}
+  const n=db.list('users').filter(u=>!isAdminRow(u)).length;
+  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">👥 Nhân sự &amp; Phân quyền</h2><p class="text-mute text-sm">${n} chuyên viên · ${db.list('projects').length} dự án. Phân bổ và đổi quyền (Viewer / Editor / Manager) cho từng người ở một nơi.</p></div>
+   <input id="uQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm tên / email..." value="${esc(UQ)}" aria-label="Tìm nhân sự"></div><div id="uTable">${usersTable()}</div>`;
+  $('#view').onclick=e=>{const b=e.target.closest('[data-assign]');if(b)assignModal(b.dataset.assign)};
+  $('#uQ').oninput=debounce(e=>{UQ=e.target.value;$('#uTable').innerHTML=usersTable()},200)}
+/* Modal tập trung: tích chọn nhiều dự án + đổi quyền cho 1 nhân sự */
+function assignModal(uid_){
+  const u=db.list('users').find(x=>x.id===uid_);if(!u||!isAdmin())return;
+  const ps=db.list('projects').slice().sort((a,b)=>String(a.code).localeCompare(String(b.code))),mine=new Map(db.list('project_members').filter(m=>m.user_id===uid_).map(m=>[m.project_id,m.role]));
+  const disp=r=>PERM_ROLE[r]?r:'manager';
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-2xl p-5 max-h-[90vh] overflow-auto">
+   <div class="flex justify-between items-center mb-1"><h3 class="font-bold text-lg">⚙️ Phân bổ dự án</h3><button id="asX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+   <div class="text-sm mb-3"><b>${esc(u.full_name||u.email)}</b> <span class="text-mute">· ${esc(u.email)}</span></div>
+   <div class="flex items-center justify-between gap-2 mb-2 text-xs"><span class="text-mute"><span id="asN">${mine.size}</span>/${ps.length} dự án được chọn</span><span class="flex gap-2"><button id="asAll" class="btn-ghost" type="button">Chọn tất cả</button><button id="asNone" class="btn-ghost" type="button">Bỏ chọn</button></span></div>
+   <div class="rounded-xl border border-line overflow-auto" style="max-height:min(55vh,26rem)">${ps.length?ps.map(p=>{const on=mine.has(p.id);return `<label class="flex items-center gap-3 px-3 py-2 border-b border-line last:border-0 cursor-pointer" data-arow="${p.id}"><input type="checkbox" data-ck="${p.id}" ${on?'checked':''} style="width:1rem;height:1rem">
+    <span class="min-w-0 flex-1"><span class="mono text-[10px] rounded px-1.5" style="background:rgba(127,127,127,.16)">${esc(p.code)}</span> <span class="text-sm font-medium" title="${esc(p.name)}">${esc(p.name)}</span></span>
+    <select data-rl="${p.id}" class="cell q" style="width:auto;font-size:.75rem" ${on?'':'disabled'} aria-label="Quyền tại ${esc(p.name)}">${Object.entries(PERM_ROLE).map(([k,v])=>`<option value="${k}" ${disp(on?mine.get(p.id):'viewer')===k?'selected':''}>${v[0]}</option>`).join('')}</select></label>`}).join(''):'<div class="p-4 text-sm text-mute text-center">Chưa có dự án nào.</div>'}</div>
+   <div class="text-xs text-mute mt-2">${Object.values(PERM_ROLE).map(v=>`<b>${v[0]}</b>: ${v[1]}`).join(' · ')}</div>
+   <div class="flex justify-end gap-2 mt-4"><button class="btn-ghost" id="asNo" type="button">Hủy</button><button class="btn" id="asSave" type="button"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu phân bổ</button></div></div></div>`;
+  const m=$('#modal'),upd=()=>{$('#asN').textContent=m.querySelectorAll('[data-ck]:checked').length};
+  m.querySelectorAll('[data-ck]').forEach(c=>c.onchange=()=>{m.querySelector(`[data-rl="${c.dataset.ck}"]`).disabled=!c.checked;upd()});
+  $('#asAll').onclick=()=>{m.querySelectorAll('[data-ck]').forEach(c=>{c.checked=true;c.onchange()})};
+  $('#asNone').onclick=()=>{m.querySelectorAll('[data-ck]').forEach(c=>{c.checked=false;c.onchange()})};
+  $('#asX').onclick=$('#asNo').onclick=closeModal;
+  $('#asSave').onclick=async()=>{
+    const b=$('#asSave');b.disabled=true;
+    const rest=db.list('project_members').filter(x=>x.user_id!==uid_),next=[];
+    m.querySelectorAll('[data-ck]').forEach(c=>{if(!c.checked)return;const pid=c.dataset.ck,sel=m.querySelector(`[data-rl="${pid}"]`).value,old=mine.get(pid);
+      next.push({project_id:pid,user_id:uid_,role:old!=null&&disp(old)===sel?old:sel})});   // giữ nguyên quyền cũ nếu không đổi (vd. owner)
+    const ok=await db.save('project_members',[...rest,...next]);
+    if(ok){toast(`Đã lưu phân bổ: ${next.length} dự án`,false);closeModal();viewUsers();renderSide(curPid)}else{b.disabled=false;toast('Lưu phân bổ thất bại')}}}
 function renderView(name,pid,target){
   $('#view').onclick=null;   // gỡ listener ủy quyền của view trước
   renderBell();
   if(name==='projects')return viewProjects();
+  if(name==='users')return viewUsers();
   const p=myProjects().find(x=>x.id===pid);
   if(!p){go('#/projects');return}
   ({overview:viewDashboard,progress:viewProgress,gantt:viewGantt,budget:viewBudget,todo:viewTodo,notes:viewNotes})[name](p,target);
