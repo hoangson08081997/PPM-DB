@@ -261,7 +261,6 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     </div>
 
     <div class="relative">
-      <span id="syncInd" class="hidden items-center gap-1 text-xs text-mute whitespace-nowrap" title="Đồng bộ dữ liệu các dự án ở chế độ nền"></span>
       <button id="bellBtn" class="relative p-2" aria-label="Thông báo"><i class="fa-solid fa-bell"></i>
         <span id="bellBadge" class="absolute top-0 right-0 text-[10px] bg-red-600 text-white rounded-full px-1.5">0</span></button>
       <div id="bellMenu" class="hidden absolute right-0 mt-2 w-[24rem] max-w-[92vw] bg-surface border border-line rounded-xl shadow-lg p-3 z-40">
@@ -481,40 +480,27 @@ function ingest(k,rows,col,vals){
   SNAP[k]=new Map(CACHE[k].map(r=>[pkOf(c,r),JSON.stringify(toDB(k,r))]));
   return rows;
 }
-/* Lớp 1 (nhẹ, chạy ngay khi vào app): User + danh sách dự án + thành viên -> đủ để vẽ trang chủ */
-async function fetchLight(){
+/* Tải ĐỒNG THỜI toàn bộ dữ liệu cốt lõi ngay sau khi đăng nhập (trước khi vẽ trang chủ) để mọi con số tiến độ / thực chi / % hiển thị đủ ngay.
+   Admin: 1 lượt Promise.all cho mọi bảng. Thành viên: lấy project_members trước (cần để biết dự án nào / vai trò nào), rồi 1 lượt Promise.all cho phần còn lại. */
+async function fetchAll(){
   const admin=isAdmin();
-  await Promise.all([fetchTable('users'),fetchTable('project_members')]);
-  if(admin)await fetchTable('projects');
-  else await fetchTable('projects','id',CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id));
+  if(admin){
+    await Promise.all([fetchTable('users'),fetchTable('project_members'),fetchTable('projects'),fetchTable('tasks'),fetchTable('budget_items'),fetchTable('extra_tasks'),fetchTable('notes'),fetchTable('master_gantt')]);
+  }else{
+    await Promise.all([fetchTable('users'),fetchTable('project_members')]);
+    const pids=[...new Set(CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id))],bp=pids.filter(id=>roleOf(id)==='manager');
+    await Promise.all([fetchTable('projects','id',pids),fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids)]);
+  }
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
+  CACHE.projects.forEach(x=>LOADED.add(x.id));PF.state='done';syncCPD();
+  fetchTable('attachments','task_id',CACHE.tasks.map(t=>t.id)).catch(e=>console.error(e));   // file đính kèm không ảnh hưởng số liệu trang chủ -> tải nền, không chặn
 }
-/* Lớp 2 (nặng): Tasks, Budgets, Việc phát sinh, Ghi chú, Master Gantt, File đính kèm của MỌI dự án */
-async function fetchHeavy(){
-  const admin=isAdmin(),pids=CACHE.projects.map(p=>p.id),bp=admin?pids:pids.filter(id=>roleOf(id)==='manager');
-  await Promise.all([fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids)]);
-  await fetchTable('attachments','task_id',CACHE.tasks.map(t=>t.id));
-}
-async function fetchAll(){await fetchLight();await fetchHeavy()}
-/* Tải ngầm sau khi trang chủ đã hiện. window.appCache = bộ nhớ dùng chung (CACHE). Chỉ chạy 1 lần, ai cần thì chờ cùng 1 promise */
+/* window.appCache = bộ nhớ dùng chung (CACHE); window.projectCache[projectId] = { tasks, budgets, members } luôn đọc từ đó */
 window.appCache=CACHE;
-/* window.projectCache[projectId] = { tasks, budgets, members } — luôn lấy từ bộ nhớ chung nên không bao giờ cũ */
 window.projectCache=new Proxy({},{get:(_,pid)=>typeof pid!=='string'?undefined:{tasks:CACHE.tasks.filter(x=>x.project_id===pid),budgets:CACHE.budget_items.filter(x=>x.project_id===pid),members:CACHE.project_members.filter(x=>x.project_id===pid)},has:(_,pid)=>LOADED.has(pid),ownKeys:()=>[...LOADED],getOwnPropertyDescriptor:(_,pid)=>LOADED.has(pid)?{enumerable:true,configurable:true,value:window.projectCache[pid]}:undefined});
-const CLOUD='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/></svg>';
-function syncInd(st){const e=document.getElementById('syncInd');if(!e)return;
-  if(st==='loading'){e.className='inline-flex items-center gap-1 text-xs text-mute whitespace-nowrap';e.innerHTML='<span class="animate-pulse inline-flex items-center gap-1">'+CLOUD+'Đang đồng bộ ngầm...</span>'}
-  else if(st==='done'){e.className='inline-flex items-center gap-1 text-xs whitespace-nowrap';e.style.color='#16a34a';e.innerHTML=CLOUD+'✓ Đã đồng bộ';setTimeout(()=>{e.className='hidden'},3500)}
-  else{e.className='hidden'}}
-/* Chạy ngầm ngay sau khi trang chủ hiện: hút Tasks, Budgets, Members, ... của TẤT CẢ dự án (song song) vào bộ nhớ chung */
-function prefetchAllProjects(){return startPrefetch()}
 const PF={state:'idle',p:null};
-function startPrefetch(){
-  if(PF.p)return PF.p;PF.state='loading';syncInd('loading');
-  PF.p=Q.then(fetchHeavy).then(()=>{PF.state='done';syncInd('done');CACHE.projects.forEach(x=>LOADED.add(x.id));syncCPD();
-      if(!curPid&&!LOADING_R)route(true);else{try{updateBadges();renderBell()}catch(e){}}},
-    e=>{PF.state='error';syncInd('');PF.p=null;console.error(e);toast('Không tải ngầm được dữ liệu: '+(e.message||e),true)});
-  return PF.p}
-const idle=fn=>setTimeout(()=>('requestIdleCallback' in window)?requestIdleCallback(fn,{timeout:1500}):fn(),500);
+function startPrefetch(){return PF.p||(PF.p=Promise.resolve())}      // dữ liệu đã có đủ từ fetchAll -> không còn tải ngầm
+function prefetchAllProjects(){return startPrefetch()}
 async function fetchProject(pid){
   /* tasks / budgets / extra_tasks đã nằm trong CACHE từ fetchAll -> chỉ tải phần còn thiếu, tất cả song song trong 1 lượt Promise.all */
   const need=[];if(!CACHE.tasks.some(t=>t.project_id===pid))need.push(fetchTable('tasks','project_id',[pid]));
@@ -665,9 +651,9 @@ async function onSignedIn(su){
   if(SIGNING)return;SIGNING=true;loading(true,'Đang đăng nhập và tải dữ liệu...');
   try{
     CUR=await ensureUser(su);SESS=(CUR.prefs&&typeof CUR.prefs==='object')?CUR.prefs:{};
-    await fetchLight();LISTOK=true;LOADED.clear();PF.state='idle';PF.p=null;
+    LOADED.clear();PF.state='idle';PF.p=null;await fetchAll();LISTOK=true;
     if(location.search.includes('code=')){try{history.replaceState(null,'',location.pathname+(location.hash||''))}catch(e){}}
-    boot();idle(prefetchAllProjects);      // trang chủ đã hiện -> sau 500ms tải ngầm dữ liệu nặng
+    boot();
   }catch(e){
     console.error(e);CUR=null;
     renderGate('<span class="text-red-600">Lỗi: '+esc(e.message||e)+'</span><br>Kiểm tra đã chạy file <b>supabase_setup.sql</b> chưa. <button id="gOut" class="underline">Đăng xuất</button>');
@@ -1027,7 +1013,7 @@ function route(keep){
   const need=pid?!LOADED.has(pid):!LISTOK;
   if(need){
     if(!LOADING_R){LOADING_R=true;$('#view').innerHTML=SPIN_HTML;
-      (pid?startPrefetch().then(()=>PF.state==='error'?fetchProject(pid):0):Q.then(fetchLight))     // chỉ hiện loading nhỏ trong vùng nội dung, chờ đúng lượt tải ngầm
+      (pid?startPrefetch().then(()=>PF.state==='error'?fetchProject(pid):0):Q.then(fetchAll))     // chỉ hiện loading nhỏ trong vùng nội dung, chờ đúng lượt tải ngầm
         .catch(e=>{console.error(e);toast('Không tải được dữ liệu: '+(e.message||e),true)})
         .finally(()=>{LOADING_R=false;if(pid)LOADED.add(pid);else LISTOK=true;syncCPD();route(keep)})}
     return;
@@ -1547,20 +1533,28 @@ async function exportDuyTanBudget(project,budgetItems){
 }
 
 /* ===================== XUẤT BÁO CÁO TỔNG HỢP RA POWERPOINT (.pptx) =====================
-   Hàm độc lập: exportPortfolioPPTX(projects, allTasks, allBudgets). Dùng PptxGenJS 3.12.0 (CDN ở thẻ <script> đầu file).
-   Muốn đổi theo Template mẫu của Duy Tân: sửa khối "CẤU HÌNH GIAO DIỆN" (màu, font, kích thước) và 3 khối slide đánh dấu [SLIDE 1] / [SLIDE 2] / [SLIDE DỰ ÁN]. */
-async function exportPortfolioPPTX(projects,allTasks,allBudgets){
-  try{
-    if(!window.PptxGenJS)await loadJS('https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js');
-    projects=projects||[];if(!projects.length){toast('Chưa có dự án nào để xuất báo cáo');return}
-    /* ---------- CẤU HÌNH GIAO DIỆN (đổi theo template Duy Tân tại đây) ---------- */
-    const C={brand:'1F6F43',dark:'1E293B',orange:'EA580C',red:'DC2626',green:'16A34A',blue:'2563EB',mute:'64748B',line:'CBD5E1',card:'F1F5F9',white:'FFFFFF'};
-    const FONT='Calibri',W=13.33,Hh=7.5;
-    const money=n=>Math.round(n||0).toLocaleString('en-US');
-    const ty=n=>(n||0)>=1e9?((n/1e9).toFixed(2)+' tỷ'):(n||0)>=1e6?((n/1e6).toFixed(1)+' triệu'):money(n);
-    const dmy=d=>d?d.split('-').reverse().join('/'):'—';
-    const user=currentUser()||{},maker=user.full_name||user.email||'';
-    /* ---------- TÍNH SỐ LIỆU TỪNG DỰ ÁN ---------- */
+   exportPortfolioPPTX(projects, allTasks, allBudgets) = bộ điều phối. Thư viện PptxGenJS 3.12.0 (CDN ở thẻ <script> đầu file).
+   CẤU TRÚC (để ánh xạ vào template mẫu Duy Tân ở bước sau):
+     PPT_THEME ........ màu, font, khổ slide, logo, tọa độ khối chính  -> đổi theo template tại ĐÂY
+     pptCollect() ..... gom số liệu từng dự án + tổng danh mục (không đụng tới giao diện slide)
+     pptHeader/pptCard  thành phần dùng chung (thanh tiêu đề, thẻ KPI)
+     pptSlideCover() .. [SLIDE 1]  Trang bìa
+     pptSlideOverview() [SLIDE 2]  Tổng quan danh mục: 4 thẻ KPI + bảng tổng hợp
+     pptSlideProject() [SLIDE 3+]  Mỗi dự án 1 slide: Header + Khối CAPEX (trái) + Khối Tiến độ (phải)
+   Có template thật: thay các hàm pptSlide* bằng slide master / tọa độ từ template, giữ nguyên pptCollect. */
+const PPT_THEME={
+  C:{brand:'1F6F43',dark:'1E293B',orange:'EA580C',red:'DC2626',green:'16A34A',blue:'2563EB',mute:'64748B',line:'CBD5E1',card:'F1F5F9',white:'FFFFFF'}   // bảng màu: đổi theo template Duy Tân
+};
+Object.assign(PPT_THEME,{FONT:'Calibri',W:13.33,Hh:7.5,logo:null /* dataURL logo Duy Tân, ví dụ 'data:image/png;base64,...' */,
+  layout:'LAYOUT_WIDE',
+  project:{leftBlock:{x:0.45,y:1.2,w:6.0,h:5.6},rightBlock:{x:6.7,y:1.2,w:6.18,h:5.6}},
+  kpiRow:{x:0.45,y:1.15,h:1.25,gap:0.3},overviewTable:{x:0.45,y:2.65}});
+const pptFmt={
+  money:n=>Math.round(n||0).toLocaleString('en-US'),
+  ty:n=>(n||0)>=1e9?((n/1e9).toFixed(2)+' tỷ'):(n||0)>=1e6?((n/1e6).toFixed(1)+' triệu'):Math.round(n||0).toLocaleString('en-US'),
+  dmy:d=>d?d.split('-').reverse().join('/'):'—'};
+/* ---- Gom số liệu ---- */
+function pptCollect(projects,allTasks,allBudgets){
     const info=projects.map(p=>{
       const tk=(allTasks||[]).filter(t=>t.project_id===p.id),bd=(allBudgets||[]).filter(b=>b.project_id===p.id);
       const par=new Set(tk.map(t=>t.parent_id).filter(Boolean)),leaf=tk.filter(t=>!par.has(t.id));
@@ -1574,19 +1568,25 @@ async function exportPortfolioPPTX(projects,allTasks,allBudgets){
       return{p,leaf,pct,overdue,planned,actual,ratio:T.ratio,late,pmp,bec,donePmp:done(pmp),doneBec:done(bec),bs,disb:planned?actual/planned*100:0};
     });
     const totPlan=info.reduce((a,x)=>a+x.planned,0),totAct=info.reduce((a,x)=>a+x.actual,0),run=info.filter(x=>x.p.status!=='completed'),ontime=run.filter(x=>!x.late).length,lateTasks=info.reduce((a,x)=>a+x.overdue.length,0);
-    const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.title='Báo cáo tổng hợp tiến độ & chi phí dự án kỹ thuật';pptx.company='Duy Tân Recycling';
-    const header=(sl,txt,sub)=>{sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:W,h:0.95,fill:{color:C.brand}});
-      sl.addText(txt,{x:0.45,y:0.1,w:W-0.9,h:0.5,fontFace:FONT,fontSize:24,bold:true,color:C.white});
-      if(sub)sl.addText(sub,{x:0.45,y:0.55,w:W-0.9,h:0.32,fontFace:FONT,fontSize:12,color:'D1FAE5'});
-      sl.addText('Duy Tân Recycling · Báo cáo kỹ thuật',{x:0.45,y:Hh-0.38,w:6,h:0.3,fontFace:FONT,fontSize:9,color:C.mute});
-      sl.addText('Ngày '+dmy(today()),{x:W-3.45,y:Hh-0.38,w:3,h:0.3,fontFace:FONT,fontSize:9,color:C.mute,align:'right'})};
-    const card=(sl,x,y,w,h,label,val,sub,col)=>{sl.addShape(pptx.ShapeType.roundRect,{x,y,w,h,fill:{color:C.card},line:{color:C.line,width:0.75},rectRadius:0.08});
-      sl.addShape(pptx.ShapeType.rect,{x,y:y+0.12,w:0.07,h:h-0.24,fill:{color:col}});
-      sl.addText(label,{x:x+0.2,y:y+0.08,w:w-0.3,h:0.3,fontFace:FONT,fontSize:11,color:C.mute,bold:true});
-      sl.addText(val,{x:x+0.2,y:y+0.38,w:w-0.3,h:0.55,fontFace:FONT,fontSize:24,bold:true,color:col,fit:'shrink'});
-      if(sub)sl.addText(sub,{x:x+0.2,y:y+h-0.38,w:w-0.3,h:0.3,fontFace:FONT,fontSize:10,color:C.mute,fit:'shrink'})};
-
-    /* ---------- [SLIDE 1] TRANG BÌA ---------- */
+  const user=currentUser()||{};
+  return{info,totPlan,totAct,run,ontime,lateTasks,maker:user.full_name||user.email||''};
+}
+/* ---- Thành phần dùng chung ---- */
+function pptHeader(pptx,sl,txt,sub){const{C,FONT,W,Hh,logo}=PPT_THEME,{dmy}=pptFmt;
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:W,h:0.95,fill:{color:C.brand}});
+  if(logo)sl.addImage({data:logo,x:W-2.2,y:0.12,w:1.7,h:0.7});
+  sl.addText(txt,{x:0.45,y:0.1,w:W-0.9,h:0.5,fontFace:FONT,fontSize:24,bold:true,color:C.white});
+  if(sub)sl.addText(sub,{x:0.45,y:0.55,w:W-0.9,h:0.32,fontFace:FONT,fontSize:12,color:'D1FAE5'});
+  sl.addText('Duy Tân Recycling · Báo cáo kỹ thuật',{x:0.45,y:Hh-0.38,w:6,h:0.3,fontFace:FONT,fontSize:9,color:C.mute});
+  sl.addText('Ngày '+dmy(today()),{x:W-3.45,y:Hh-0.38,w:3,h:0.3,fontFace:FONT,fontSize:9,color:C.mute,align:'right'})}
+function pptCard(pptx,sl,x,y,w,h,label,val,sub,col){const{C,FONT}=PPT_THEME;
+  sl.addShape(pptx.ShapeType.roundRect,{x,y,w,h,fill:{color:C.card},line:{color:C.line,width:0.75},rectRadius:0.08});
+  sl.addShape(pptx.ShapeType.rect,{x,y:y+0.12,w:0.07,h:h-0.24,fill:{color:col}});
+  sl.addText(label,{x:x+0.2,y:y+0.08,w:w-0.3,h:0.3,fontFace:FONT,fontSize:11,color:C.mute,bold:true});
+  sl.addText(val,{x:x+0.2,y:y+0.38,w:w-0.3,h:0.55,fontFace:FONT,fontSize:24,bold:true,color:col,fit:'shrink'});
+  if(sub)sl.addText(sub,{x:x+0.2,y:y+h-0.38,w:w-0.3,h:0.3,fontFace:FONT,fontSize:10,color:C.mute,fit:'shrink'})}
+/* ---- [SLIDE 1] TRANG BÌA ---- */
+function pptSlideCover(pptx,ctx){const{C,FONT,W}=PPT_THEME,{dmy}=pptFmt,{info,maker}=ctx;
     const s1=pptx.addSlide();s1.background={color:C.brand};
     s1.addShape(pptx.ShapeType.rect,{x:0,y:5.2,w:W,h:0.06,fill:{color:C.orange}});
     s1.addText('BÁO CÁO TỔNG HỢP TIẾN ĐỘ & CHI PHÍ DỰ ÁN KỸ THUẬT - DUY TÂN RECYCLING',{x:0.8,y:1.6,w:W-1.6,h:1.9,fontFace:FONT,fontSize:34,bold:true,color:C.white,valign:'middle'});
@@ -1594,7 +1594,9 @@ async function exportPortfolioPPTX(projects,allTasks,allBudgets){
     s1.addText('Người lập: '+(maker||'—'),{x:0.8,y:5.9,w:8,h:0.4,fontFace:FONT,fontSize:16,color:C.white});
     s1.addText(info.length+' dự án',{x:W-3.8,y:5.45,w:3,h:0.4,fontFace:FONT,fontSize:16,color:C.white,align:'right'});
 
-    /* ---------- [SLIDE 2] TỔNG QUAN DANH MỤC: 4 thẻ KPI + bảng tổng hợp ---------- */
+}
+/* ---- [SLIDE 2] TỔNG QUAN DANH MỤC ---- */
+function pptSlideOverview(pptx,ctx){const{C,FONT,W}=PPT_THEME,{money,ty,dmy}=pptFmt,{info,totPlan,totAct,run,ontime,lateTasks}=ctx,header=(sl,t,sb)=>pptHeader(pptx,sl,t,sb),card=(...a)=>pptCard(pptx,...a);
     const s2=pptx.addSlide();header(s2,'Tổng quan danh mục dự án','Số liệu tại ngày '+dmy(today()));
     const cw=(W-0.9-0.3*3)/4;
     card(s2,0.45,1.15,cw,1.25,'TỔNG NGÂN SÁCH',ty(totPlan)+' VND','Kế hoạch tất cả dự án',C.blue);
@@ -1607,8 +1609,9 @@ async function exportPortfolioPPTX(projects,allTasks,allBudgets){
       rows.push([{text:x.p.code||'',options:{align:'center'}},{text:x.p.name||'',options:{align:'left'}},{text:x.pct+'%',options:{align:'center',bold:true,color:x.pct>=100?C.green:C.dark}},{text:money(x.planned),options:{align:'right'}},{text:money(x.actual),options:{align:'right',color:x.bs.k==='over'?C.red:C.dark,bold:x.bs.k==='over'}},{text:stt,options:{align:'center',bold:true,color:x.late?C.red:C.green}}])});
     s2.addTable(rows,{x:0.45,y:2.65,w:W-0.9,colW:[1.3,4.4,1.3,2.2,2.2,1.53],fontFace:FONT,fontSize:11,border:{type:'solid',pt:0.5,color:C.line},valign:'middle',autoPage:true,autoPageRepeatHeader:true,newSlideStartY:1.15,rowH:0.34});
 
-    /* ---------- [SLIDE DỰ ÁN] MỖI DỰ ÁN 1 SLIDE ---------- */
-    info.forEach(x=>{
+}
+/* ---- [SLIDE 3+] CHI TIẾT TỪNG DỰ ÁN: Header + Khối CAPEX (trái) + Khối Tiến độ (phải) ---- */
+function pptSlideProject(pptx,ctx,x){const{C,FONT,W}=PPT_THEME,{money,dmy}=pptFmt,header=(sl,t,sb)=>pptHeader(pptx,sl,t,sb);
       const sl=pptx.addSlide();
       /* Header: tên, mã, thời gian, trạng thái */
       header(sl,x.p.name||'',`Mã dự án: ${x.p.code||'—'}   ·   Thời gian: ${dmy(x.p.start_date)} → ${dmy(x.p.end_date)}   ·   Trạng thái: ${x.late?'Nguy cơ trễ':(STATUS[x.p.status]||['—'])[0]}`);
@@ -1638,7 +1641,16 @@ async function exportPortfolioPPTX(projects,allTasks,allBudgets){
         tr.push([{text:(t.wbs_code?t.wbs_code+' ':'')+(t.name||''),options:{align:'left',color:bad?C.red:C.dark}},{text:dmy(t.due_date),options:{align:'center',color:odSet.has(t.id)?C.red:C.dark}},{text:pd!=null?String(pd):'—',options:{align:'center'}},{text:ad!=null?String(ad):'—',options:{align:'center',bold:true,color:ad!=null&&pd!=null&&ad>pd?C.red:C.dark}},{text:(t.progress||0)+'%',options:{align:'center'}}])});
       if(!top.length)tr.push([{text:'Không có đầu việc tồn đọng',options:{colspan:5,align:'center',color:C.green}}]);
       sl.addTable(tr,{x:6.9,y:3.05,w:5.8,colW:[2.6,0.95,0.75,0.75,0.75],fontFace:FONT,fontSize:10,border:{type:'solid',pt:0.5,color:C.line},valign:'middle',rowH:0.5});
-    });
+}
+async function exportPortfolioPPTX(projects,allTasks,allBudgets){
+  try{
+    if(!window.PptxGenJS)await loadJS('https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js');
+    projects=projects||[];if(!projects.length){toast('Chưa có dự án nào để xuất báo cáo');return}
+    const ctx=pptCollect(projects,allTasks,allBudgets);
+    const pptx=new PptxGenJS();pptx.layout=PPT_THEME.layout;pptx.title='Báo cáo tổng hợp tiến độ & chi phí dự án kỹ thuật';pptx.company='Duy Tân Recycling';
+    pptSlideCover(pptx,ctx);                              // Slide 1
+    pptSlideOverview(pptx,ctx);                           // Slide 2
+    ctx.info.forEach(x=>pptSlideProject(pptx,ctx,x));     // Slide 3+
     await pptx.writeFile({fileName:`Bao_cao_tong_hop_DuyTan_${today()}.pptx`});
     toast('Đã xuất báo cáo PowerPoint',false);
   }catch(e){console.error(e);toast('Xuất PowerPoint lỗi: '+(e.message||e))}
