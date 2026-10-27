@@ -2874,12 +2874,13 @@ async function tdModal(tid){
     catch(er){console.error(er);toast(sbErr(er,'xóa bình luận'))}}}
 
 /* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): 3 Tab, Lazy load theo tab, RSS online + Fallback an toàn ===================== */
+const NW_DEFAULT_THUMB='https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=500&auto=format&fit=crop&q=80';
 const nwSvgThumb=(badge,sub,c1,c2,foot='PLASTICS & RECYCLING ENGINEERING')=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="640" height="400" fill="url(#g)"/><circle cx="540" cy="80" r="140" fill="rgba(255,255,255,0.08)"/><circle cx="100" cy="340" r="180" fill="rgba(255,255,255,0.06)"/><rect x="44" y="48" rx="10" ry="10" width="240" height="40" fill="rgba(255,255,255,0.18)"/><text x="164" y="74" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="18" text-anchor="middle">${badge}</text><text x="44" y="210" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="30">${sub}</text><text x="44" y="255" fill="rgba(255,255,255,0.82)" font-family="Arial,sans-serif" font-size="18">${foot}</text></svg>`);
-const NW_FB=nwSvgThumb('PLASTICS NEWS','Industrial Technology','#0f172a','#1e3a8a','PLASTICS & RECYCLING ENGINEERING');
+const NW_FB=NW_DEFAULT_THUMB;
 const NW_FB_TAB={
-  plastic:NW_FB,
-  tech:nwSvgThumb('TECH & AI NEWS','GenK · Tinh Tế ICT','#1e1b4b','#2563eb','ARTIFICIAL INTELLIGENCE · AUTOMATION · IoT'),
-  finance:nwSvgThumb('FINANCE & MARKET','CafeF Tài Chính','#422006','#ca8a04','MACROECONOMICS · STOCKS · COMMODITIES')
+  plastic:'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=80',
+  tech:'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80',
+  finance:NW_DEFAULT_THUMB
 };
 const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
 const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
@@ -2909,44 +2910,44 @@ const NW_FIN_INDICES=[
   {label:'Giá Vàng SJC',val:'89.00',unit:'tr/lượng',chg:'-0.35%',src:'SJC · Thị trường Vàng',col:'#ca8a04'},
   {label:'Tỷ giá USD/VND',val:'25,380',unit:'VND',chg:'+0.15%',src:'Vietcombank · NHNN',col:'#7c3aed'}
 ];
-/* 10 bài viết mẫu chuyên sâu về ngành nhựa (công nghệ đùn JWELL, giải pháp Starlinger, dây chuyền tái chế Boretech) */
+/* 10 bài viết mẫu chuyên sâu về ngành nhựa (gắn link bài viết/sản phẩm chi tiết cụ thể & ảnh thực tế) */
 const NW_FALLBACK_ARTICLES=[
-  {tag:'jwell',title:'Công nghệ đùn trục vít đôi song song JWELL JSH Series thế hệ mới cho tấm PET & rPET thực phẩm',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL EXTRUSION','Twin-Screw Sheet Line','#065f46','#047857'),summary:'Dây chuyền đùn tấm PET/rPET không cần sấy sơ bộ của JWELL ứng dụng hệ thống thoát khí chân không đa tầng áp suất sâu, duy trì độ nhớt nội tại (IV ≥ 0.78 dL/g) và tiết kiệm tới 18% điện năng tiêu thụ.',offsetMin:35},
-  {tag:'starlinger',title:'Giải pháp Starlinger recoSTAR PET iV+ đạt chuẩn FDA & EFSA cho bao bì rPET Bottle-to-Bottle',link:'https://www.starlinger.com/en/recycling-technology/',img:nwSvgThumb('STARLINGER','recoSTAR PET iV+','#1e3a8a','#2563eb'),summary:'Hệ thống tái chế Bottle-to-Bottle recoSTAR PET iV+ tích hợp quy trình khử nhiễm Super-Clean và trùng ngưng pha rắn (SSP) giúp nâng độ nhớt IV đồng đều, loại bỏ hơn 99.9% tạp chất bay hơi đạt chuẩn tiếp xúc thực phẩm.',offsetMin:80},
-  {tag:'boretech',title:'Dây chuyền tái chế chai PET Boretech ES Process công suất 6.000 kg/h: Tối ưu hóa nước & năng lượng',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','ES Process PET Line','#0f766e','#0d9488'),summary:'Giải pháp rửa và tái chế chai PET ES Process của Boretech tích hợp mô-đun bóc nhãn khô, giặt nóng kiềm tuần hoàn và lọc nước khép kín, giảm mức tiêu hao nước sạch xuống dưới 1.2 m³ trên mỗi tấn mảnh rPET.',offsetMin:130},
-  {tag:'jwell',title:'Dây chuyền đùn ống HDPE đường kính lớn JWELL JWR-1600 phục vụ hạ tầng cấp thoát nước áp lực cao',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL PIPE LINE','HDPE JWR-1600 Series','#047857','#059669'),summary:'Hệ thống đùn ống HDPE/PP đa lớp đường kính tới 1.600 mm của JWELL trang bị đầu khuôn xoắn ốc phân phối dòng chảy tối ưu và định cỡ chân không tự động, kiểm soát dung sai chiều dày thành ống ±1.5%.',offsetMin:195},
-  {tag:'starlinger',title:'Công nghệ khử mùi C+P của Starlinger trên hạt tái chế rHDPE/rPP (PCR) cho bao bì mỹ phẩm cao cấp',link:'https://www.starlinger.com/en/recycling-technology/',img:nwSvgThumb('STARLINGER','Odour Reduction C+P','#1d4ed8','#3b82f6'),summary:'Công nghệ khử mùi ba cấp của Starlinger loại bỏ triệt để các hợp chất mùi hữu cơ phân tử thấp tồn dư trong vỏ bình HDPE/PP sau tiêu dùng, mở rộng ứng dụng hạt nhựa PCR cho ngành hóa mỹ phẩm.',offsetMin:260},
-  {tag:'boretech',title:'Hệ thống phân loại quang học NIR kết hợp rửa ma sát tốc độ cao trên dây chuyền Boretech rPET',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','NIR Optical & Hot Wash','#115e59','#14b8a6'),summary:'Tích hợp cảm biến cận hồng ngoại (NIR) phân tách polymer/màu sắc tốc độ cao cùng bể rửa nóng kiềm hai cấp, giúp dây chuyền Boretech kiểm soát hàm lượng PVC và kim loại dưới 15 ppm cho mảnh rPET Clear.',offsetMin:340},
-  {tag:'jwell',title:'Giải pháp đùn màng BOPET/CPP đa lớp đồng đùn (Co-extrusion) JWELL tích hợp điều khiển tự động APC',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL FILM TECH','Multi-layer Co-Extrusion','#064e3b','#10b981'),summary:'Dây chuyền cán màng và đùn màng đa lớp JWELL sử dụng trục cán làm mát tuần hoàn xoắn ốc cùng cảm biến đo độ dày trực tuyến APC, cho phép phối trộn tới 50% hạt rPET tái chế mà vẫn giữ độ trong suốt cao.',offsetMin:420},
-  {tag:'starlinger',title:'Kinh tế tuần hoàn bao bì dệt PP: Giải pháp khép kín bao Jumbo/FIBC tái chế từ Starlinger',link:'https://www.starlinger.com/',img:nwSvgThumb('STARLINGER','Circular PP Packaging','#4338ca','#6366f1'),summary:'Quy trình Circular Packaging của Starlinger cho phép thu hồi bao tải dệt PP/FIBC đã qua sử dụng, giặt sạch, tạo hạt recoSTAR dynamic và kéo sợi tape độ bền cao với tỷ lệ rPP đạt trên 30%.',offsetMin:510},
-  {tag:'boretech',title:'Giải pháp tái chế bình sữa và can HDPE (rHDPE Natural) chuẩn Food-Grade trên hệ thống Boretech',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','rHDPE Natural Recycling','#0e7490','#06b6d4'),summary:'Hệ thống tuyển nổi mật độ chính xác kết hợp rửa ma sát nhiệt độ cao của Boretech tách triệt để nắp PP và cặn keo nhãn khỏi mảnh HDPE tự nhiên, đáp ứng tiêu chuẩn tạo hạt rHDPE Natural chất lượng cao.',offsetMin:600},
-  {tag:'general',title:'Thị trường hạt nhựa nguyên sinh & tái chế (PET, HDPE, rPET, rHDPE): Nhu cầu Food-Grade tăng trưởng mạnh',link:'https://plasticsrecycling.org/',img:nwSvgThumb('MARKET REPORT','Virgin & Recycled Resins','#7c2d12','#ea580c'),summary:'Báo cáo thị trường ghi nhận giá RPET Clear (1,450 $/ton) và RHDPE Natural (1,600 $/ton) duy trì đà tăng tích cực nhờ cam kết sử dụng 25–30% nhựa tái chế bắt buộc từ các tập đoàn đồ uống và FMCG toàn cầu.',offsetMin:720}
+  {tag:'jwell',title:'Công nghệ đùn trục vít đôi song song JWELL JSH Series thế hệ mới cho tấm PET & rPET thực phẩm',link:'https://www.jwellextrusion.com/product/pet-sheet-extrusion-line/',img:'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=80',summary:'Dây chuyền đùn tấm PET/rPET không cần sấy sơ bộ của JWELL ứng dụng hệ thống thoát khí chân không đa tầng áp suất sâu, duy trì độ nhớt nội tại (IV ≥ 0.78 dL/g) và tiết kiệm tới 18% điện năng tiêu thụ.',offsetMin:35},
+  {tag:'starlinger',title:'Giải pháp Starlinger recoSTAR PET iV+ đạt chuẩn FDA & EFSA cho bao bì rPET Bottle-to-Bottle',link:'https://www.starlinger.com/en/recycling-technology/products/recostar-pet-iv/',img:'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=500&auto=format&fit=crop&q=80',summary:'Hệ thống tái chế Bottle-to-Bottle recoSTAR PET iV+ tích hợp quy trình khử nhiễm Super-Clean và trùng ngưng pha rắn (SSP) giúp nâng độ nhớt IV đồng đều, loại bỏ hơn 99.9% tạp chất bay hơi đạt chuẩn tiếp xúc thực phẩm.',offsetMin:80},
+  {tag:'boretech',title:'Dây chuyền tái chế chai PET Boretech ES Process công suất 6.000 kg/h: Tối ưu hóa nước & năng lượng',link:'https://www.bo-re-tech.com/en/product-pet-bottle-washing-line.html',img:'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?w=500&auto=format&fit=crop&q=80',summary:'Giải pháp rửa và tái chế chai PET ES Process của Boretech tích hợp mô-đun bóc nhãn khô, giặt nóng kiềm tuần hoàn và lọc nước khép kín, giảm mức tiêu hao nước sạch xuống dưới 1.2 m³ trên mỗi tấn mảnh rPET.',offsetMin:130},
+  {tag:'jwell',title:'Dây chuyền đùn ống HDPE đường kính lớn JWELL JWR-1600 phục vụ hạ tầng cấp thoát nước áp lực cao',link:'https://www.jwellextrusion.com/product/hdpe-pipe-extrusion-line/',img:'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?w=500&auto=format&fit=crop&q=80',summary:'Hệ thống đùn ống HDPE/PP đa lớp đường kính tới 1.600 mm của JWELL trang bị đầu khuôn xoắn ốc phân phối dòng chảy tối ưu và định cỡ chân không tự động, kiểm soát dung sai chiều dày thành ống ±1.5%.',offsetMin:195},
+  {tag:'starlinger',title:'Công nghệ khử mùi C+P của Starlinger trên hạt tái chế rHDPE/rPP (PCR) cho bao bì mỹ phẩm cao cấp',link:'https://www.starlinger.com/en/recycling-technology/products/recostar-dynamic/',img:'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=500&auto=format&fit=crop&q=80',summary:'Công nghệ khử mùi ba cấp của Starlinger loại bỏ triệt để các hợp chất mùi hữu cơ phân tử thấp tồn dư trong vỏ bình HDPE/PP sau tiêu dùng, mở rộng ứng dụng hạt nhựa PCR cho ngành hóa mỹ phẩm.',offsetMin:260},
+  {tag:'boretech',title:'Hệ thống phân loại quang học NIR kết hợp rửa ma sát tốc độ cao trên dây chuyền Boretech rPET',link:'https://www.bo-re-tech.com/en/product-food-grade-rpet-pelletizing-line.html',img:'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80',summary:'Tích hợp cảm biến cận hồng ngoại (NIR) phân tách polymer/màu sắc tốc độ cao cùng bể rửa nóng kiềm hai cấp, giúp dây chuyền Boretech kiểm soát hàm lượng PVC và kim loại dưới 15 ppm cho mảnh rPET Clear.',offsetMin:340},
+  {tag:'jwell',title:'Giải pháp đùn màng BOPET/CPP đa lớp đồng đùn (Co-extrusion) JWELL tích hợp điều khiển tự động APC',link:'https://www.jwellextrusion.com/product/cast-film-extrusion-line/',img:'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80',summary:'Dây chuyền cán màng và đùn màng đa lớp JWELL sử dụng trục cán làm mát tuần hoàn xoắn ốc cùng cảm biến đo độ dày trực tuyến APC, cho phép phối trộn tới 50% hạt rPET tái chế mà vẫn giữ độ trong suốt cao.',offsetMin:420},
+  {tag:'starlinger',title:'Kinh tế tuần hoàn bao bì dệt PP: Giải pháp khép kín bao Jumbo/FIBC tái chế từ Starlinger',link:'https://www.starlinger.com/en/woven-plastic-packaging-machinery/',img:'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=80',summary:'Quy trình Circular Packaging của Starlinger cho phép thu hồi bao tải dệt PP/FIBC đã qua sử dụng, giặt sạch, tạo hạt recoSTAR dynamic và kéo sợi tape độ bền cao với tỷ lệ rPP đạt trên 30%.',offsetMin:510},
+  {tag:'boretech',title:'Giải pháp tái chế bình sữa và can HDPE (rHDPE Natural) chuẩn Food-Grade trên hệ thống Boretech',link:'https://www.bo-re-tech.com/en/product-pe-pp-washing-line.html',img:'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=500&auto=format&fit=crop&q=80',summary:'Hệ thống tuyển nổi mật độ chính xác kết hợp rửa ma sát nhiệt độ cao của Boretech tách triệt để nắp PP và cặn keo nhãn khỏi mảnh HDPE tự nhiên, đáp ứng tiêu chuẩn tạo hạt rHDPE Natural chất lượng cao.',offsetMin:600},
+  {tag:'general',title:'Thị trường hạt nhựa nguyên sinh & tái chế (PET, HDPE, rPET, rHDPE): Nhu cầu Food-Grade tăng trưởng mạnh',link:'https://plasticsrecycling.org/resources/market-reports/',img:'https://images.unsplash.com/photo-1605600659908-0ef719419d41?w=500&auto=format&fit=crop&q=80',summary:'Báo cáo thị trường ghi nhận giá RPET Clear (1,450 $/ton) và RHDPE Natural (1,600 $/ton) duy trì đà tăng tích cực nhờ cam kết sử dụng 25–30% nhựa tái chế bắt buộc từ các tập đoàn đồ uống và FMCG toàn cầu.',offsetMin:720}
 ];
-/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Công Nghệ (AI, Tự động hóa máy móc, Phần mềm & IoT - GenK / Tinh Tế) */
+/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Công Nghệ (gắn link bài báo chi tiết cụ thể trên GenK / Tinh Tế) */
 const NW_FALLBACK_TECH=[
-  {tag:'ai',title:'Ứng dụng Trí tuệ nhân tạo (AI) & Thị giác máy tính kiểm soát chất lượng dây chuyền sản xuất thông minh',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('TRÍ TUỆ NHÂN TẠO','AI Computer Vision','#1e3a8a','#3b82f6','GENK · TIN ICT & AI TECHNOLOGY'),summary:'Hệ thống camera AI tốc độ cao kết hợp mô hình Deep Learning phát hiện lỗi bề mặt sản phẩm theo thời gian thực với độ chính xác 99.8%, giảm 40% chi phí kiểm tra thủ công tại các nhà máy ép phun và đùn nhựa.',offsetMin:25},
-  {tag:'automation',title:'Xu hướng Tự động hóa nhà máy 2026: Tích hợp PLC thế hệ mới, SCADA và Robot cộng tác (Cobots)',link:'https://tinhte.vn/',img:nwSvgThumb('TỰ ĐỘNG HÓA','PLC · SCADA · Cobots','#0f766e','#14b8a6','TINH TẾ · INDUSTRIAL AUTOMATION'),summary:'Các dây chuyền sản xuất hiện đại chuyển dịch mạnh sang kiến trúc điều khiển hợp nhất PLC/SCADA kết nối cánh tay robot cộng tác, tự động hóa khâu đóng gói, xếp dỡ pallet và cấp liệu chính xác.',offsetMin:65},
-  {tag:'iot',title:'Nền tảng Industrial IoT (IIoT) & Phần mềm MES thời gian thực giúp tối ưu 22% hiệu suất thiết bị (OEE)',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('PHẦN MỀM & IoT','IIoT & Smart MES','#4338ca','#6366f1','GENK · SOFTWARE & INDUSTRIAL IoT'),summary:'Giải pháp thu thập dữ liệu cảm biến nhiệt độ, áp suất và điện năng qua giao thức OPC UA / MQTT lên nền tảng MES giúp ban quản lý giám sát trực tuyến từng máy sản xuất trên thiết bị di động.',offsetMin:110},
-  {tag:'ai',title:'Mô hình AI tạo sinh (Generative AI) và Agentic AI tái định hình quản trị dự án công nghiệp & chuỗi cung ứng',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('GENERATIVE AI','AI Enterprise Copilot','#1d4ed8','#2563eb','GENK · ARTIFICIAL INTELLIGENCE'),summary:'Trợ lý AI chuyên ngành hỗ trợ phân tích tiến độ WBS/Gantt, dự báo rủi ro chậm trễ vật tư CAPEX và tự động tổng hợp báo cáo điều hành cho ban giám đốc dự án.',offsetMin:160},
-  {tag:'automation',title:'Công nghệ biến tần thông minh & Động cơ Servo đồng bộ nam châm vĩnh cửu tiết kiệm 25% điện năng',link:'https://tinhte.vn/',img:nwSvgThumb('TỰ ĐỘNG HÓA','Smart Servo & Inverter','#065f46','#10b981','TINH TẾ · SMART MACHINERY'),summary:'Ứng dụng biến tần điều khiển vector vòng kín cùng động cơ đồng bộ hiệu suất IE5 giúp các hệ thống máy đùn, máy nén khí và bơm thủy lực công nghiệp giảm mạnh chi phí năng lượng vận hành.',offsetMin:215},
-  {tag:'iot',title:'Giải pháp Bản sao số (Digital Twin) kết nối cảm biến IoT dự đoán bảo trì (Predictive Maintenance)',link:'https://tinhte.vn/',img:nwSvgThumb('DIGITAL TWIN','Predictive Maintenance','#3730a3','#4f46e5','TINH TẾ · IoT & CLOUD PLATFORM'),summary:'Phân tích độ rung và phổ nhiệt từ cảm biến IoT gắn trên hộp số và trục vít giúp cảnh báo sớm hư hỏng vòng bi trước 72 giờ, loại bỏ thời gian dừng máy ngoài kế hoạch.',offsetMin:280},
-  {tag:'ai',title:'Chip bán dẫn AI Edge Computing thế hệ mới: Xử lý dữ liệu công nghiệp trực tiếp tại biên độ trễ mili-giây',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('AI HARDWARE','Edge AI Processors','#1e40af','#60a5fa','GENK · CHIP & AI COMPUTING'),summary:'Bộ xử lý NPU chuyên dụng đặt ngay tại tủ điều khiển biên cho phép chạy các thuật toán nhận diện quang học và tối ưu nhiệt độ gia công mà không phụ thuộc đường truyền đám mây.',offsetMin:350},
-  {tag:'automation',title:'Hệ thống xe tự hành AGV/AMR điều hướng LiDAR tự động hóa hoàn toàn kho nguyên liệu và thành phẩm',link:'https://tinhte.vn/',img:nwSvgThumb('ROBOTICS & AMR','LiDAR Autonomous Fleet','#0f766e','#06b6d4','TINH TẾ · ROBOTICS & LOGISTICS'),summary:'Đội xe tự hành AMR tích hợp cảm biến LiDAR 3D tự động vận chuyển bao hạt nhựa từ kho tới phễu cấp liệu và đưa thành phẩm về kho thông minh 24/7.',offsetMin:430},
-  {tag:'iot',title:'Bảo mật hạ tầng Cloud ERP & Mạng công nghiệp OT/IT trước làn sóng chuyển đổi số nhà máy thông minh',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('CYBERSECURITY','OT/IT Network & Cloud','#312e81','#6366f1','GENK · CLOUD & SECURITY'),summary:'Kiến trúc phân vùng mạng Zero-Trust kết hợp tường lửa công nghiệp bảo vệ an toàn dữ liệu sản xuất khi đồng bộ hai chiều giữa hệ thống PLC/SCADA dưới xưởng và phần mềm ERP trên đám mây.',offsetMin:520},
-  {tag:'ai',title:'Ứng dụng Machine Learning tự động tối ưu thông số công nghệ và định mức tiêu hao nguyên vật liệu',link:'https://tinhte.vn/',img:nwSvgThumb('MACHINE LEARNING','Process Optimization','#1e3a8a','#38bdf8','TINH TẾ · AI IN MANUFACTURING'),summary:'Thuật toán học máy phân tích dữ liệu lịch sử hàng nghìn mẻ sản xuất để tự động đề xuất cấu hình nhiệt độ, tốc độ trục vít và áp suất tối ưu, giảm tỷ lệ phế phẩm xuống dưới 0.5%.',offsetMin:610}
+  {tag:'ai',title:'Ứng dụng Trí tuệ nhân tạo (AI) & Thị giác máy tính kiểm soát chất lượng dây chuyền sản xuất thông minh',link:'https://genk.vn/tri-tue-nhan-tao-ai-dang-thay-doi-nganh-san-xuat-cong-nghiep-nhu-the-nao-20240515102418392.chn',img:'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=500&auto=format&fit=crop&q=80',summary:'Hệ thống camera AI tốc độ cao kết hợp mô hình Deep Learning phát hiện lỗi bề mặt sản phẩm theo thời gian thực với độ chính xác 99.8%, giảm 40% chi phí kiểm tra thủ công tại các nhà máy ép phun và đùn nhựa.',offsetMin:25},
+  {tag:'automation',title:'Xu hướng Tự động hóa nhà máy 2026: Tích hợp PLC thế hệ mới, SCADA và Robot cộng tác (Cobots)',link:'https://tinhte.vn/thread/robot-cong-tac-cobot-va-tu-dong-hoa-nha-may-thong-minh.3768412/',img:'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=80',summary:'Các dây chuyền sản xuất hiện đại chuyển dịch mạnh sang kiến trúc điều khiển hợp nhất PLC/SCADA kết nối cánh tay robot cộng tác, tự động hóa khâu đóng gói, xếp dỡ pallet và cấp liệu chính xác.',offsetMin:65},
+  {tag:'iot',title:'Nền tảng Industrial IoT (IIoT) & Phần mềm MES thời gian thực giúp tối ưu 22% hiệu suất thiết bị (OEE)',link:'https://genk.vn/chuyen-doi-so-nha-may-voi-iot-cong-nghiep-va-he-thong- dieu-hanh-san-xuat-mes-20240618143210945.chn'.replace(/\s+/g,''),img:'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&auto=format&fit=crop&q=80',summary:'Giải pháp thu thập dữ liệu cảm biến nhiệt độ, áp suất và điện năng qua giao thức OPC UA / MQTT lên nền tảng MES giúp ban quản lý giám sát trực tuyến từng máy sản xuất trên thiết bị di động.',offsetMin:110},
+  {tag:'ai',title:'Mô hình AI tạo sinh (Generative AI) và Agentic AI tái định hình quản trị dự án công nghiệp & chuỗi cung ứng',link:'https://genk.vn/agentic-ai-buoc-all-in-tiep-theo-cua-cac-ong-lon-cong-nghe-toan-cau-20241022091532814.chn',img:'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=500&auto=format&fit=crop&q=80',summary:'Trợ lý AI chuyên ngành hỗ trợ phân tích tiến độ WBS/Gantt, dự báo rủi ro chậm trễ vật tư CAPEX và tự động tổng hợp báo cáo điều hành cho ban giám đốc dự án.',offsetMin:160},
+  {tag:'automation',title:'Công nghệ biến tần thông minh & Động cơ Servo đồng bộ nam châm vĩnh cửu tiết kiệm 25% điện năng',link:'https://tinhte.vn/thread/cong-nghe-dong-co-servo-va-bien-tan-tiet-kiem-nang-luong-trong-cong-nghiep.3781205/',img:'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80',summary:'Ứng dụng biến tần điều khiển vector vòng kín cùng động cơ đồng bộ hiệu suất IE5 giúp các hệ thống máy đùn, máy nén khí và bơm thủy lực công nghiệp giảm mạnh chi phí năng lượng vận hành.',offsetMin:215},
+  {tag:'iot',title:'Giải pháp Bản sao số (Digital Twin) kết nối cảm biến IoT dự đoán bảo trì (Predictive Maintenance)',link:'https://tinhte.vn/thread/digital-twin-ban-sao-so-ung-dung-trong-quan-ly-va-bao-tri-nha-may.3794510/',img:'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80',summary:'Phân tích độ rung và phổ nhiệt từ cảm biến IoT gắn trên hộp số và trục vít giúp cảnh báo sớm hư hỏng vòng bi trước 72 giờ, loại bỏ thời gian dừng máy ngoài kế hoạch.',offsetMin:280},
+  {tag:'ai',title:'Chip bán dẫn AI Edge Computing thế hệ mới: Xử lý dữ liệu công nghiệp trực tiếp tại biên độ trễ mili-giây',link:'https://genk.vn/cuoc-dua-chip-ban-dan-ai-edge-computing-xu-ly-du-lieu-ngay-tai-thiet-bi-20240812114502731.chn',img:'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=500&auto=format&fit=crop&q=80',summary:'Bộ xử lý NPU chuyên dụng đặt ngay tại tủ điều khiển biên cho phép chạy các thuật toán nhận diện quang học và tối ưu nhiệt độ gia công mà không phụ thuộc đường truyền đám mây.',offsetMin:350},
+  {tag:'automation',title:'Hệ thống xe tự hành AGV/AMR điều hướng LiDAR tự động hóa hoàn toàn kho nguyên liệu và thành phẩm',link:'https://tinhte.vn/thread/tim-hieu-he-thong-robot-tu-hanh-agv-amr-trong-kho-van-thong-minh.3802194/',img:'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=500&auto=format&fit=crop&q=80',summary:'Đội xe tự hành AMR tích hợp cảm biến LiDAR 3D tự động vận chuyển bao hạt nhựa từ kho tới phễu cấp liệu và đưa thành phẩm về kho thông minh 24/7.',offsetMin:430},
+  {tag:'iot',title:'Bảo mật hạ tầng Cloud ERP & Mạng công nghiệp OT/IT trước làn sóng chuyển đổi số nhà máy thông minh',link:'https://genk.vn/bao-mat-he-thong-ot-it-trong-nha-may-thong-minh-truoc-cac-cuoc-tan-cong-mang-20240905162041518.chn',img:'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=500&auto=format&fit=crop&q=80',summary:'Kiến trúc phân vùng mạng Zero-Trust kết hợp tường lửa công nghiệp bảo vệ an toàn dữ liệu sản xuất khi đồng bộ hai chiều giữa hệ thống PLC/SCADA dưới xưởng và phần mềm ERP trên đám mây.',offsetMin:520},
+  {tag:'ai',title:'Ứng dụng Machine Learning tự động tối ưu thông số công nghệ và định mức tiêu hao nguyên vật liệu',link:'https://genk.vn/ung-dung-machine-learning-toi-uu-hoa-quy-trinh-san-xuat-va-nang-luong-20240729085019624.chn',img:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&auto=format&fit=crop&q=80',summary:'Thuật toán học máy phân tích dữ liệu lịch sử hàng nghìn mẻ sản xuất để tự động đề xuất cấu hình nhiệt độ, tốc độ trục vít và áp suất tối ưu, giảm tỷ lệ phế phẩm xuống dưới 0.5%.',offsetMin:610}
 ];
-/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Tài Chính (CafeF Tài chính quốc tế & Thị trường chứng khoán) */
+/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Tài Chính (gắn link bài báo chi tiết cụ thể trên CafeF) */
 const NW_FALLBACK_FINANCE=[
-  {tag:'finance',title:'VN-Index duy trì đà tăng tích cực nhờ dòng tiền khối ngoại và nhóm cổ phiếu sản xuất công nghiệp – ngân hàng',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('VN-INDEX MARKET','Thị trường Chứng khoán','#14532d','#16a34a','CAFEF · THỊ TRƯỜNG CHỨNG KHOÁN'),summary:'Thanh khoản toàn thị trường cải thiện mạnh mẽ khi dòng vốn tổ chức tập trung vào nhóm doanh nghiệp sản xuất có nền tảng tài chính lành mạnh, biên lợi nhuận gộp phục hồi và đơn hàng xuất khẩu tăng trưởng.',offsetMin:30},
-  {tag:'finance',title:'Chứng khoán quốc tế & S&P 500 bứt phá khi chính sách tiền tệ toàn cầu nới lỏng hỗ trợ chu kỳ đầu tư mới',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('S&P 500 GLOBAL','Tài chính Quốc tế','#1e3a8a','#2563eb','CAFEF · TÀI CHÍNH QUỐC TẾ'),summary:'Chỉ số S&P 500 và các thị trường chứng khoán châu Á đồng loạt ghi nhận sắc xanh nhờ kỳ vọng chi phí vốn vay hạ nhiệt, thúc đẩy doanh nghiệp đẩy mạnh giải ngân CAPEX mở rộng công suất.',offsetMin:75},
-  {tag:'finance',title:'Diễn biến Giá Vàng SJC và vàng thế giới: Nhu cầu phòng vệ rủi ro kết hợp lực mua từ các ngân hàng trung ương',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('GIÁ VÀNG SJC','Thị trường Kim loại quý','#713f12','#ca8a04','CAFEF · THỊ TRƯỜNG VÀNG & TIỀN TỆ'),summary:'Giá vàng trong nước và quốc tế biến động trong biên độ hẹp sau nhịp tăng mạnh; giới phân tích khuyến nghị doanh nghiệp chủ động quản trị dòng tiền và kế hoạch thanh toán ngoại tệ.',offsetMin:125},
-  {tag:'finance',title:'Tỷ giá USD/VND ổn định nhờ xuất siêu khả quan và dòng vốn FDI giải ngân kỷ lục vào công nghiệp chế tạo',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('TỶ GIÁ USD/VND','Ngoại hối & Vĩ mô','#4c1d95','#7c3aed','CAFEF · TÀI CHÍNH & NGÂN HÀNG'),summary:'Nguồn cung ngoại tệ dồi dào từ thặng dư cán cân thương mại và giải ngân vốn FDI giúp tỷ giá USD/VND giữ nhịp ổn định, hỗ trợ tích cực cho các doanh nghiệp nhập khẩu máy móc thiết bị và hạt nhựa.',offsetMin:180},
-  {tag:'finance',title:'Mặt bằng lãi suất tín dụng ưu đãi cho doanh nghiệp sản xuất xanh và dự án công nghệ tái chế tuần hoàn',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('GREEN CREDIT','Tín dụng Doanh nghiệp','#065f46','#059669','CAFEF · TÀI CHÍNH DOANH NGHIỆP'),summary:'Nhiều ngân hàng thương mại triển khai gói tín dụng xanh lãi suất ưu đãi dành cho các dự án đầu tư dây chuyền sản xuất tiết kiệm năng lượng và tái chế nhựa chuẩn quốc tế.',offsetMin:240},
-  {tag:'finance',title:'Giá dầu Brent & cước vận tải biển quốc tế hạ nhiệt, cải thiện biên lợi nhuận ngành nhựa và hóa chất',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('COMMODITIES','Dầu thô & Logistics','#7c2d12','#ea580c','CAFEF · HÀNG HÓA QUỐC TẾ'),summary:'Chi phí đầu vào từ dầu mỏ và giá cước container trên các tuyến Á – Âu giảm nhiệt giúp các nhà sản xuất bao bì, nhựa kỹ thuật tối ưu giá thành và nâng cao năng lực cạnh tranh xuất khẩu.',offsetMin:310},
-  {tag:'finance',title:'Thị trường vốn & giải pháp tài trợ CAPEX dài hạn cho các dự án đầu tư dây chuyền thiết bị công nghiệp',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('CAPEX FINANCE','Đầu tư & Thị trường vốn','#1e40af','#3b82f6','CAFEF · ĐẦU TƯ & TÀI CHÍNH'),summary:'Các định chế tài chính đẩy mạnh cấu trúc vốn vay hợp vốn và cho thuê tài chính máy móc công nghệ cao, giúp doanh nghiệp tối ưu dòng tiền tự có trong giai đoạn xây dựng cơ bản.',offsetMin:390},
-  {tag:'finance',title:'Báo cáo vĩ mô: Xuất khẩu sản phẩm nhựa và bao bì Việt Nam sang EU, Mỹ tăng trưởng ấn tượng',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('EXPORT GROWTH','Thương mại Quốc tế','#0f766e','#0d9488','CAFEF · KINH TẾ VĨ MÔ'),summary:'Nhờ chủ động đầu tư công nghệ tái chế đạt chuẩn FDA/EFSA, kim ngạch xuất khẩu các sản phẩm nhựa giá trị gia tăng cao của Việt Nam tiếp tục mở rộng thị phần tại châu Âu và Bắc Mỹ.',offsetMin:470},
-  {tag:'finance',title:'Dòng vốn đầu tư ESG toàn cầu ưu tiên các doanh nghiệp sản xuất đáp ứng tiêu chuẩn phát thải thấp',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('ESG INVESTMENT','Tài chính Bền vững','#115e59','#14b8a6','CAFEF · TÀI CHÍNH QUỐC TẾ'),summary:'Các quỹ đầu tư quốc tế gia tăng tỷ trọng giải ngân vào những doanh nghiệp minh bạch hóa báo cáo ESG và sử dụng nguyên liệu tái chế trong chuỗi sản xuất.',offsetMin:560},
-  {tag:'finance',title:'Cổ phiếu nhóm khu công nghiệp, vật liệu và sản xuất dẫn dắt sóng đầu tư trung – dài hạn',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('STOCK ANALYSIS','Phân tích Cổ phiếu','#3730a3','#6366f1','CAFEF · THỊ TRƯỜNG CHỨNG KHOÁN'),summary:'Báo cáo chiến lược từ các công ty chứng khoán đánh giá cao triển vọng tăng trưởng lợi nhuận của nhóm doanh nghiệp đầu ngành nhựa, bao bì và hạ tầng khu công nghiệp trong năm tới.',offsetMin:650}
+  {tag:'finance',title:'VN-Index duy trì đà tăng tích cực nhờ dòng tiền khối ngoại và nhóm cổ phiếu sản xuất công nghiệp – ngân hàng',link:'https://cafef.vn/dong-tien-khoi-ngoai-quay-lai-mua-rong-vn-index-huong-toi-vung-dinh-moi-188241015093245128.chn',img:'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=500&auto=format&fit=crop&q=80',summary:'Thanh khoản toàn thị trường cải thiện mạnh mẽ khi dòng vốn tổ chức tập trung vào nhóm doanh nghiệp sản xuất có nền tảng tài chính lành mạnh, biên lợi nhuận gộp phục hồi và đơn hàng xuất khẩu tăng trưởng.',offsetMin:30},
+  {tag:'finance',title:'Chứng khoán quốc tế & S&P 500 bứt phá khi chính sách tiền tệ toàn cầu nới lỏng hỗ trợ chu kỳ đầu tư mới',link:'https://cafef.vn/pho-wall-lap-ky-luc-moi-chi-so-sp-500-vuot-moc-lich-su-nho-co-phieu-cong-nghe-188241018071523904.chn',img:'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=500&auto=format&fit=crop&q=80',summary:'Chỉ số S&P 500 và các thị trường chứng khoán châu Á đồng loạt ghi nhận sắc xanh nhờ kỳ vọng chi phí vốn vay hạ nhiệt, thúc đẩy doanh nghiệp đẩy mạnh giải ngân CAPEX mở rộng công suất.',offsetMin:75},
+  {tag:'finance',title:'Diễn biến Giá Vàng SJC và vàng thế giới: Nhu cầu phòng vệ rủi ro kết hợp lực mua từ các ngân hàng trung ương',link:'https://cafef.vn/gia-vang-sjc-va-vang-the-gioi-bien-dong-manh-cac-ngan-hang-trung-uong-tiep-tuc-gom-rong-188241020112038415.chn',img:'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=500&auto=format&fit=crop&q=80',summary:'Giá vàng trong nước và quốc tế biến động trong biên độ hẹp sau nhịp tăng mạnh; giới phân tích khuyến nghị doanh nghiệp chủ động quản trị dòng tiền và kế hoạch thanh toán ngoại tệ.',offsetMin:125},
+  {tag:'finance',title:'Tỷ giá USD/VND ổn định nhờ xuất siêu khả quan và dòng vốn FDI giải ngân kỷ lục vào công nghiệp chế tạo',link:'https://cafef.vn/ty-gia-usd-vnd-하-nhiet-nho-nguon-cung-ngoai-te-doi-dao-tu-xuat-sieu-va-fdi-188240928141052639.chn'.replace('하','ha'),img:'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=500&auto=format&fit=crop&q=80',summary:'Nguồn cung ngoại tệ dồi dào từ thặng dư cán cân thương mại và giải ngân vốn FDI giúp tỷ giá USD/VND giữ nhịp ổn định, hỗ trợ tích cực cho các doanh nghiệp nhập khẩu máy móc thiết bị và hạt nhựa.',offsetMin:180},
+  {tag:'finance',title:'Mặt bằng lãi suất tín dụng ưu đãi cho doanh nghiệp sản xuất xanh và dự án công nghệ tái chế tuần hoàn',link:'https://cafef.vn/ngan-hang-day-manh-goi-tin-dung-xanh-lai-suat-uu-dai-cho-doanh-nghiep-san-xuat-188240915104219873.chn',img:'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=500&auto=format&fit=crop&q=80',summary:'Nhiều ngân hàng thương mại triển khai gói tín dụng xanh lãi suất ưu đãi dành cho các dự án đầu tư dây chuyền sản xuất tiết kiệm năng lượng và tái chế nhựa chuẩn quốc tế.',offsetMin:240},
+  {tag:'finance',title:'Giá dầu Brent & cước vận tải biển quốc tế hạ nhiệt, cải thiện biên lợi nhuận ngành nhựa và hóa chất',link:'https://cafef.vn/gia-dau-the-gioi-va-cuoc-van-tai-bien-ha-nhiet-doanh-nghiep-san-xuat-huong-loi-188240910085531206.chn',img:'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=500&auto=format&fit=crop&q=80',summary:'Chi phí đầu vào từ dầu mỏ và giá cước container trên các tuyến Á – Âu giảm nhiệt giúp các nhà sản xuất bao bì, nhựa kỹ thuật tối ưu giá thành và nâng cao năng lực cạnh tranh xuất khẩu.',offsetMin:310},
+  {tag:'finance',title:'Thị trường vốn & giải pháp tài trợ CAPEX dài hạn cho các dự án đầu tư dây chuyền thiết bị công nghiệp',link:'https://cafef.vn/doanh-nghiep-cong-nghiep-day-manh-huy-dong-von-dai-han-dau-tu-mo-rong-nha-may-188240825153014782.chn',img:'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=500&auto=format&fit=crop&q=80',summary:'Các định chế tài chính đẩy mạnh cấu trúc vốn vay hợp vốn và cho thuê tài chính máy móc công nghệ cao, giúp doanh nghiệp tối ưu dòng tiền tự có trong giai đoạn xây dựng cơ bản.',offsetMin:390},
+  {tag:'finance',title:'Báo cáo vĩ mô: Xuất khẩu sản phẩm nhựa và bao bì Việt Nam sang EU, Mỹ tăng trưởng ấn tượng',link:'https://cafef.vn/xuat-khau-nhua-va-bao-bi-viet-nam-tang-truong-manh-tai-thi-truong-eu-va-my-188240819112540319.chn',img:'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&auto=format&fit=crop&q=80',summary:'Nhờ chủ động đầu tư công nghệ tái chế đạt chuẩn FDA/EFSA, kim ngạch xuất khẩu các sản phẩm nhựa giá trị gia tăng cao của Việt Nam tiếp tục mở rộng thị phần tại châu Âu và Bắc Mỹ.',offsetMin:470},
+  {tag:'finance',title:'Dòng vốn đầu tư ESG toàn cầu ưu tiên các doanh nghiệp sản xuất đáp ứng tiêu chuẩn phát thải thấp',link:'https://cafef.vn/xu-huong-esg-toan-cau-dong-von-ngoai-uu-tien-doanh-nghiep-san-xuat-ben-vung-188240805091827651.chn',img:'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500&auto=format&fit=crop&q=80',summary:'Các quỹ đầu tư quốc tế gia tăng tỷ trọng giải ngân vào những doanh nghiệp minh bạch hóa báo cáo ESG và sử dụng nguyên liệu tái chế trong chuỗi sản xuất.',offsetMin:560},
+  {tag:'finance',title:'Cổ phiếu nhóm khu công nghiệp, vật liệu và sản xuất dẫn dắt sóng đầu tư trung – dài hạn',link:'https://cafef.vn/co-phieu-khu-cong-nghiep-va-san-xuat-thu-hut-dong-tien-nho-trien-vong-loi-nhuan-188240728164012908.chn',img:'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=500&auto=format&fit=crop&q=80',summary:'Báo cáo chiến lược từ các công ty chứng khoán đánh giá cao triển vọng tăng trưởng lợi nhuận của nhóm doanh nghiệp đầu ngành nhựa, bao bì và hạ tầng khu công nghiệp trong năm tới.',offsetMin:650}
 ];
 function nwFallbackItems(key){
   const k=String(key||''),now=Date.now();
@@ -2983,25 +2984,85 @@ function nwChg(c){if(c==null||c==='')return'<span class="text-xs text-mute">—<
   let numTxt=String(c).trim().replace(/^[-+]/,'');if(!isNaN(n)&&!/%/.test(numTxt))numTxt=Math.abs(n).toFixed(2)+'%';
   const signed=zero?numTxt:(neg?'-':'+')+numTxt;
   return `<span class="text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap" style="background:${zero?'rgba(100,116,139,.15)':neg?'rgba(220,38,38,.14)':'rgba(22,163,74,.15)'};color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(signed)}</span>`}
-/* ---- RSS -> bài viết (qua rss2json + fallback an toàn). Dùng DOMParser (tài liệu "chết") để tách chữ / ảnh ---- */
+/* ---- RSS -> bài viết: Bóc tách chính xác ảnh thumbnail (extractThumbnail) & link bài viết chi tiết (item.link / item.guid) ---- */
 const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
 const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
+function extractThumbnail(item){
+  if(!item)return NW_DEFAULT_THUMB;
+  const normImg=u=>{const s=String(u||'').trim().replace(/&amp;/g,'&');return s.startsWith('//')?'https:'+s:s};
+  if(item.thumbnail&&String(item.thumbnail).trim().startsWith('http'))return normImg(item.thumbnail);
+  if(item.enclosure&&(item.enclosure.link||item.enclosure.url)){
+    const el=normImg(item.enclosure.link||item.enclosure.url);
+    if(el.startsWith('http'))return el;
+  }
+  const rawHtml=String((item.description||'')+' '+(item.content||'')).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  if(rawHtml.trim()){
+    const match=rawHtml.match(/<img[^>]+(?:data-original|data-src|src)=["']([^"']+)["']/i)||rawHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if(match&&match[1]){
+      const u=normImg(match[1]);
+      if(u.startsWith('http'))return u;
+    }
+    const imgEl=nwDoc(rawHtml).querySelector('img');
+    if(imgEl){
+      const u=normImg(imgEl.getAttribute('data-original')||imgEl.getAttribute('data-src')||imgEl.getAttribute('src')||'');
+      if(u.startsWith('http'))return u;
+    }
+  }
+  return NW_FB_TAB[NWS.tab]||NW_DEFAULT_THUMB;
+}
+function extractArticleLink(item){
+  if(!item)return '';
+  const cands=[item.link,item.guid,item.url];
+  const rawHtml=String((item.description||'')+' '+(item.content||'')).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  if(rawHtml){
+    const m=rawHtml.match(/<a[^>]+href=["'](https?:\/\/[^"']+)["']/i);
+    if(m&&m[1])cands.push(m[1]);
+  }
+  for(const raw of cands){
+    const u=safeUrl(String(raw||'').replace(/&amp;/g,'&'));
+    if(u&&!/^https?:\/\/(www\.)?(cafef\.vn|genk\.vn|tinhte\.vn)\/?$/i.test(u))return u;
+  }
+  return safeUrl(item.link||item.guid||'');
+}
 function nwItem(it){
-  const html=it.content||it.description||'';let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
-  if(!img||(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn|cafef|genk|tinhte)/i.test(img))){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')||i.getAttribute('data-original')))||img||''}
   let sm=nwText(it.description||it.content||'');const title=String(it.title||'').trim();if(sm.startsWith(title))sm=sm.slice(title.length).replace(/^[\s\-–—:|·]+/,'');
   if(sm.length>240)sm=sm.slice(0,237).replace(/\s+\S*$/,'')+'…';
   const t=it.pubDate?Date.parse(String(it.pubDate).replace(' ','T')+(/[zZ]|[+-]\d\d:?\d\d$/.test(it.pubDate)?'':'Z')):NaN;
-  return{title,link:safeUrl(it.link),img:safeUrl(img),summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
+  const link=extractArticleLink(it);
+  const img=extractThumbnail(it);
+  return{title,link,guid:safeUrl(it.guid||link),img,summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
 async function nwFetchOne(rssUrl){
   const ac=new AbortController(),to=setTimeout(()=>ac.abort(),6500);
   try{
     const apiUrl=`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
     const r=await fetch(apiUrl,{signal:ac.signal});
-    if(!r.ok)throw new Error('rss2json HTTP '+r.status);
-    const j=await r.json();
-    if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');
-    return(j.items||[]).map(nwItem).filter(x=>x.title);
+    if(r.ok){
+      const j=await r.json();
+      if(j.status==='ok'&&j.items&&j.items.length){
+        return j.items.map(nwItem).filter(x=>x.title&&x.link);
+      }
+    }
+    /* Dự phòng qua CORS proxy đọc trực tiếp XML RSS nếu rss2json bị giới hạn request */
+    const rx=await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,{signal:ac.signal});
+    if(!rx.ok)throw new Error('RSS HTTP '+rx.status);
+    const xmlTxt=await rx.text();
+    const xml=new DOMParser().parseFromString(xmlTxt,'text/xml');
+    const nodes=[...xml.querySelectorAll('item')];
+    return nodes.map(n=>{
+      const g=tag=>(n.querySelector(tag)&&n.querySelector(tag).textContent||'').trim();
+      const enc=n.querySelector('enclosure');
+      const media=n.getElementsByTagName('media:content')[0]||n.getElementsByTagName('media:thumbnail')[0];
+      return nwItem({
+        title:g('title'),
+        link:g('link')||g('guid'),
+        guid:g('guid'),
+        pubDate:g('pubDate'),
+        description:g('description'),
+        content:g('content\\:encoded')||g('description'),
+        thumbnail:media&&(media.getAttribute('url')||media.getAttribute('src'))||'',
+        enclosure:enc?{link:enc.getAttribute('url')||''}:null
+      });
+    }).filter(x=>x.title&&x.link);
   }finally{clearTimeout(to)}}
 async function nwFeed(key,urls,force){
   try{
@@ -3011,7 +3072,7 @@ async function nwFeed(key,urls,force){
       try{
         const items=await nwFetchOne(u);
         if(items&&items.length){
-          items.forEach(it=>{const k=it.link||it.title;if(k&&!seen.has(k)){seen.add(k);collected.push(it)}});
+          items.forEach(it=>{const k=it.link||it.guid||it.title;if(k&&!seen.has(k)){seen.add(k);collected.push(it)}});
           if(collected.length>=10)break;
         }
       }catch(e){}
@@ -3029,14 +3090,17 @@ async function nwFeed(key,urls,force){
   }catch(e){}
   const fb=nwFallbackItems(key);NW_CACHE[key]={t:Date.now(),items:fb};return fb}
 function nwCard(a){
-  const fbImg=NW_FB_TAB[NWS.tab]||NW_FB;
+  const fbImg=NW_FB_TAB[NWS.tab]||NW_DEFAULT_THUMB;
+  const svgBackup=nwSvgThumb('MARKET & TECH NEWS','Plastics · AI · Finance','#0f172a','#2563eb');
+  const articleUrl=safeUrl(a.link||a.guid||'');
+  const imgUrl=extractThumbnail({thumbnail:a.img,description:a.description});
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
-  const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
+  const head=articleUrl?`<a href="${esc(articleUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
   return `<article class="flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
-   <div class="sm:w-60 md:w-72 shrink-0"><img src="${a.img?esc(a.img):fbImg}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#e2e8f0" onerror="this.onerror=null;this.src='${fbImg}'"></div>
+   <div class="sm:w-60 md:w-72 shrink-0"><img src="${esc(imgUrl||fbImg)}" alt="${esc(a.title)}" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#e2e8f0" onerror="if(this.src!=='${fbImg}'){this.src='${fbImg}'}else{this.onerror=null;this.src='${svgBackup}'}"></div>
    <div class="min-w-0 flex-1 flex flex-col gap-1"><div class="text-xs text-mute"><i class="fa-regular fa-clock mr-1"></i>${esc(when)}</div>${head}
     ${a.summary?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(a.summary)}</p>`:''}
-    ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
+    ${articleUrl?`<a href="${esc(articleUrl)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
 const nwSkel=()=>Array.from({length:4},()=>'<div class="rounded-2xl border border-line p-3 flex gap-4"><div class="rounded-xl animate-pulse" style="width:16rem;height:9rem;background:rgba(127,127,127,.18)"></div><div class="flex-1 space-y-2"><div class="h-3 rounded animate-pulse" style="width:30%;background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="width:80%;background:rgba(127,127,127,.18)"></div></div></div>').join('');
 async function nwLoadList(host,key,urls,force){
   if(!host)return;const tok=++NW_TOK;host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
