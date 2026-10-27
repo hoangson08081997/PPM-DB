@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.10.26-1700</title>
+<title>Technical PM · v26.10.27-1600</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -215,6 +215,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 .xt.done .xt-t{text-decoration:line-through;opacity:.55}
 .xt input[type=checkbox]{width:1.1rem;height:1.1rem;accent-color:var(--brand);flex-shrink:0}
 .td-card.td-drag{opacity:.4}.td-col.td-over{outline:2px dashed var(--brand);outline-offset:-2px}.td-card:active{cursor:grabbing}
+.nw-spin .nw-ic{animation:nwr .8s linear infinite}@keyframes nwr{to{transform:rotate(360deg)}}
 .nw-flash{animation:nwf 1.6s ease}@keyframes nwf{0%{background:rgba(250,204,21,.35)}100%{background:transparent}}
 </style>
 </head>
@@ -253,7 +254,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.26-1700</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.27-1600</span>
     <div class="flex-1"></div>
 
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
@@ -735,7 +736,7 @@ function toast(msg,bad=true){
 }
 
 function card(p){
-  const adm=canBudget(p.id),mg=isMgr(p.id),root=isAdmin(),s=projStats(p.id),st=STATUS[effStatus(p,s)],nxt=pjNext(s),mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
+  const adm=canBudget(p.id),mg=isMgr(p.id),root=isAdmin(),s=projStats(p.id),st=STATUS[effStatus(p,s)],nxt=pjNext(s),dueToday=s.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100&&t.due_date===today()).length,mem=db.list('project_members').filter(m=>m.project_id===p.id),late=s.overdue.length;
   const done=s.leaf.filter(t=>t.status==='done').length,us=db.list('users');
   const own=us.find(u=>u.id===p.created_by)||us.find(u=>u.id===(mem.find(m=>m.role==='owner')||{}).user_id)||us.find(u=>isAdmin(u));
   const mv=n=>n>=1e6?[Math.round(n/1e6).toLocaleString('vi-VN'),'tr']:[Math.round(n||0).toLocaleString('vi-VN'),n?'đ':''];
@@ -756,7 +757,7 @@ function card(p){
    <div class="text-xs text-mute truncate" title="${nxt?esc(nxt.name):''}">📌 Việc tiếp theo: ${nxt?`<b class="text-ink">${esc(nxt.name)}</b>${nxt.due_date?' · '+fmtD(nxt.due_date):''}`:'<span>Không còn việc tồn đọng</span>'}</div>
    <div class="flex items-center justify-between gap-2 min-h-[1.75rem]">
     ${adm?`<span class="mono text-xs text-mute truncate">NS duyệt: <b class="text-ink">${plan[0]}${plan[1]?' '+plan[1]:''} đ</b></span>`:`<span class="text-xs text-mute"><i class="fa-solid fa-lock mr-1"></i>Ngân sách chỉ Admin xem</span>`}
-    ${late?`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">${late} trễ hạn</span>`:`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Không trễ hạn</span>`}</div>
+    ${late?`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">⚠️ ${late} việc trễ</span>`:dueToday?`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 whitespace-nowrap">⏰ Hạn hôm nay</span>`:`<span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Không trễ hạn</span>`}</div>
    <div class="border-t border-line pt-3 flex flex-wrap items-center justify-between gap-2">
     <span class="flex items-center gap-2 min-w-0 text-sm text-mute"><span class="w-7 h-7 rounded-full text-white grid place-items-center text-[10px] font-bold overflow-hidden shrink-0" style="background:${(own&&own.avatar_color)||'#64748b'}">${own?avatarHTML(own):''}</span><span class="truncate">${esc(own?own.full_name:'')}</span></span>
     <span class="flex items-center gap-1 shrink-0">
@@ -884,6 +885,21 @@ function pjList(){   // vùng danh sách (lưới / bảng) — vẽ lại riên
   rows=rows.filter(x=>(PJF==='all'||x.eff===PJF)&&(!q||nk0(x.p.name+' '+x.p.code+' '+(x.p.client||'')).includes(q)));
   const empty=`<div class="text-mute">${q?'Không có dự án khớp "'+esc(PJQ)+'".':ps.length?'Không có dự án nào ở trạng thái này.':adm?'Chưa có dự án. Bấm "Dự án mới".':'Bạn chưa được gán vào dự án nào. Hãy nhờ Admin thêm email của bạn.'}</div>`;
   $('#pjList').innerHTML=!rows.length?empty:PJV==='table'?pjTable(rows,adm):`<div class="pjwrap"><div class="pjgrid">${rows.map(x=>card(x.p)).join('')}</div></div>`}
+/* 📋 Copy báo cáo nhanh: tóm tắt các dự án đang triển khai (Tên, % tiến độ, thực chi, việc tiếp theo) -> clipboard */
+async function pjCopyReport(st){
+  const run=st.filter(x=>x.eff==='active');
+  if(!run.length){toast('Chưa có dự án đang triển khai để báo cáo');return}
+  const lines=[`📊 BÁO CÁO NHANH DỰ ÁN — ${fmtD(today())}`,`Đang triển khai: ${run.length} dự án`,''];
+  run.forEach(({p,s},i)=>{const nx=pjNext(s),cb=canBudget(p.id);
+    lines.push(`${i+1}. ${p.name}${p.code?' ('+p.code+')':''}`,`   • Tiến độ: ${s.pct}%`);
+    if(cb)lines.push(`   • Thực chi: ${fmtVND(s.actual)}${s.planned?' / '+fmtVND(s.planned)+' ('+Math.round(s.actual/s.planned*100)+'%)':''}`);
+    lines.push(`   • Việc tiếp theo: ${nx?nx.name+(nx.due_date?' (hạn '+fmtD(nx.due_date)+')':''):'Không còn việc tồn đọng'}`);
+    if(s.overdue.length)lines.push(`   • ⚠️ ${s.overdue.length} việc trễ hạn`);
+    lines.push('')});
+  const text=lines.join('\n').trim();
+  try{await navigator.clipboard.writeText(text)}
+  catch(e){const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0;top:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(x){}ta.remove();if(!ok){toast('Không copy được — trình duyệt chặn clipboard');return}}
+  toast('Đã copy báo cáo để gửi Zalo/Teams!',false)}
 function viewProjects(){
   const adm=isAdmin();autoSyncStatus(myProjects());
   const ps=myProjects(),st=ps.map(p=>{const s=projStats(p.id);return{p,s,eff:effStatus(p,s)}});
@@ -892,17 +908,15 @@ function viewProjects(){
   const totB=st.reduce((a,x)=>a+x.s.planned,0),totA=st.reduce((a,x)=>a+x.s.actual,0);
   const late=st.filter(x=>x.eff!=='completed'&&projLate(x.p,x.s)).length,run=st.filter(x=>x.eff!=='completed').length,ontime=run-late;
   const ovT=st.reduce((a,x)=>a+x.s.overdue.length,0);
-  /* Biểu đồ: chỉ dự án có số liệu (tất cả trống mới vẽ hết), sắp xếp giảm dần theo ngân sách (Admin) / tiến độ (người khác) */
-  const bs0=st.filter(x=>x.s.planned>0||x.s.actual>0||x.s.pct>0),bs=(bs0.length?bs0:st).slice().sort(adm?((a,b)=>(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct):((a,b)=>b.s.pct-a.s.pct)),chH=Math.max(150,bs.length*(adm?46:32)+70);
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
-   <div class="flex gap-2 flex-wrap items-center"><div class="relative" id="qsWrap"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-mute pointer-events-none"></i><input id="pjQ" type="search" autocomplete="off" class="inp" style="margin:0;padding:.45rem .8rem .45rem 2.1rem;width:16rem" placeholder="Tìm nhanh dự án...  ( / )" value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"><div id="qsBox" class="hidden absolute right-0 mt-1 w-[22rem] max-w-[90vw] bg-surface border border-line rounded-xl shadow-2xl z-40 overflow-hidden"></div></div><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
+   <div class="flex gap-2 flex-wrap items-center"><div class="relative" id="qsWrap"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-mute pointer-events-none"></i><input id="pjQ" type="search" autocomplete="off" class="inp" style="margin:0;padding:.45rem .8rem .45rem 2.1rem;width:16rem" placeholder="Tìm nhanh dự án...  ( / )" value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"><div id="qsBox" class="hidden absolute right-0 mt-1 w-[22rem] max-w-[90vw] bg-surface border border-line rounded-xl shadow-2xl z-40 overflow-hidden"></div></div><button id="cpBtn" class="btn-ghost" type="button" title="Copy tóm tắt tiến độ các dự án đang triển khai để gửi Zalo / Teams">📋 Copy Báo cáo</button><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
     ${adm?kpi('Tổng ngân sách quản lý',fmtVND(totB),'Đã chi '+fmtVND(totA)+(totB?' ('+Math.round(totA/totB*100)+'%)':''),'fa-wallet','#2563eb'):kpi('Dự án của tôi',ps.length,'Được Admin gán','fa-folder-open','#2563eb')}
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
     ${kpi('Dự án đúng hạn',ontime+'/'+run,late+' dự án có nguy cơ trễ','fa-circle-check','#7c3aed')}
     ${kpi('Việc trễ hạn',ovT,'Tổng các dự án','fa-triangle-exclamation',ovT?'#dc2626':'#059669')}</div>
-   <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ) — giảm dần':'Tiến độ hoàn thành theo dự án (%) — giảm dần'}</div><div style="position:relative;height:${chH}px"><canvas id="pjBar"></canvas></div></div></div>
+  </div>
    <div class="flex items-center gap-2 mb-3 border-b border-line" id="pjTabs"><div class="flex gap-1 overflow-x-auto flex-1 min-w-0">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
     <button id="pjView" class="btn-ghost shrink-0 mb-1" title="Chuyển Thẻ (Grid) ⇄ Bảng (Table)" aria-label="Đổi chế độ xem"><i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span></button></div>
    <div id="pjList"></div>`;
@@ -933,16 +947,8 @@ function viewProjects(){
   if(!window.__qsKey){window.__qsKey=1;document.addEventListener('keydown',e=>{if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const q=$('#pjQ');if(q){e.preventDefault();q.focus()}})}
   if(adm){$('#newBtn').onclick=()=>projectForm()}
   $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
-  charts.forEach(c=>c.destroy());charts=[];
-  if(typeof Chart==='undefined'||!st.length)return;
-  const css=getComputedStyle(document.documentElement),cv=n=>css.getPropertyValue(n).trim();
-  Chart.defaults.color=cv('--mute');Chart.defaults.borderColor=cv('--line');
-  const sh=n=>n.length>16?n.slice(0,15)+'…':n;
-  /* Biểu đồ: chỉ vẽ dự án có số liệu (nếu tất cả đều trống mới vẽ hết) */
-  const fm=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' tr';
-  charts.push(new Chart($('#pjBar'),{type:'bar',data:{labels:bs.map(x=>(x.p.code?x.p.code+' · ':'')+sh(x.p.name)),datasets:adm?[{label:'Kế hoạch',data:bs.map(x=>Math.round(x.s.planned/1e6)),backgroundColor:'#94a3b8',borderRadius:4,barThickness:14},{label:'Thực chi',data:bs.map(x=>Math.round(x.s.actual/1e6)),backgroundColor:cv('--brand'),borderRadius:4,barThickness:14}]:[{label:'Hoàn thành %',data:bs.map(x=>x.s.pct),backgroundColor:cv('--brand'),borderRadius:4,barThickness:16}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}},tooltip:{callbacks:{title:i=>bs[i[0].dataIndex].p.name,label:()=>null,
-      afterBody:i=>{const x=bs[i[0].dataIndex];return[`Mã: ${x.p.code||'—'}`,...(adm?[`Kế hoạch: ${fm(x.s.planned)}`,`Thực chi: ${fm(x.s.actual)}`]:[]),`Tiến độ: ${x.s.pct}%`]}}}},scales:{x:{beginAtZero:true,max:adm?undefined:100},y:{ticks:{autoSkip:false}}}}}));
+  $('#cpBtn').onclick=()=>pjCopyReport(st);
+  charts.forEach(c=>c.destroy());charts=[];   // trang chủ không còn biểu đồ
 }
 function delProject(id){
   const p=db.list('projects').find(x=>x.id===id);
@@ -2680,7 +2686,7 @@ function assignModal(uid_){
     try{const r=await saveAssignments(uid_,next);toast(`Đã lưu phân bổ (${next.length} dự án; +${r.ups} cập nhật, −${r.del} gỡ)`,false);closeModal();viewUsers();renderSide(curPid)}
     catch(e){console.error(e);const msg=sbErr(e,'phân bổ dự án (project_members)');$('#asErr').textContent=msg;toast(msg);b.disabled=false}}}
 /* ===================== VIỆC CẦN LÀM (#/todos): List + Kanban, kéo thả HTML5 native, bình luận ===================== */
-const TD_PRI={urgent:['Khẩn cấp','bg-red-100 text-red-700'],high:['Cao','bg-amber-100 text-amber-700'],medium:['Trung bình','bg-blue-100 text-blue-700'],low:['Thấp','bg-slate-200 text-slate-700']};
+const TD_PRI={urgent:['Urgent','bg-red-100 text-red-700'],high:['High','bg-amber-100 text-amber-700'],medium:['Medium','bg-blue-100 text-blue-700'],low:['Low','bg-slate-200 text-slate-700']};
 const TD_COLS=[['todo','Chưa làm','#64748b'],['in_progress','Đang làm','#2563eb'],['done','Hoàn thành','#16a34a']];
 const TD_PRI_ORD={urgent:0,high:1,medium:2,low:3};
 let TDV=(()=>{try{return localStorage.getItem('tdv')||'kanban'}catch(e){return'kanban'}})(),TDF={p:'',pri:'',q:''};
@@ -2718,10 +2724,10 @@ function tdMove(id,to){
   if(to==='done'){const as=t.actual_start_date||td,ae=t.actual_end_date||td;u={...u,progress:100,actual_start_date:as,actual_end_date:ae,actual_days:daysBetween(as,ae)+1}}
   else if(to==='in_progress')u={...u,progress:(t.progress||0)>=100?90:(t.progress||0),actual_start_date:t.actual_start_date||td,actual_end_date:null,actual_days:null};
   else u={...u,progress:0,actual_start_date:null,actual_end_date:null,actual_days:null};
-  db.save('tasks',db.list('tasks').map(x=>x.id===id?{...x,...u}:x));renderBell();tdDraw();tdRefreshTabs()}
+  db.save('tasks',db.list('tasks').map(x=>x.id===id?{...x,...u}:x));renderBell();tdDraw()}
 function tdProjectView(){
   const ps=myProjects();
-  $('#tdHost').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">✅ Việc của dự án</h2><p class="text-mute text-sm"><span id="tdCount"></span> từ ${ps.length} dự án · kéo thả thẻ để đổi trạng thái</p></div>
+  $('#tdHost').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">✅ Việc cần làm</h2><p class="text-mute text-sm"><span id="tdCount"></span> từ ${ps.length} dự án · kéo thả thẻ để đổi trạng thái</p></div>
    <div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface" role="group" aria-label="Chế độ xem">${[['kanban','Kanban','fa-table-columns'],['list','Danh sách','fa-list']].map(([k,l,ic])=>`<button data-tdv="${k}" class="px-3 py-1.5 ${TDV===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}"><i class="fa-solid ${ic} mr-1"></i>${l}</button>`).join('')}</div></div>
    <div class="flex gap-2 flex-wrap mb-3"><input id="tdQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm việc / dự án..." value="${esc(TDF.q)}" aria-label="Tìm việc">
     <select id="tdP" class="inp" style="margin:0;width:auto;max-width:16rem" aria-label="Lọc dự án"><option value="">Tất cả dự án</option>${ps.map(p=>`<option value="${p.id}" ${TDF.p===p.id?'selected':''}>${esc(p.code||'')} · ${esc(p.name)}</option>`).join('')}</select>
@@ -2738,106 +2744,40 @@ function tdProjectView(){
   v.ondragover=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col||!dragId)return;e.preventDefault();e.dataTransfer.dropEffect='move';v.querySelectorAll('.td-over').forEach(x=>x!==col&&x.classList.remove('td-over'));col.classList.add('td-over')};
   v.ondrop=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col)return;e.preventDefault();const id=dragId||(e.dataTransfer&&e.dataTransfer.getData('text/plain'));dragId=null;if(id)tdMove(id,col.dataset.col)}}
 
-/* ---- Việc cá nhân của tôi: đồng bộ localStorage + bảng extra_tasks (project_id = null), hỗ trợ chọn mức ưu tiên ---- */
-let TDT=(()=>{try{return localStorage.getItem('tdt')||'project'}catch(e){return'project'}})(),PTF='open',PTF_PRI='',PT_LOADED=false;
-const ptKey=()=>'ppm_personal_todos_'+(CUR&&CUR.id?CUR.id:'guest');
-function ptParseNote(raw,priFallback){
-  const s=String(raw||''),m=s.match(/^\[PRI:(urgent|high|medium|low)\]\s*/i);
-  return m?{priority:m[1].toLowerCase(),note:s.slice(m[0].length)}:{priority:TD_PRI[priFallback]?priFallback:'medium',note:s}}
-function ptFormatNote(note,pri){const clean=ptParseNote(note).note.trim();return `[PRI:${TD_PRI[pri]?pri:'medium'}]${clean?' '+clean:''}`}
-function ptReadLS(){
-  try{
-    const raw=localStorage.getItem(ptKey())||localStorage.getItem('ppm_personal_todos');
-    const arr=raw?JSON.parse(raw):[];
-    return Array.isArray(arr)?arr.map(x=>{const pn=ptParseNote(x.note,x.priority);return{...x,project_id:null,priority:pn.priority,note:pn.note,done:!!x.done}}):[];
-  }catch(e){return[]}}
-function ptRows(){
-  const uid_=CUR&&CUR.id,ls=ptReadLS(),byId=new Map();
-  ls.forEach(x=>{if(x&&x.id)byId.set(x.id,x)});
-  db.list('extra_tasks').filter(x=>!x.project_id&&(!uid_||!x.created_by||x.created_by===uid_)).forEach(x=>{
-    const prev=byId.get(x.id),pn=ptParseNote(x.note,x.priority||(prev&&prev.priority));
-    byId.set(x.id,{...prev,...x,project_id:null,priority:pn.priority,note:pn.note,done:!!x.done});
-  });
-  return[...byId.values()].sort((a,b)=>(a.done-b.done)||(TD_PRI_ORD[a.priority||'medium']??2)-(TD_PRI_ORD[b.priority||'medium']??2)||String(b.created_at||'').localeCompare(String(a.created_at||'')))}
-function ptSaveAll(rows,changedRow,deletedId){
-  const norm=rows.map(x=>{const pn=ptParseNote(x.note,x.priority);return{id:x.id,project_id:null,title:String(x.title||'').trim(),note:pn.note,priority:pn.priority,done:!!x.done,created_by:x.created_by||(CUR&&CUR.id)||'local',created_at:x.created_at||new Date().toISOString()}});
-  try{const js=JSON.stringify(norm);localStorage.setItem(ptKey(),js);localStorage.setItem('ppm_personal_todos',js)}catch(e){}
-  const others=CACHE.extra_tasks.filter(x=>x.project_id!=null);
-  const forCache=norm.map(x=>({...x,note:ptFormatNote(x.note,x.priority)}));
-  CACHE.extra_tasks=[...others,...forCache];
-  SNAP.extra_tasks=new Map(CACHE.extra_tasks.map(r=>[pkOf(TB.extra_tasks,r),JSON.stringify(toDB('extra_tasks',r))]));
-  if(sb&&CUR&&CUR.id){
-    if(changedRow){
-      const dbRow=toDB('extra_tasks',{...changedRow,project_id:null,created_by:CUR.id,note:ptFormatNote(changedRow.note,changedRow.priority)});
-      sb.from('extra_tasks').upsert([dbRow],{onConflict:'id'}).then(({error})=>{if(error)console.warn('extra_tasks local fallback:',error.message)}).catch(()=>{});
-    }
-    if(deletedId){
-      sb.from('extra_tasks').delete().eq('id',deletedId).then(()=>{}).catch(()=>{});
-    }
-  }
-  tdRefreshTabs()}
-async function ptLoad(){
-  if(!CUR||!CUR.id){PT_LOADED=true;return}
-  try{await fetchTable('extra_tasks','created_by',[CUR.id])}catch(e){}
-  PT_LOADED=true;ptSaveAll(ptRows())}
+/* ---- Việc cá nhân của tôi: bảng extra_tasks với project_id = null, created_by = người dùng hiện tại ---- */
+let TDT=(()=>{try{return localStorage.getItem('tdt')||'project'}catch(e){return'project'}})(),PTF='open',PT_LOADED=false,PT_ERR='';
+const ptRows=()=>db.list('extra_tasks').filter(x=>!x.project_id&&CUR&&x.created_by===CUR.id).sort((a,b)=>(a.done-b.done)||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+async function ptLoad(){PT_ERR='';try{await fetchTable('extra_tasks','created_by',[CUR.id]);PT_LOADED=true}catch(e){console.error(e);PT_ERR=sbErr(e,'tải việc cá nhân (bảng extra_tasks)')}}
 function ptDraw(){
-  const box=$('#ptList');if(!box)return;
-  const all=ptRows(),rows=all.filter(x=>(PTF==='all'||(PTF==='open'?!x.done:x.done))&&(!PTF_PRI||(x.priority||'medium')===PTF_PRI));
-  const cnt=$('#ptCount');if(cnt)cnt.textContent=`${all.filter(x=>!x.done).length} chưa xong · ${all.filter(x=>x.done).length} đã xong`;
-  box.innerHTML=rows.length?rows.map(x=>{const pr=TD_PRI[x.priority||'medium']||TD_PRI.medium;return `<div class="flex items-start gap-3 px-3.5 py-3 border-b border-line last:border-0 hover:bg-black/5 transition-colors" data-pid="${x.id}">
-    <input type="checkbox" data-ptdone="${x.id}" ${x.done?'checked':''} style="width:1.15rem;height:1.15rem;margin-top:.2rem;cursor:pointer" aria-label="Hoàn thành">
-    <div class="min-w-0 flex-1">
-      <div class="flex items-center gap-2 flex-wrap"><span class="${x.done?'line-through text-mute':'font-semibold'} break-words">${esc(x.title)}</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${pr[1]}">${pr[0]}</span></div>
-      ${x.note?`<div class="text-xs text-mute break-words mt-0.5">${esc(x.note)}</div>`:''}
-      <div class="text-[10px] text-mute mt-1"><i class="fa-regular fa-calendar mr-1"></i>${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div>
-    </div>
-    <select data-ptpri="${x.id}" class="cell q text-xs" style="width:auto;font-size:.72rem;padding:.2rem .4rem" aria-label="Đổi mức ưu tiên" title="Đổi mức ưu tiên">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${(x.priority||'medium')===k?'selected':''}>${v[0]}</option>`).join('')}</select>
-    <button data-ptedit="${x.id}" class="p-1.5 text-mute hover:text-brand" aria-label="Sửa" title="Sửa"><i class="fa-solid fa-pen"></i></button>
-    <button data-ptdel="${x.id}" class="p-1.5 text-mute hover:text-red-600" aria-label="Xóa" title="Xóa"><i class="fa-solid fa-trash"></i></button></div>`}).join(''):'<div class="text-mute text-sm p-6 text-center">Chưa có việc cá nhân nào ở mục này. Gõ tên việc ở trên rồi nhấn Enter để thêm nhanh!</div>'}
+  const box=$('#ptList');if(!box)return;const all=ptRows(),rows=all.filter(x=>PTF==='all'||(PTF==='open'?!x.done:x.done));
+  $('#ptCount').textContent=`${all.filter(x=>!x.done).length} chưa xong · ${all.filter(x=>x.done).length} đã xong`;
+  box.innerHTML=rows.length?rows.map(x=>`<div class="flex items-start gap-3 px-3 py-2.5 border-b border-line last:border-0" data-pid="${x.id}">
+    <input type="checkbox" data-ptdone="${x.id}" ${x.done?'checked':''} style="width:1.1rem;height:1.1rem;margin-top:.2rem" aria-label="Hoàn thành">
+    <div class="min-w-0 flex-1"><div class="${x.done?'line-through text-mute':'font-medium'} break-words">${esc(x.title)}</div>${x.note?`<div class="text-xs text-mute break-words">${esc(x.note)}</div>`:''}<div class="text-[10px] text-mute mt-0.5">${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div></div>
+    <button data-ptedit="${x.id}" class="p-1.5 text-mute hover:text-brand" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button><button data-ptdel="${x.id}" class="p-1.5 text-mute hover:text-red-600" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button></div>`).join(''):'<div class="text-mute text-sm p-6 text-center">Chưa có việc cá nhân nào ở mục này.</div>'}
 async function tdPersonalView(){
-  $('#tdHost').innerHTML=`<div class="max-w-3xl"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><h2 class="text-xl font-bold">🙋 Việc cá nhân của tôi</h2><div class="text-xs text-mute">Lưu đồng bộ cục bộ (localStorage) &amp; extra_tasks · <span id="ptCount"></span></div></div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <select id="ptFilterPri" class="inp text-xs" style="margin:0;width:auto;padding:.35rem .6rem" aria-label="Lọc mức ưu tiên"><option value="">Mọi mức ưu tiên</option>${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${PTF_PRI===k?'selected':''}>${v[0]}</option>`).join('')}</select>
-      <div class="inline-flex rounded-xl border border-line overflow-hidden text-xs bg-surface">${[['open','Chưa xong'],['done','Đã xong'],['all','Tất cả']].map(([k,l])=>`<button data-ptf="${k}" class="px-3 py-1.5 ${PTF===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div>
-    </div></div>
-    <div class="card p-3 mb-3"><div class="flex gap-2 flex-wrap sm:flex-nowrap">
-      <input id="ptTitle" class="inp" style="margin:0;flex:2;min-width:12rem" placeholder="Thêm nhanh việc cá nhân mới... (Enter)" maxlength="200" aria-label="Tên việc">
-      <select id="ptPri" class="inp" style="margin:0;width:auto;min-width:8.5rem" aria-label="Mức ưu tiên">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${k==='medium'?'selected':''}>Ưu tiên: ${v[0]}</option>`).join('')}</select>
-      <input id="ptNote" class="inp" style="margin:0;flex:1;min-width:9rem" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú">
-      <button id="ptAdd" class="btn whitespace-nowrap" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button>
-    </div></div>
-    <div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden"></div></div>`;
+  $('#tdHost').innerHTML=`<div class="max-w-2xl"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><div class="font-bold">🙋 Việc cá nhân của tôi</div><div class="text-xs text-mute">Riêng tư, không gắn dự án · <span id="ptCount"></span></div></div>
+    <div class="inline-flex rounded-xl border border-line overflow-hidden text-xs bg-surface">${[['open','Chưa xong'],['done','Đã xong'],['all','Tất cả']].map(([k,l])=>`<button data-ptf="${k}" class="px-3 py-1.5 ${PTF===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div></div>
+    <div class="flex gap-2 mb-3"><input id="ptTitle" class="inp" style="margin:0" placeholder="Thêm việc cá nhân mới... (Enter)" maxlength="200" aria-label="Tên việc"><input id="ptNote" class="inp" style="margin:0;max-width:11rem" placeholder="Ghi chú" aria-label="Ghi chú"><button id="ptAdd" class="btn" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button></div>
+    <div id="ptErr" class="text-xs mb-2" style="color:#dc2626">${esc(PT_ERR)}</div><div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden">${SPIN_HTML}</div></div>`;
   const add=()=>{const t=$('#ptTitle').value.trim();if(!t){$('#ptTitle').focus();return}
-    const pri=$('#ptPri').value||'medium',nt=$('#ptNote').value.trim();
-    const item={id:uid(),project_id:null,title:t,note:nt,priority:pri,done:false,created_by:(CUR&&CUR.id)||'local',created_at:new Date().toISOString()};
-    ptSaveAll([item,...ptRows()],item);
+    db.save('extra_tasks',[...db.list('extra_tasks'),{id:uid(),project_id:null,title:t,note:$('#ptNote').value.trim(),done:false,created_by:CUR.id,created_at:new Date().toISOString()}]);
     $('#ptTitle').value='';$('#ptNote').value='';$('#ptTitle').focus();ptDraw()};
   $('#ptAdd').onclick=add;$('#ptTitle').onkeydown=e=>{if(e.key==='Enter')add()};$('#ptNote').onkeydown=e=>{if(e.key==='Enter')add()};
   const v=$('#view');
   v.onclick=e=>{let b;
     if(b=e.target.closest('[data-ptf]')){PTF=b.dataset.ptf;tdPersonalView()}
-    else if(b=e.target.closest('[data-ptdel]')){const x=ptRows().find(r=>r.id===b.dataset.ptdel);if(!x)return;ask(`Xóa "${x.title}"?`,()=>{ptSaveAll(ptRows().filter(r=>r.id!==x.id),null,x.id);ptDraw()})}
-    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=ptRows().find(r=>r.id===id),row=b.closest('[data-pid]');if(!x||!row)return;
-      row.querySelector('.min-w-0').innerHTML=`<div class="flex flex-col gap-1.5"><input class="inp" style="margin:0" id="ptET" value="${esc(x.title)}" placeholder="Tên việc"><div class="flex gap-2"><select id="ptEP" class="inp" style="margin:0;width:auto">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${(x.priority||'medium')===k?'selected':''}>${v[0]}</option>`).join('')}</select><input class="inp" style="margin:0;flex:1" id="ptEN" value="${esc(x.note||'')}" placeholder="Ghi chú"></div><div class="flex gap-2 mt-1"><button type="button" id="ptESave" class="btn text-xs py-1 px-2.5"><i class="fa-solid fa-check mr-1"></i>Lưu</button><button type="button" id="ptECancel" class="btn-ghost text-xs py-1 px-2.5">Hủy</button></div></div>`;
-      const save=()=>{const t=$('#ptET')&&$('#ptET').value.trim();if(t){const updated={...x,title:t,priority:$('#ptEP').value||'medium',note:$('#ptEN').value.trim()};ptSaveAll(ptRows().map(r=>r.id===id?updated:r),updated)}ptDraw()};
-      $('#ptESave').onclick=save;$('#ptECancel').onclick=()=>ptDraw();
-      row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus()}};
-  v.onchange=e=>{
-    if(e.target.id==='ptFilterPri'){PTF_PRI=e.target.value;ptDraw();return}
-    const c=e.target.closest('[data-ptdone]');
-    if(c){const id=c.dataset.ptdone,cur=ptRows(),found=cur.find(r=>r.id===id);if(found){const updated={...found,done:c.checked};ptSaveAll(cur.map(r=>r.id===id?updated:r),updated);ptDraw()}return}
-    const p=e.target.closest('[data-ptpri]');
-    if(p){const id=p.dataset.ptpri,cur=ptRows(),found=cur.find(r=>r.id===id);if(found){const updated={...found,priority:p.value};ptSaveAll(cur.map(r=>r.id===id?updated:r),updated);ptDraw()}}};
+    else if(b=e.target.closest('[data-ptdel]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.ptdel);ask(`Xóa "${x.title}"?`,()=>{db.save('extra_tasks',db.list('extra_tasks').filter(r=>r.id!==x.id));ptDraw()})}
+    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=db.list('extra_tasks').find(r=>r.id===id),row=b.closest('[data-pid]');
+      row.querySelector('.min-w-0').innerHTML=`<input class="inp" style="margin:0 0 .25rem" id="ptET" value="${esc(x.title)}"><input class="inp" style="margin:0" id="ptEN" value="${esc(x.note||'')}" placeholder="Ghi chú">`;
+      const save=()=>{const t=$('#ptET').value.trim();if(t)db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===id?{...r,title:t,note:$('#ptEN').value.trim()}:r));ptDraw()};
+      row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus();row.querySelectorAll('input')[1].onblur=()=>setTimeout(()=>{if($('#ptET'))save()},150)}};
+  v.onchange=e=>{const c=e.target.closest('[data-ptdone]');if(c){db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===c.dataset.ptdone?{...r,done:c.checked}:r));ptDraw()}};
   v.ondragstart=v.ondragend=v.ondragover=v.ondrop=null;
-  ptDraw();
-  if(!PT_LOADED){await ptLoad();if($('#ptList'))ptDraw()}}
-function tdRefreshTabs(){
-  const box=$('#tdTabs');if(!box)return;
-  const pOpen=tdTasks().filter(x=>tdCol(x.t)!=='done').length,mOpen=ptRows().filter(x=>!x.done).length;
-  box.innerHTML=[['project','📁 Việc của dự án',pOpen],['mine','🙋 Việc cá nhân của tôi',mOpen]].map(([k,l,n])=>`<button role="tab" type="button" data-tdt="${k}" class="px-4 py-2 flex items-center gap-2 ${TDT===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}"><span>${l}</span><span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${TDT===k?'rgba(255,255,255,.22)':'rgba(127,127,127,.16)'}">${n}</span></button>`).join('')}
+  if(!PT_LOADED){await ptLoad();if(!$('#ptList'))return;$('#ptErr').textContent=PT_ERR}
+  ptDraw()}
 function viewTodos(){
-  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-4" role="tablist" id="tdTabs"></div><div id="tdHost"></div>`;
-  tdRefreshTabs();
+  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-4" role="tablist" id="tdTabs">${[['project','📁 Việc của dự án'],['mine','🙋 Việc cá nhân của tôi']].map(([k,l])=>`<button role="tab" data-tdt="${k}" class="px-4 py-2 ${TDT===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div><div id="tdHost"></div>`;
   if(TDT==='mine')tdPersonalView();else tdProjectView();
   $('#tdTabs').onclick=e=>{const t=e.target.closest('[data-tdt]');if(t){TDT=t.dataset.tdt;try{localStorage.setItem('tdt',TDT)}catch(x){}viewTodos()}}}
 /* Modal chi tiết việc + bình luận (task_comments, tải khi mở) */
@@ -2873,55 +2813,20 @@ async function tdModal(tid){
     try{await Q;const{data,error}=await sb.from('task_comments').delete().eq('id',cid).select('id');if(error)throw error;if(!data||!data.length)throw Object.assign(new Error('row-level security: không xóa được bình luận'),{code:'42501'});setCache('task_comments',db.list('task_comments').filter(c=>c.id!==cid));draw()}
     catch(er){console.error(er);toast(sbErr(er,'xóa bình luận'))}}}
 
-/* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): Danh mục Nguồn tin Chính thống + TradingView Live + Cập Nhật Giá Nhựa ===================== */
+/* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): 3 Tab, Lazy load theo tab, RSS online qua rss2json ===================== */
+const NW_FB="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#e2e8f0"/><text x="50%" y="50%" fill="#94a3b8" font-family="Arial" font-size="28" text-anchor="middle" dominant-baseline="middle">Không có ảnh</text></svg>');
+const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
+const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
+/* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài */
 const NW_TABS=[['plastic','Tin Ngành Nhựa','fa-recycle','#16a34a'],['tech','Tin Công Nghệ','fa-microchip','#2563eb'],['finance','Tin Tài Chính','fa-chart-line','#ca8a04']];
-const NW_PILLS=[
-  ['all','TẤT CẢ TIN NGÀNH NHỰA & BAO BÌ'],
-  ['recycle','NHỰA TÁI CHẾ (rPET / rHDPE)'],
-  ['machinery','CÔNG NGHỆ ĐÙN & THIẾT BỊ (JWELL / STARLINGER)']
-];
-const NW_BRAND_PORTALS=[
-  ['JWELL Machinery','https://www.jwell.cn','fa-gears','#059669'],
-  ['Starlinger','https://www.starlinger.com','fa-arrows-spin','#2563eb'],
-  ['Boretech Recycling','https://www.bo-re-tech.com','fa-recycle','#0d9488']
-];
-const NW_TECH_PILLS=[
-  ['all','Tất cả Công nghệ'],
-  ['ai','Trí tuệ nhân tạo (AI)'],
-  ['automation','Tự động hóa & Thiết bị'],
-  ['iot','Phần mềm & IoT']
-];
-const NW_FINANCE_PORTALS=[
-  ['VnExpress Kinh doanh','https://vnexpress.net/kinh-doanh','fa-newspaper','#ca8a04'],
-  ['VnExpress Chứng khoán','https://vnexpress.net/kinh-doanh/chung-khoan','fa-chart-column','#16a34a'],
-  ['CafeF Thị trường','https://cafef.vn/thi-truong-chung-khoan.chn','fa-building-columns','#2563eb'],
-  ['CafeF Tài chính Quốc tế','https://cafef.vn/tai-chinh-quoc-te.chn','fa-globe','#0d9488']
-];
-const NW_TECH_PORTALS=[
-  ['VnExpress Công nghệ','https://vnexpress.net/khoa-hoc-cong-nghe','fa-microchip','#2563eb'],
-  ['VnExpress AI','https://vnexpress.net/khoa-hoc-cong-nghe/ai','fa-robot','#7c3aed'],
-  ['GenK Tin ICT','https://genk.vn/tin-ict.chn','fa-bolt','#059669'],
-  ['GenK AI & Khám phá','https://genk.vn/ai.chn','fa-brain','#ca8a04']
-];
-/* Giá hạt nhựa nội bộ công ty (lưu đồng bộ localStorage + Supabase market_news) */
-const NW_RESIN_KEY='ppm_resin_prices_v1';
-const NW_PRICES=[
-  ['PET Virgin',['petvirgin'],{price:1050,chg:'+0.50%',src:'Tham chiếu nội bộ (ICIS / Platts)'}],
-  ['HDPE Virgin',['hdpevirgin'],{price:1120,chg:'-0.30%',src:'Tham chiếu nội bộ (ICIS / Platts)'}],
-  ['RPET Clear',['rpetclear','rpet'],{price:1450,chg:'+1.20%',src:'Tham chiếu nội bộ (ICIS / Platts)'}],
-  ['RHDPE Natural',['rhdpenatural','rhdpe'],{price:1600,chg:'+0.80%',src:'Tham chiếu nội bộ (ICIS / Platts)'}]
-];
-function nwReadLocalPrices(){
-  try{const raw=localStorage.getItem(NW_RESIN_KEY);return raw?JSON.parse(raw):null}catch(e){return null}
-}
-function nwWriteLocalPrices(obj){
-  try{localStorage.setItem(NW_RESIN_KEY,JSON.stringify(obj))}catch(e){}
-}
-const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'all',techPill:'all',price:undefined,priceErr:'',live:null};
-let NW_CH=null;
+const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[GN('ngành nhựa tái chế',true),GN('plastic recycling PET HDPE market')]]];
+const NW_FEEDS={tech:['https://vnexpress.net/rss/so-hoa.rss','https://tinhte.vn/rss','https://genk.vn/rss/home.rss'],finance:['https://vneconomy.vn/tai-chinh.rss','https://cafef.vn/thi-truong-chung-khoan.rss','https://vnexpress.net/rss/kinh-doanh.rss']};
+const NW_PRICES=[['PET Virgin',['petvirgin']],['HDPE Virgin',['hdpevirgin']],['RPET Clear',['rpetclear','rpet']],['RHDPE Natural',['rhdpenatural','rhdpe']]];
+const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',price:undefined,priceErr:'',live:null};
+const NW_CACHE={},NW_TTL=5*60e3;let NW_CH=null,NW_TOK=0;
 const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
 const timeAgo=iso=>{if(!iso)return'';const m=Math.round((Date.now()-Date.parse(iso))/6e4);if(isNaN(m))return'';return m<1?'vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'};
-/* Chuẩn hóa extra_data giá nhựa -> [{name,price,unit,chg,src}] */
+/* Chuẩn hóa extra_data giá nhựa -> [{name,price,unit,chg,src}] (chấp nhận object / mảng / bọc prices|items|data) */
 function nwPrices(ex){
   if(typeof ex==='string'){try{ex=JSON.parse(ex)}catch(e){return{rows:[],meta:{}}}}
   if(!ex||typeof ex!=='object')return{rows:[],meta:{}};
@@ -2934,510 +2839,135 @@ function nwPrices(ex){
   else Object.entries(src).forEach(([k,v])=>{if(/^(updated_at|date|as_of|source|note|unit|currency)$/i.test(k))return;const r=row(k.replace(/_/g,' '),v);if(r)rows.push(r)});
   return{rows,meta:{src:ex.source||ex.source_name||'',at:ex.updated_at||ex.date||ex.as_of||''}}}
 function nwChg(c){if(c==null||c==='')return'<span class="text-xs text-mute">—</span>';const n=parseFloat(String(c).replace(',','.')),neg=isNaN(n)?String(c).trim().startsWith('-'):n<0,zero=!isNaN(n)&&n===0;
-  let numTxt=String(c).trim().replace(/^[-+]/,'');if(!isNaN(n)&&!/%/.test(numTxt))numTxt=Math.abs(n).toFixed(2)+'%';
-  const signed=zero?numTxt:(neg?'-':'+')+numTxt;
-  return `<span class="text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap" style="background:${zero?'rgba(100,116,139,.15)':neg?'rgba(220,38,38,.14)':'rgba(22,163,74,.15)'};color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(signed)}</span>`}
-
-/* ---- Nhãn nguồn báo & Khối đồ họa Gradient + SVG Icon chống vỡ ảnh 100% ---- */
-function nwSourceLabel(link,srcName,title){
-  if(srcName&&String(srcName).trim())return String(srcName).trim().toUpperCase();
-  const tl=String(title||'');
-  const dash=tl.match(/\s[-–]\s([^-\–]{2,35})$/);
-  if(dash&&dash[1])return dash[1].trim().toUpperCase();
-  try{
-    const h=new URL(link).hostname.replace(/^www\./i,'').toLowerCase();
-    if(h.includes('vnexpress'))return 'VNEXPRESS.NET';
-    if(h.includes('cafef'))return 'CAFEF.VN';
-    if(h.includes('genk'))return 'GENK.VN';
-    if(h.includes('jwell'))return 'JWELL.CN';
-    if(h.includes('starlinger'))return 'STARLINGER.COM';
-    if(h.includes('bo-re-tech'))return 'BO-RE-TECH.COM';
-    return h.toUpperCase();
-  }catch(e){return 'BẢN TIN CHÍNH THỐNG'}
-}
-function nwGraphicInner(a){
-  const t=NWS.tab;
-  const src=nwSourceLabel(a.link,a.source,a.title);
-  const cfg=t==='finance'
-    ?{g1:'#713f12',g2:'#ca8a04',cat:'Tài Chính & Thị Trường',sub:'FINANCE · STOCKS · MACRO',svg:'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>'}
-    :t==='tech'
-    ?{g1:'#1e3a8a',g2:'#2563eb',cat:'Khoa Học & Công Nghệ',sub:'TECH · AI · AUTOMATION · IoT',svg:'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>'}
-    :{g1:'#065f46',g2:'#059669',cat:'Công Nghiệp & Ngành Nhựa',sub:'PLASTICS · EXTRUSION · RECYCLING',svg:'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>'};
-  return `<div class="w-full rounded-xl p-4 flex flex-col justify-between relative overflow-hidden select-none" style="aspect-ratio:16/10;background:linear-gradient(135deg,${cfg.g1} 0%,${cfg.g2} 100%);color:#fff">
-    <div style="position:absolute;right:-1.5rem;top:-1.5rem;width:7rem;height:7rem;border-radius:9999px;background:rgba(255,255,255,.08)"></div>
-    <div style="position:absolute;left:-1.2rem;bottom:-1.8rem;width:8rem;height:8rem;border-radius:9999px;background:rgba(255,255,255,.06)"></div>
-    <div class="flex items-center justify-between gap-2 relative z-10">
-      <span class="px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wider uppercase truncate" style="background:rgba(255,255,255,.2);backdrop-filter:blur(4px)">${esc(src)}</span>
-      <span class="opacity-90">${cfg.svg}</span>
-    </div>
-    <div class="relative z-10 mt-auto">
-      <div class="text-base font-extrabold leading-tight drop-shadow-sm">${esc(cfg.cat)}</div>
-      <div class="text-[10px] font-semibold tracking-wider uppercase opacity-80 mt-0.5">${esc(cfg.sub)}</div>
-    </div>
-  </div>`;
-}
-
-/* ---- Danh sách Bài viết & Nguồn tin Chính thống (Tải tức thì 0ms, không dùng proxy RSS lỏng lẻo) ---- */
-const NW_ARTICLES_DATA={
-  finance:[
-    {
-      title:'VN-Index duy trì đà hồi phục tích cực, dòng tiền tập trung vào nhóm cổ phiếu ngân hàng và sản xuất công nghiệp',
-      description:'Thanh khoản thị trường chứng khoán cải thiện mạnh mẽ với lực cầu chủ động tại nhóm vốn hóa lớn VN30, ngân hàng, thép và nhựa công nghiệp, củng cố tâm lý nhà đầu tư.',
-      link:'https://vnexpress.net/kinh-doanh/chung-khoan',
-      source:'VNEXPRESS.NET',
-      pubDate:'Chuyên mục Chứng khoán · VnExpress',
-      image:'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Tỷ giá USD/VND và lãi suất liên ngân hàng ổn định nhờ điều hành linh hoạt trên thị trường mở',
-      description:'Ngân hàng Nhà nước điều tiết nhịp nhàng thanh khoản hệ thống qua kênh OMO, giúp tỷ giá USD/VND duy trì biên độ ổn định, hỗ trợ doanh nghiệp nhập khẩu hạt nhựa và máy móc thiết bị.',
-      link:'https://cafef.vn/tai-chinh-ngan-hang.chn',
-      source:'CAFEF.VN',
-      pubDate:'Tài chính Ngân hàng · CafeF',
-      image:'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Giá vàng SJC và vàng nhẫn 9999 biến động sát nhịp giá vàng giao ngay quốc tế XAU/USD',
-      description:'Thị trường kim loại quý toàn cầu ghi nhận lực mua phòng vệ trước các báo cáo vĩ mô Mỹ, kéo theo sự điều chỉnh tương ứng của giá vàng miếng SJC và vàng nhẫn trong nước.',
-      link:'https://vnexpress.net/kinh-doanh/ebank/ngan-hang',
-      source:'VNEXPRESS.NET',
-      pubDate:'Thị trường Vàng & Ngoại hối · VnExpress',
-      image:'https://images.unsplash.com/photo-1610375461246-83df859d849d?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Thị trường chứng khoán Việt Nam đón nhận triển vọng nâng hạng và dòng vốn ngoại quay trở lại',
-      description:'Các quỹ đầu tư quốc tế đánh giá cao tốc độ tăng trưởng lợi nhuận của khối doanh nghiệp niêm yết tại HOSE, đặc biệt ở nhóm xuất khẩu, khu công nghiệp và sản xuất bao bì.',
-      link:'https://cafef.vn/thi-truong-chung-khoan.chn',
-      source:'CAFEF.VN',
-      pubDate:'Thị trường Chứng khoán · CafeF',
-      image:'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Giá dầu thô WTI và Brent giằng co quanh ngưỡng hỗ trợ, chi phí nguyên liệu hóa dầu hạ nhiệt',
-      description:'Diễn biến ổn định của giá dầu thô thế giới giúp giảm áp lực chi phí đầu vào Naphtha và Ethylene, cải thiện biên lợi nhuận gộp cho các doanh nghiệp sản xuất nhựa và hóa chất.',
-      link:'https://vnexpress.net/kinh-doanh/quoc-te',
-      source:'VNEXPRESS.NET',
-      pubDate:'Kinh doanh Quốc tế · VnExpress',
-      image:'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Dòng vốn FDI đăng ký mới vào lĩnh vực chế biến chế tạo và công nghiệp phụ trợ tiếp tục bứt phá',
-      description:'Các tập đoàn sản xuất quốc tế mở rộng quy mô nhà máy tại Việt Nam, thúc đẩy nhu cầu lớn về linh kiện kỹ thuật, bao bì công nghiệp và vật liệu nhựa tái chế đạt chuẩn ESG.',
-      link:'https://cafef.vn/vi-mo-dau-tu.chn',
-      source:'CAFEF.VN',
-      pubDate:'Kinh tế Vĩ mô & Đầu tư · CafeF',
-      image:'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Ngân hàng thương mại đẩy mạnh gói tín dụng xanh ưu đãi cho dự án kinh tế tuần hoàn và tái chế',
-      description:'Doanh nghiệp đầu tư dây chuyền sản xuất tiết kiệm năng lượng, điện mặt trời áp mái và tái chế rPET/rHDPE được tiếp cận nguồn vốn vay trung dài hạn với lãi suất ưu đãi.',
-      link:'https://vnexpress.net/kinh-doanh/doanh-nghiep',
-      source:'VNEXPRESS.NET',
-      pubDate:'Tài chính Doanh nghiệp · VnExpress',
-      image:'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Chỉ số S&P 500 và chứng khoán châu Á khởi sắc nhờ kỳ vọng chu kỳ nới lỏng chính sách tiền tệ',
-      description:'Phố Wall và các sàn chứng khoán lớn tại châu Á đồng loạt ghi nhận sắc xanh khi lạm phát hạ nhiệt, tạo hiệu ứng tích cực lên thị trường tài chính khu vực Đông Nam Á.',
-      link:'https://cafef.vn/tai-chinh-quoc-te.chn',
-      source:'CAFEF.VN',
-      pubDate:'Tài chính Quốc tế · CafeF',
-      image:'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=640&auto=format&fit=crop&q=80'
-    }
-  ],
-  tech:[
-    {
-      title:'Trí tuệ nhân tạo (AI) tạo sinh và thị giác máy tính bứt phá trong kiểm soát chất lượng nhà máy thông minh',
-      description:'Hệ thống AI kết hợp camera tốc độ cao giúp phát hiện lỗi bề mặt sản phẩm, dị vật hạt nhựa và sai lệch kích thước theo thời gian thực với độ chính xác trên 99,5%.',
-      link:'https://vnexpress.net/khoa-hoc-cong-nghe/ai',
-      source:'VNEXPRESS.NET',
-      pubDate:'Chuyên mục Trí tuệ nhân tạo · VnExpress',
-      pill:'ai',
-      image:'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Cuộc đua chip bán dẫn AI thế hệ mới: Kiến trúc GPU và NPU tối ưu hóa hiệu suất trung tâm dữ liệu',
-      description:'Các hãng công nghệ bán dẫn hàng đầu ra mắt thế hệ vi xử lý AI tiến trình 2nm - 3nm giúp tăng gấp đôi hiệu năng tính toán mô hình ngôn ngữ lớn (LLM) và giảm 40% điện năng.',
-      link:'https://genk.vn/tin-ict.chn',
-      source:'GENK.VN',
-      pubDate:'Chip bán dẫn & ICT · GenK',
-      pill:'ai',
-      image:'https://images.unsplash.com/photo-1518770660439-4636190af475?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Tự động hóa dây chuyền sản xuất với Robot cộng tác (Cobot) và xe tự hành AGV/AMR trong nhà máy hiện đại',
-      description:'Giải pháp tích hợp cánh tay robot tự động đóng gói, xếp dỡ pallet cùng đội xe tự hành AMR giúp nhà máy vận hành liên tục 24/7, giảm 35% chi phí nhân công vận chuyển nội bộ.',
-      link:'https://vnexpress.net/khoa-hoc-cong-nghe',
-      source:'VNEXPRESS.NET',
-      pubDate:'Tự động hóa & Robot · VnExpress',
-      pill:'automation',
-      image:'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Nền tảng IIoT & Digital Twin giám sát điện năng, nhiệt độ và áp suất dây chuyền đùn theo thời gian thực',
-      description:'Kết nối PLC Siemens/Mitsubishi với hệ thống SCADA và cảm biến IoT giúp kỹ sư theo dõi OEE, cảnh báo sớm hao mòn trục vít - hộp số và bảo trì dự đoán (Predictive Maintenance).',
-      link:'https://genk.vn/kham-pha.chn',
-      source:'GENK.VN',
-      pubDate:'Phần mềm & Công nghệ IIoT · GenK',
-      pill:'iot',
-      image:'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Hệ thống điều khiển tự động hóa PLC thế hệ mới tích hợp thuật toán PID tự thích nghi cho máy công nghiệp',
-      description:'Công nghệ điều khiển nhiệt độ đa vùng và đồng bộ tốc độ biến tần chính xác giúp ổn định lưu lượng dòng chảy polymer, giảm tỷ lệ phế phẩm khi khởi động máy.',
-      link:'https://vnexpress.net/khoa-hoc-cong-nghe/doi-moi-sang-tao',
-      source:'VNEXPRESS.NET',
-      pubDate:'Đổi mới Sáng tạo · VnExpress',
-      pill:'automation',
-      image:'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Ứng dụng AI Agent trong quản trị dự án CAPEX, lập kế hoạch vật tư ERP và tối ưu chuỗi cung ứng',
-      description:'Các doanh nghiệp sản xuất triển khai trợ lý AI phân tích tiến độ WBS/Gantt, dự báo tồn kho hạt nhựa nguyên liệu và tự động đối soát đơn hàng mua sắm thiết bị.',
-      link:'https://genk.vn/ai.chn',
-      source:'GENK.VN',
-      pubDate:'AI & Quản trị Doanh nghiệp · GenK',
-      pill:'ai',
-      image:'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Bảo mật mạng OT/IT và hạ tầng Cloud Hybrid cho nhà máy sản xuất thông minh chuẩn Công nghiệp 4.0',
-      description:'Giải pháp phân tách mạng điều khiển công nghiệp (OT) và mạng văn phòng (IT) kết hợp mã hóa dữ liệu đầu cuối giúp bảo vệ hệ thống SCADA/MES trước các nguy cơ tấn công mạng.',
-      link:'https://genk.vn/internet.chn',
-      source:'GENK.VN',
-      pubDate:'Hạ tầng Cloud & An ninh mạng · GenK',
-      pill:'iot',
-      image:'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Cảm biến quang phổ cận hồng ngoại (NIR) kết hợp AI phân loại vật liệu tốc độ cao trên băng chuyền',
-      description:'Thiết bị phân loại quang học thế hệ mới nhận diện chính xác từng loại polymer (PET, HDPE, PP, PVC) và màu sắc ở tốc độ hàng chục tấn mỗi giờ.',
-      link:'https://vnexpress.net/khoa-hoc-cong-nghe/chuyen-doi-so',
-      source:'VNEXPRESS.NET',
-      pubDate:'Chuyển đổi số Công nghiệp · VnExpress',
-      pill:'automation',
-      image:'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=640&auto=format&fit=crop&q=80'
-    }
-  ],
-  plastic:[
-    {
-      title:'JWELL Machinery: Dây chuyền đùn tấm PET/rPET đa lớp công suất cao không cần sấy sơ bộ',
-      description:'Tập đoàn JWELL giới thiệu hệ thống đùn trục vít đôi đồng chiều kết hợp hút chân không sâu giúp xử lý trực tiếp mảnh chai PET tái chế (rPET flakes) thành màng tấm định hình nhiệt chất lượng cao, tiết kiệm 25% điện năng.',
-      link:'https://www.jwell.cn/en/product.html',
-      source:'JWELL.CN',
-      pubDate:'Cổng sản phẩm chính thức · JWELL Extrusion',
-      pill:'machinery',
-      image:'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Starlinger recoSTAR PET art: Giải pháp tái chế Bottle-to-Bottle rPET chuẩn tiếp xúc thực phẩm FDA & EFSA',
-      description:'Hệ thống tái chế Starlinger recoSTAR PET thế hệ mới tối ưu hóa quá trình khử nhiễm chân không SSP, nâng độ nhớt nội tại (IV) ổn định và giảm tiêu hao năng lượng cho sản xuất hạt nhựa rPET Clear.',
-      link:'https://www.starlinger.com/en/recycling-technology/pet-recycling-systems/',
-      source:'STARLINGER.COM',
-      pubDate:'Công nghệ tái chế PET · Starlinger Austria',
-      pill:'recycle',
-      image:'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Boretech ES Process: Dây chuyền nghiền rửa chai PET thông minh tiết kiệm nước và hóa chất',
-      description:'Công nghệ rửa nóng và tách nhãn tự động của Boretech Recycling giúp loại bỏ keo PVC/EVA và tạp chất xuống dưới ngưỡng 50 ppm, cung cấp nguồn mảnh PET Flakes siêu sạch cho khâu tạo hạt rPET.',
-      link:'https://www.bo-re-tech.com/en/products.html',
-      source:'BO-RE-TECH.COM',
-      pubDate:'Hệ thống rửa & tái chế PET · Boretech',
-      pill:'recycle',
-      image:'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Thị trường hạt nhựa rPET Clear và rHDPE Natural tăng trưởng mạnh trước lộ trình EPR và cam kết bao bì xanh',
-      description:'Các tập đoàn đồ uống và FMCG toàn cầu đẩy mạnh tỷ lệ sử dụng 25% - 50% nhựa tái sinh trong vỏ chai, giúp giá hạt rPET Clear và rHDPE Natural duy trì mức premium cao so với nhựa nguyên sinh.',
-      link:'https://www.starlinger.com/en/recycling-technology/',
-      source:'STARLINGER.COM',
-      pubDate:'Thị trường Hạt nhựa Tái sinh · Starlinger',
-      pill:'recycle',
-      image:'https://images.unsplash.com/photo-1605600659908-0ef719419d41?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Dây chuyền đùn ống HDPE/PP đường kính lớn và tạo hạt nhựa kỹ thuật Compounding của JWELL',
-      description:'Hệ thống đùn ống nguyên sinh & tái sinh của JWELL trang bị đầu khuôn xoắn ốc thế hệ mới và hệ thống định cỡ chân không thông minh, đáp ứng tiêu chuẩn cấp thoát nước và hạ tầng công nghiệp.',
-      link:'https://www.jwell.cn/',
-      source:'JWELL.CN',
-      pubDate:'Thiết bị Đùn Nhựa · JWELL Machinery',
-      pill:'machinery',
-      image:'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Tích hợp bộ lọc chảy dẻo tự động (Melt Filter) và máy phân loại màu quang học trên dây chuyền tái chế rHDPE',
-      description:'Giải pháp kết hợp lọc lưới liên tục Laser Filter cùng hệ thống khử mùi giúp hạt nhựa rHDPE Natural đạt độ tinh khiết cao, không mùi, phục vụ ép thổi chai mỹ phẩm và hóa phẩm.',
-      link:'https://www.bo-re-tech.com/',
-      source:'BO-RE-TECH.COM',
-      pubDate:'Thiết bị & Dây chuyền Tái chế · Boretech',
-      pill:'machinery',
-      image:'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Xu hướng đầu tư nhà máy nhựa tái chế tuần hoàn tại Việt Nam đón sóng xuất khẩu sang EU và Bắc Mỹ',
-      description:'Việc đáp ứng tiêu chuẩn GRS (Global Recycled Standard) và chứng nhận EFSA/FDA mở ra cơ hội lớn cho các nhà máy nhựa Việt Nam tham gia chuỗi cung ứng bao bì bền vững toàn cầu.',
-      link:'https://vnexpress.net/kinh-doanh/doanh-nghiep',
-      source:'VNEXPRESS.NET',
-      pubDate:'Doanh nghiệp Sản xuất & ESG · VnExpress',
-      pill:'recycle',
-      image:'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=640&auto=format&fit=crop&q=80'
-    },
-    {
-      title:'Giải pháp tối ưu hóa điện năng và thu hồi nhiệt dư trên hệ thống gia nhiệt trục vít đùn nhựa công suất lớn',
-      description:'Sử dụng vòng nhiệt hồng ngoại Nano kết hợp biến tần Servo giúp giảm từ 15% - 20% suất tiêu hao điện năng (kWh/kg) cho dây chuyền đùn tạo hạt và cán màng nhựa.',
-      link:'https://www.jwell.cn/en/news.html',
-      source:'JWELL.CN',
-      pubDate:'Tin tức Kỹ thuật · JWELL Machinery',
-      pill:'machinery',
-      image:'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=640&auto=format&fit=crop&q=80'
-    }
-  ]
-};
-function nwGetArticles(key){
-  const k=String(key||NWS.tab||'plastic');
-  const [tab,sub]=k.split(':');
-  const base=(NW_ARTICLES_DATA[tab]||NW_ARTICLES_DATA.plastic).slice();
-  const filtered=(sub&&sub!=='all')?base.filter(x=>x.pill===sub):base;
-  const list=filtered.length?filtered:base;
-  return list.map(it=>({
-    title:it.title,
-    link:it.link,
-    guid:it.link,
-    img:it.image||it.img||'',
-    image:it.image||it.img||'',
-    source:it.source||'TIN TỨC',
-    summary:it.description||it.summary||'',
-    description:it.description||it.summary||'',
-    pubDate:it.pubDate||'Mới nhất',
-    time:it.time||null
-  }));
-}
+  let txt=String(c).replace(/^[-+]/,'');if(!isNaN(n)&&!/%/.test(txt))txt+='%';
+  return `<span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${zero?'rgba(100,116,139,.15)':neg?'rgba(220,38,38,.12)':'rgba(22,163,74,.14)'};color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(txt)}</span>`}
+/* ---- RSS -> bài viết (qua rss2json). Dùng DOMParser (tài liệu "chết") để tách chữ / ảnh, không chạy script & không tải ảnh ---- */
+const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
+const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
+function nwItem(it){
+  const html=it.content||it.description||'';let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
+  if(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn)/i.test(img)){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')))||img||''}
+  let sm=nwText(it.description||it.content||'');const title=String(it.title||'').trim();if(sm.startsWith(title))sm=sm.slice(title.length).replace(/^[\s\-–—:|·]+/,'');
+  if(sm.length>240)sm=sm.slice(0,237).replace(/\s+\S*$/,'')+'…';
+  const t=it.pubDate?Date.parse(String(it.pubDate).replace(' ','T')+(/[zZ]|[+-]\d\d:?\d\d$/.test(it.pubDate)?'':'Z')):NaN;
+  return{title,link:safeUrl(it.link),img:safeUrl(img),summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
+/* Proxy RSS công cộng chống CORS — thử lần lượt: allorigins (XML thô) -> rss2json (JSON). Mỗi lần có timeout riêng */
+async function nwTimed(url,ms){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms);try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)throw new Error('HTTP '+r.status);return r}finally{clearTimeout(to)}}
+function nwParseXml(xml){
+  const d=new DOMParser().parseFromString(String(xml||''),'text/xml');if(d.querySelector('parsererror'))throw new Error('RSS không hợp lệ');
+  const tx=(e,n)=>{const x=e.getElementsByTagName(n)[0];return x?(x.textContent||'').trim():''},at=(e,n,a)=>{const x=e.getElementsByTagName(n)[0];return x?x.getAttribute(a)||'':''};
+  return[...d.querySelectorAll('item, entry')].map(e=>{const pd=tx(e,'pubDate')||tx(e,'published')||tx(e,'updated')||tx(e,'dc:date'),t=Date.parse(pd);
+    return nwItem({title:tx(e,'title'),link:tx(e,'link')||at(e,'link','href'),description:tx(e,'description')||tx(e,'summary'),content:tx(e,'content:encoded')||tx(e,'content'),pubDate:isNaN(t)?'':new Date(t).toISOString(),
+      thumbnail:at(e,'media:thumbnail','url')||at(e,'media:content','url'),enclosure:{link:at(e,'enclosure','url')}})}).filter(x=>x.title)}
+const NW_PROXIES=[
+  async url=>{const r=await nwTimed('https://api.allorigins.win/get?url='+encodeURIComponent(url),7000),j=await r.json();if(!j||!j.contents)throw new Error('allorigins rỗng');return nwParseXml(j.contents)},
+  async url=>{const r=await nwTimed('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url),7000),j=await r.json();if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');return(j.items||[]).map(nwItem).filter(x=>x.title)}];
+async function nwFetchOne(url){let last=null;for(const px of NW_PROXIES){try{const it=await px(url);if(it.length)return it}catch(e){last=e}}throw last||new Error('Proxy không trả dữ liệu')}
+/* Dữ liệu MẪU (offline) — chỉ dùng khi mọi proxy đều lỗi; luôn gắn nhãn "Dữ liệu mẫu", không có link / ngày giả */
+const NW_SAMPLE={
+ plastic:[['jwell','Công nghệ đùn tấm PET nhiều lớp: những điểm cần kiểm soát khi chạy dây chuyền','Tổng hợp các thông số then chốt của dây chuyền đùn tấm PET: độ ẩm hạt, nhiệt độ vùng nung chảy, độ nhớt nội tại (IV) và cách hạn chế vệt đục trên bề mặt tấm.'],
+  ['jwell','Máy đùn trục vít đôi cho tái chế: chọn tỷ số L/D và cấu hình trục vít theo loại phế liệu','Vì sao nhựa tái chế cần cấu hình trục vít khác nhựa nguyên sinh, và cách cân bằng giữa công suất, mức tiêu hao điện năng và chất lượng hạt.'],
+  ['starlinger','Giải pháp tái chế PET food-grade: các công đoạn khử nhiễm và tăng IV ở trạng thái rắn (SSP)','Mô tả luồng công nghệ từ mảnh PET rửa sạch đến hạt rPET đạt chuẩn tiếp xúc thực phẩm, các chỉ tiêu AA, Benzen và Limonene cần theo dõi.'],
+  ['starlinger','Tối ưu hiệu suất dây chuyền: bảo trì dự phòng và theo dõi OEE trên máy lọc nóng chảy','Các chỉ số vận hành nên ghi nhận mỗi ca và ngưỡng cảnh báo giúp giảm dừng máy ngoài kế hoạch ở dây chuyền tạo hạt.'],
+  ['boretech','Dây chuyền rửa chai PET: bể tuyển nổi, rửa nóng và kiểm soát tạp chất PVC','Những điểm nghẽn thường gặp ở khâu rửa – tách, cách đo hiệu quả loại tạp chất và ảnh hưởng của PVC lên chỉ số màu b của hạt thành phẩm.'],
+  ['boretech','Hệ thống tách kim loại và tách màu: khi nào nên đầu tư thêm cho dây chuyền tái chế','Phân tích kinh tế đơn giản giữa chi phí thiết bị tách và mức tăng tỷ lệ thu hồi / giá bán phế phẩm theo cấp chất lượng.'],
+  ['general','Giá hạt nhựa PET, HDPE chịu tác động từ giá dầu và nhu cầu bao bì: các yếu tố nên theo dõi','Khung phân tích nhanh các biến số ảnh hưởng giá nhựa nguyên sinh và nhựa tái chế để lập kế hoạch mua nguyên liệu theo quý.'],
+  ['general','Nhựa tái chế và trách nhiệm mở rộng của nhà sản xuất (EPR): doanh nghiệp cần chuẩn bị gì','Tóm tắt các nội dung nhà máy tái chế nên rà soát: truy xuất nguồn gốc nguyên liệu, chứng nhận chất lượng và hồ sơ môi trường.'],
+  ['general','Chỉ số IV, AA và màu L/a/b: cách đọc báo cáo chất lượng hạt rPET','Hướng dẫn đọc nhanh các chỉ tiêu trong phiếu kiểm nghiệm và đối chiếu với tiêu chuẩn của khách hàng.'],
+  ['general','Quản lý CAPEX dự án nhà máy tái chế: các hạng mục thường bị bỏ sót khi lập dự toán','Danh mục kiểm tra chi phí hạ tầng, đường ống, tủ điện, hệ thống phụ trợ và dự phòng trượt giá khi lập ngân sách dự án.']],
+ tech:[['Tự động hóa nhà máy: bắt đầu từ dữ liệu vận hành thay vì từ thiết bị','Lộ trình ba bước: thu thập dữ liệu, chuẩn hóa chỉ số, rồi mới tự động hóa các điểm nghẽn có tác động lớn nhất.'],
+  ['IoT công nghiệp: chọn cảm biến và giao thức kết nối cho dây chuyền hiện hữu','So sánh nhanh các phương án đọc tín hiệu từ PLC và đồng hồ cũ để đưa lên bảng theo dõi mà không cần dừng sản xuất.'],
+  ['AI trong quản lý dự án: những việc có thể giao cho trợ lý ngay hôm nay','Tóm tắt biên bản họp, lập báo cáo tiến độ, đối chiếu ngân sách – những tác vụ lặp lại phù hợp để tự động hóa.'],
+  ['Bảo mật tài khoản làm việc: bật xác thực hai lớp và quản lý mật khẩu đúng cách','Các bước đơn giản giúp giảm rủi ro lộ dữ liệu dự án khi dùng chung thiết bị hoặc làm việc từ xa.'],
+  ['Bảng điều khiển dữ liệu (dashboard) hiệu quả: ít chỉ số hơn nhưng đúng chỗ hơn','Nguyên tắc chọn chỉ số, màu sắc và bố cục để người xem nắm tình hình trong vài giây.'],
+  ['Điện mặt trời áp mái cho nhà xưởng: cách ước tính công suất và thời gian hoàn vốn','Công thức tính nhanh dựa trên diện tích mái, số giờ nắng và biểu giá điện của nhà máy.'],
+  ['Bảo trì dự đoán: dùng dữ liệu rung và nhiệt độ để báo trước hỏng hóc','Những tín hiệu cơ bản cho động cơ, bơm, quạt và cách đặt ngưỡng cảnh báo hợp lý.'],
+  ['Excel hay công cụ web nhẹ cho quản lý khối lượng và dự toán?','Khi nào nên giữ bảng tính và khi nào nên chuyển sang công cụ web có phân quyền để tránh sai lệch số liệu.'],
+  ['Sao lưu dữ liệu dự án: quy tắc 3-2-1 áp dụng cho nhóm nhỏ','Ba bản sao, hai loại phương tiện, một bản lưu ngoài địa điểm – cách triển khai gọn nhẹ.'],
+  ['Chuẩn hóa tên tệp và thư mục dự án để tìm kiếm nhanh hơn','Mẫu quy ước đặt tên theo mã dự án, hạng mục và phiên bản giúp cả nhóm truy xuất tài liệu nhanh.']],
+ finance:[['Lập kế hoạch dòng tiền cá nhân: quy tắc ngân sách và quỹ khẩn cấp','Cách chia thu nhập thành chi tiêu thiết yếu, tiết kiệm và đầu tư; mức quỹ dự phòng nên có trước khi đầu tư.'],
+  ['Cổ phiếu cổ tức: cách đọc tỷ suất, tỷ lệ chi trả và độ bền của dòng tiền','Các chỉ số cần xem để phân biệt cổ tức bền vững với cổ tức cao nhất thời.'],
+  ['Vàng trong danh mục tích sản: tỷ trọng hợp lý và rủi ro chênh lệch mua – bán','Phân tích vai trò phòng thủ của vàng và chi phí giao dịch khi nắm giữ dài hạn.'],
+  ['Lãi suất tiền gửi và lạm phát: lãi thực dương nghĩa là gì','Cách tính lãi suất thực và ý nghĩa với quyết định gửi tiết kiệm hay đầu tư.'],
+  ['Đòn bẩy khi mua nhà: kiểm tra khả năng trả nợ trước khi vay','Nguyên tắc tỷ lệ nợ trên thu nhập và kịch bản lãi suất tăng để đánh giá mức vay an toàn.'],
+  ['Phân bổ tài sản theo giai đoạn cuộc sống: lập gia đình, mua nhà, nghỉ hưu sớm','Gợi ý khung phân bổ giữa tiền mặt, cổ phiếu, vàng và bất động sản theo mục tiêu.'],
+  ['Đọc báo cáo tài chính doanh nghiệp: ba chỉ số nên xem đầu tiên','Biên lợi nhuận, nợ vay trên vốn chủ và dòng tiền hoạt động – cách đọc nhanh.'],
+  ['Quản lý CAPEX và dòng tiền dự án: dự phòng trượt giá và chậm tiến độ','Phương pháp đặt dự phòng theo mức rủi ro hạng mục và theo dõi thực chi so với ngân sách.'],
+  ['Chi phí vốn và quyết định đầu tư thiết bị: NPV, IRR và thời gian hoàn vốn','Khi nào dùng chỉ số nào và những giả định dễ làm sai lệch kết quả.'],
+  ['Tự do tài chính (FI/RE): quy tắc 4% và những giới hạn cần biết','Cách ước tính số vốn mục tiêu và các yếu tố làm thay đổi tỷ lệ rút an toàn.']]};
+function nwSample(key){
+  let arr;if(key.startsWith('plastic')){const pill=key.split(':')[1]||'general',a=NW_SAMPLE.plastic;arr=[...a.filter(x=>x[0]===pill),...a.filter(x=>x[0]!==pill)].map(x=>({title:x[1],summary:x[2]}))}
+  else arr=NW_SAMPLE[key].map(x=>({title:x[0],summary:x[1]}));
+  return arr.slice(0,10).map(x=>({title:x.title,summary:x.summary,link:'',img:'',time:null,sample:true}))}
+async function nwFeed(key,urls,force){
+  const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return{items:c.items,sample:false};
+  const deadline=Date.now()+16000;
+  for(const u of urls){if(Date.now()>deadline)break;try{const items=await nwFetchOne(u);if(items.length){items.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));const out=items.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return{items:out,sample:false}}}catch(e){console.warn('RSS',u,e&&e.message)}}
+  return{items:nwSample(key),sample:true}}   // mọi proxy lỗi -> dữ liệu mẫu, không hiện lỗi trắng trang
 function nwCard(a){
-  const articleUrl=safeUrl(a.link||a.guid||'');
-  const imgUrl=safeUrl(a.img||a.image||'');
-  const hasImg=!!imgUrl;
-  const graphicHtml=nwGraphicInner(a);
-  const thumbHtml=hasImg
-    ?`<div class="thumbnail-box w-full relative"><img src="${esc(imgUrl)}" alt="${esc(a.title)}" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#0f172a" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='block'"><div class="fallback-grad" style="display:none">${graphicHtml}</div></div>`
-    :`<div class="thumbnail-box w-full relative"><div class="fallback-grad">${graphicHtml}</div></div>`;
-  const srcBadge=nwSourceLabel(articleUrl,a.source,a.title);
-  const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:(a.pubDate||'Mới nhất');
-  const summaryTxt=a.summary||a.description||'';
-  const head=articleUrl?`<h3 class="m-0"><a href="${esc(articleUrl)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a></h3>`:`<h3 class="m-0 font-bold text-base leading-snug break-words">${esc(a.title)}</h3>`;
-  return `<article class="news-card flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
-   <div class="sm:w-60 md:w-72 shrink-0">${thumbHtml}</div>
-   <div class="content-box min-w-0 flex-1 flex flex-col gap-1">
-    <div class="flex items-center gap-2 flex-wrap text-xs text-mute"><span class="font-bold px-2 py-0.5 rounded text-[10px]" style="background:rgba(127,127,127,.14);color:var(--ink)">${esc(srcBadge)}</span>${when?`<span class="time"><i class="fa-regular fa-clock mr-1"></i>${esc(when)}</span>`:''}</div>
-    ${head}
-    ${summaryTxt?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(summaryTxt)}</p>`:''}
-    ${articleUrl?`<a href="${esc(articleUrl)}" target="_blank" rel="noopener noreferrer" class="read-more mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
-function renderNewsArticles(articles,hostEl){
-  const container=hostEl||document.getElementById('nwList')||document.getElementById('news-container');
-  if(!container)return;
-  const list=Array.isArray(articles)&&articles.length?articles:nwGetArticles(NWS.tab);
-  container.innerHTML=`<div class="space-y-3">${list.map(item=>nwCard(item)).join('')}</div>`;
-}
-function nwLoadList(host,key){
-  const container=host||document.getElementById('nwList')||document.getElementById('news-container');
-  if(!container)return;
-  renderNewsArticles(nwGetArticles(key),container);
-}
-
-/* ---- Giá hạt nhựa nội bộ công ty (4 thẻ chỉnh sửa nhanh) + Modal lưu đồng bộ localStorage & Supabase ---- */
-function nwCurrentResinRows(){
-  const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
-  const local=nwReadLocalPrices();
-  const supa=NWS.price?nwPrices(NWS.price.extra_data):{rows:[],meta:{}};
-  const localTime=local&&local.updated_at?Date.parse(local.updated_at):0;
-  const supaTime=NWS.price&&NWS.price.published_at?Date.parse(NWS.price.published_at):(supa.meta.at?Date.parse(supa.meta.at):0);
-  const useLocal=local&&Array.isArray(local.items)&&local.items.length&&(localTime>=supaTime||!supa.rows.length);
-  return NW_PRICES.map(([label,keys,def],i)=>{
-    let row=def;
-    if(useLocal){
-      const f=local.items.find(x=>keys.includes(norm(x.name||x.label)));
-      if(f)row={price:f.price!=null&&f.price!==''?f.price:def.price,chg:f.chg!=null&&f.chg!==''?f.chg:def.chg,src:f.src||local.source||def.src};
-    }else if(supa.rows.length){
-      const f=supa.rows.find(x=>keys.includes(norm(x.name)));
-      if(f)row={price:f.price!=null&&f.price!==''?f.price:def.price,chg:f.chg!=null&&f.chg!==''?f.chg:def.chg,src:f.src||supa.meta.src||(NWS.price&&NWS.price.source_name)||def.src};
-    }
-    return{label,key:keys[0],price:row.price,chg:row.chg,src:row.src||def.src,col:['#16a34a','#2563eb','#0d9488','#7c3aed'][i]};
-  });
-}
+  const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
+  const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
+  return `<article class="flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
+   <div class="sm:w-60 md:w-72 shrink-0"><img src="${a.img?esc(a.img):NW_FB}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#e2e8f0" onerror="this.onerror=null;this.src=NW_FB"></div>
+   <div class="min-w-0 flex-1 flex flex-col gap-1"><div class="text-xs text-mute">${a.sample?'<span class="font-bold px-2 py-0.5 rounded-full" style="background:rgba(100,116,139,.18)">DỮ LIỆU MẪU</span>':'<i class="fa-regular fa-clock mr-1"></i>'+esc(when)}</div>${head}
+    ${a.summary?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(a.summary)}</p>`:''}
+    ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
+const nwSkel=()=>Array.from({length:4},()=>'<div class="rounded-2xl border border-line p-3 flex gap-4"><div class="rounded-xl animate-pulse" style="width:16rem;height:9rem;background:rgba(127,127,127,.18)"></div><div class="flex-1 space-y-2"><div class="h-3 rounded animate-pulse" style="width:30%;background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="width:80%;background:rgba(127,127,127,.18)"></div></div></div>').join('');
+async function nwLoadList(host,key,urls,force){
+  const tok=++NW_TOK;host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
+  const r=await nwFeed(key,urls,force);if(tok!==NW_TOK)return;
+  host.innerHTML=(r.sample?'<div class="rounded-xl px-4 py-2.5 mb-3 text-sm flex items-center justify-between gap-2 flex-wrap" style="background:rgba(100,116,139,.12)"><span><i class="fa-solid fa-plug-circle-xmark mr-2"></i>Chưa kết nối được nguồn tin trực tuyến — đang hiển thị <b>dữ liệu mẫu</b>.</span><button type="button" class="underline font-semibold" data-nwretry="1">Thử kết nối lại</button></div>':'')+`<div class="space-y-3">${r.items.map(nwCard).join('')}</div>`}
+/* ---- Giá hạt nhựa (4 thẻ): ưu tiên market_news (realtime); thiếu / lỗi -> giá THAM CHIẾU chuẩn (gắn nhãn) ---- */
+const NW_REF={'PET Virgin':[1050,0.8],'HDPE Virgin':[1120,-0.4],'RPET Clear':[1450,1.2],'RHDPE Natural':[1600,-0.6]};
 function nwPriceCards(){
   const box=$('#nwPrices');if(!box)return;
-  const list=nwCurrentResinRows();
-  box.innerHTML=list.map((it,idx)=>{
-    const pTxt=typeof it.price==='number'?it.price.toLocaleString('en-US'):esc(String(it.price).replace(/^\$/,'').trim());
-    return `<div class="bg-surface border border-line rounded-2xl p-4 min-w-0 hover:shadow-md transition-shadow" style="border-top:4px solid ${it.col}">
-     <div class="flex items-center justify-between gap-1">
-       <div class="text-xs font-extrabold tracking-wide uppercase" style="color:${it.col}">${esc(it.label)}</div>
-       <button type="button" data-edit-resin="${idx}" class="text-xs text-mute hover:text-ink px-1.5 py-0.5 rounded border border-transparent hover:border-line" title="Chỉnh sửa nhanh báo giá ${esc(it.label)}">✏️ Sửa</button>
-     </div>
-     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">${pTxt}<span class="text-xs font-semibold text-mute"> $/ton</span></div>${nwChg(it.chg)}</div>
-     <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(it.src)}</div></div>`;
-  }).join('')}
-function nwEditPricesModal(focusIdx){
-  const cur=nwCurrentResinRows();
-  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-2xl w-full max-w-lg p-5 max-h-[90vh] overflow-auto shadow-2xl">
-    <div class="flex items-center justify-between gap-2 mb-3">
-      <div><h3 class="font-bold text-lg">✏️ Cập nhật giá hạt nhựa nội bộ</h3><p class="text-xs text-mute">Nhập đơn giá ($/ton) và mức biến động (%) theo báo giá thực tế của công ty (lưu vào localStorage)</p></div>
-      <button type="button" id="nwPClose" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="space-y-3 my-3">
-      ${cur.map((it,idx)=>`<div class="p-3 rounded-xl border border-line" style="border-left:4px solid ${it.col}">
-        <div class="text-xs font-extrabold uppercase mb-2" style="color:${it.col}">${esc(it.label)}</div>
-        <div class="grid grid-cols-2 gap-2">
-          <label class="text-xs text-mute">Đơn giá ($/ton)<input type="number" step="any" data-rprice="${idx}" class="inp mono font-bold" style="margin:.2rem 0 0" value="${esc(String(it.price).replace(/,/g,''))}" placeholder="VD: 1050"></label>
-          <label class="text-xs text-mute">Biến động (%)<input type="text" data-rchg="${idx}" class="inp mono" style="margin:.2rem 0 0" value="${esc(it.chg)}" placeholder="VD: +0.50% hoặc -0.30%"></label>
-        </div>
-      </div>`).join('')}
-      <label class="block text-xs text-mute pt-1">Nguồn báo giá / Ghi chú nội bộ
-        <input id="nwPSrc" type="text" class="inp" style="margin:.25rem 0 0" value="${esc(cur[0]&&cur[0].src||'Báo giá nội bộ công ty')}" placeholder="VD: Báo giá Phòng Mua hàng / ICIS / Platts">
-      </label>
-    </div>
-    <div class="flex items-center justify-between gap-2 pt-3 border-t border-line">
-      <button type="button" id="nwPReset" class="btn-ghost text-xs text-mute hover:text-ink" title="Khôi phục mức giá tham chiếu mặc định">Khôi phục mặc định</button>
-      <div class="flex items-center gap-2">
-        <button type="button" id="nwPCancel" class="btn-ghost">Hủy</button>
-        <button type="button" id="nwPSave" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu báo giá</button>
-      </div>
-    </div>
-  </div></div>`;
-  if(focusIdx!=null){
-    const inp=$(`[data-rprice="${focusIdx}"]`);
-    if(inp){setTimeout(()=>{inp.focus();inp.select()},30)}
-  }
-  $('#nwPClose').onclick=closeModal;$('#nwPCancel').onclick=closeModal;
-  $('#nwPReset').onclick=()=>{
-    try{localStorage.removeItem(NW_RESIN_KEY)}catch(e){}
-    NWS.price=null;NWS.live=new Date();
-    nwPriceCards();
-    const l=$('#nwLiveAt');if(l)l.textContent='Đã khôi phục giá mặc định lúc '+NWS.live.toLocaleTimeString('vi-VN');
-    closeModal();
-    toast('Đã khôi phục bảng giá hạt nhựa tham chiếu mặc định!',false);
-  };
-  $('#nwPSave').onclick=async()=>{
-    const src=($('#nwPSrc').value||'').trim()||'Báo giá nội bộ công ty';
-    const now=new Date().toISOString();
-    const items=cur.map((it,idx)=>{
-      const rawP=($(`[data-rprice="${idx}"]`).value||'').trim();
-      const numP=parseFloat(rawP.replace(/,/g,''));
-      const rawC=($(`[data-rchg="${idx}"]`).value||'').trim()||'0.00%';
-      return{name:it.label,price:isNaN(numP)?it.price:numP,chg:rawC,src};
-    });
-    const payload={updated_at:now,source:src,items};
-    nwWriteLocalPrices(payload);
-    NWS.price={category:'plastic',source_name:src,published_at:now,extra_data:payload};
-    NWS.live=new Date();
-    nwPriceCards();
-    const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN');
-    closeModal();
-    toast('Đã lưu bảng giá hạt nhựa vào bộ nhớ trình duyệt (localStorage)!',false);
-    if(sb){
-      try{
-        await sb.from('market_news').insert([{category:'plastic',title:'Cập nhật giá hạt nhựa nội bộ',source_name:src,extra_data:payload,published_at:now}]);
-      }catch(e){}
-    }
-  };
-}
+  if(NWS.price===undefined){box.innerHTML=NW_PRICES.map(()=>'<div class="rounded-2xl border border-line p-4 animate-pulse" style="height:7.5rem;background:rgba(127,127,127,.12)"></div>').join('');return}
+  const r=NWS.price,pr=r?nwPrices(r.extra_data):{rows:[],meta:{}},norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+  box.innerHTML=NW_PRICES.map(([label,keys],i)=>{const live=pr.rows.find(x=>keys.includes(norm(x.name))),col=['#16a34a','#2563eb','#0d9488','#7c3aed'][i],ref=NW_REF[label],
+      row=live||{price:ref[0],chg:ref[1],src:'Tham chiếu (mẫu)'},isRef=!live;
+    return `<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${col}"><div class="text-xs font-extrabold tracking-wide uppercase" style="color:${col}">${label}</div>
+     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">$${typeof row.price==='number'?row.price.toLocaleString('en-US'):esc(row.price)}<span class="text-xs font-normal text-mute"> /ton</span></div>${nwChg(row.chg)}</div>
+     <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(isRef?'Tham chiếu (mẫu)':(row.src||pr.meta.src||(r&&r.source_name)||'Realtime'))}</div></div>`}).join('')}
 async function nwLoadPrices(){
   nwPriceCards();NWS.priceErr='';
-  try{
-    const{data,error}=await sb.from('market_news').select('title,source_name,source_url,extra_data,published_at').eq('category','plastic').order('published_at',{ascending:false}).limit(1);
-    if(!error&&data&&data[0])NWS.price=data[0];
-  }catch(e){}
-  nwPriceCards()}
+  try{const{data,error}=await sb.from('market_news').select('title,source_name,source_url,extra_data,published_at').eq('category','plastic').order('published_at',{ascending:false}).limit(1);if(error)throw error;NWS.price=(data&&data[0])||null}
+  catch(e){console.warn('market_news',e);NWS.price=null;NWS.priceErr='Chưa kết nối được dữ liệu giá realtime — đang hiển thị giá tham chiếu.'}
+  nwPriceCards();const el=$('#nwPriceErr');if(el)el.textContent=NWS.priceErr}
+/* Realtime: kênh Singleton (tạo 1 lần duy nhất khi lần đầu mở tab Nhựa) — giá mới tự cập nhật 4 thẻ */
 function nwRealtime(){
   if(NW_CH||!sb||typeof sb.channel!=='function')return;
   NW_CH=sb.channel('realtime_market_news').on('postgres_changes',{event:'*',schema:'public',table:'market_news'},pl=>{
     const r=pl.new;if(!r||r.category!=='plastic')return;if(NWS.price&&NWS.price.published_at&&r.published_at&&Date.parse(r.published_at)<Date.parse(NWS.price.published_at))return;
     NWS.price=r;NWS.live=new Date();nwPriceCards();const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')}).subscribe()}
-
-/* ---- TradingView Ticker Tape Widget thời gian thực tại Tab Tin Tài Chính ---- */
-function nwMountTradingView(){
-  const wrap=$('#nwTvTicker');if(!wrap)return;
-  wrap.innerHTML='<div class="tradingview-widget-container rounded-2xl overflow-hidden border border-line bg-surface"><div class="tradingview-widget-container__widget"></div></div>';
-  const sc=document.createElement('script');
-  sc.type='text/javascript';
-  sc.src='https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
-  sc.async=true;
-  const isDark=document.documentElement.classList.contains('dark');
-  sc.text=JSON.stringify({
-    symbols:[
-      {proName:'FX_IDC:USDVND',title:'Tỷ giá USD/VND'},
-      {proName:'OANDA:XAUUSD',title:'Giá Vàng Thế Giới (XAU/USD)'},
-      {proName:'FOREXCOM:SPXUSD',title:'Chỉ số S&P 500'},
-      {proName:'TVC:USOIL',title:'Dầu Thô WTI (Nguyên liệu nhựa)'},
-      {proName:'TVC:UKOIL',title:'Dầu Thô Brent (Nguyên liệu nhựa)'}
-    ],
-    showSymbolLogo:true,
-    isTransparent:false,
-    displayMode:'adaptive',
-    colorTheme:isDark?'dark':'light',
-    locale:'vi_VN'
-  });
-  const container=wrap.querySelector('.tradingview-widget-container');
-  if(container)container.appendChild(sc);
-}
-
-/* ---- Khung 3 tab: hiển thị tức thì 0ms, không có skeleton loading ảo ---- */
+/* ---- Khung 3 tab: chỉ tải dữ liệu của tab đang mở ---- */
 function nwTab(){
   const body=$('#nwBody'),t=NWS.tab;if(!body)return;
   document.querySelectorAll('#nwTabs [data-nwt]').forEach(b=>{const on=b.dataset.nwt===t,c=NW_TABS.find(x=>x[0]===b.dataset.nwt)[3];b.style.borderColor=on?c:'transparent';b.style.color=on?c:'';b.classList.toggle('font-bold',on)});
   if(t==='plastic'){
-    const p=NW_PILLS.find(x=>x[0]===NWS.pill)||NW_PILLS[0];
-    const localP=nwReadLocalPrices();
-    const lastAt=NWS.live?('Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')):(localP&&localP.updated_at?('Đã lưu báo giá ngày '+new Date(localP.updated_at).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):'');
-    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
-      <div class="flex items-center gap-2 flex-wrap">
-        <button id="nwEditPriceBtn" type="button" class="btn" style="background:#16a34a;color:#fff">✏️ Cập nhật báo giá hạt nhựa</button>
-        <span id="nwLiveAt" class="text-xs text-mute">${esc(lastAt)}</span>
-      </div>
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-xs text-mute mr-1">Cổng thông tin hãng:</span>
-        ${NW_BRAND_PORTALS.map(([nm,url,ic,col])=>`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-lg text-xs font-bold border border-line bg-surface hover:shadow-sm transition inline-flex items-center gap-1.5" style="color:${col}"><i class="fa-solid ${ic}"></i>${esc(nm)} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-75"></i></a>`).join('')}
-      </div>
-     </div>
-     <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div>
-     <div class="flex gap-2 flex-wrap my-3" id="nwPills">${NW_PILLS.map(([k,l])=>`<button type="button" data-nwp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${p[0]===k?'text-white':'text-mute hover:text-ink'}" style="${p[0]===k?'background:#16a34a;border-color:#16a34a':'border-color:var(--line)'}">${l}</button>`).join('')}</div>
-     <div id="nwList"></div>`;
+    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><button id="nwLive" type="button" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-rotate nw-ic mr-2"></i>Cập nhật Live</button><span id="nwLiveAt" class="text-xs text-mute">${NWS.live?'Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN'):''}</span></div>
+     <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div><div id="nwPriceErr" class="text-xs mb-2 text-mute">${esc(NWS.priceErr)}</div>
+     <div class="flex gap-2 flex-wrap my-3" id="nwPills">${NW_PILLS.map(([k,l])=>`<button type="button" data-nwp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${NWS.pill===k?'text-white':'text-mute hover:text-ink'}" style="${NWS.pill===k?'background:#16a34a;border-color:#16a34a':'border-color:var(--line)'}">${l}</button>`).join('')}</div><div id="nwList"></div>`;
     nwPriceCards();if(NWS.price===undefined)nwLoadPrices();nwRealtime();
-    nwLoadList($('#nwList'),'plastic:'+p[0]);
-  }else if(t==='tech'){
-    const tp=NW_TECH_PILLS.find(x=>x[0]===NWS.techPill)||NW_TECH_PILLS[0];
-    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
-      <div class="flex gap-2 flex-wrap" id="nwTechPills">${NW_TECH_PILLS.map(([k,l])=>`<button type="button" data-nwtp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${tp[0]===k?'text-white':'text-mute hover:text-ink'}" style="${tp[0]===k?'background:#2563eb;border-color:#2563eb':'border-color:var(--line)'}">${esc(l)}</button>`).join('')}</div>
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-xs text-mute mr-1">Chuyên trang gốc:</span>
-        ${NW_TECH_PORTALS.map(([nm,url,ic,col])=>`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-lg text-xs font-bold border border-line bg-surface hover:shadow-sm transition inline-flex items-center gap-1.5" style="color:${col}"><i class="fa-solid ${ic}"></i>${esc(nm)} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-75"></i></a>`).join('')}
-      </div>
-    </div><div id="nwList"></div>`;
-    nwLoadList($('#nwList'),'tech:'+tp[0]);
-  }else{
-    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-      <span class="text-xs text-mute font-medium"><i class="fa-solid fa-bolt mr-1" style="color:#ca8a04"></i>Thị trường Thời gian thực (TradingView Live: USD/VND · Vàng XAU/USD · S&amp;P 500 · Dầu WTI &amp; Brent)</span>
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-xs text-mute mr-1">Chuyên trang gốc:</span>
-        ${NW_FINANCE_PORTALS.map(([nm,url,ic,col])=>`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 rounded-lg text-xs font-bold border border-line bg-surface hover:shadow-sm transition inline-flex items-center gap-1.5" style="color:${col}"><i class="fa-solid ${ic}"></i>${esc(nm)} <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-75"></i></a>`).join('')}
-      </div>
-    </div>
-    <div id="nwTvTicker" class="mb-4" style="min-height:46px"></div>
-    <div id="nwList"></div>`;
-    nwMountTradingView();
-    nwLoadList($('#nwList'),'finance')}}
+    const p=NW_PILLS.find(x=>x[0]===NWS.pill);nwLoadList($('#nwList'),'plastic:'+p[0],p[2]);
+  }else{body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3"><span class="text-xs text-mute">10 bài mới nhất · nguồn RSS online</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate nw-ic mr-1"></i>Làm mới</button></div><div id="nwList"></div>`;
+    nwLoadList($('#nwList'),t,NW_FEEDS[t])}}
+/* Cập nhật Live: xóa cache, xoay icon loading, quét lại giá + nguồn tin mới nhất */
+let NW_BUSY=false;
+async function nwRefresh(){
+  if(NW_BUSY)return;NW_BUSY=true;const t=NWS.tab,btn=$('#nwLive'),ic=btn&&btn.querySelector('i,.nw-dot');
+  Object.keys(NW_CACHE).forEach(k=>{if(k===t||k.startsWith(t+':'))delete NW_CACHE[k]});
+  if(btn){btn.disabled=true;btn.classList.add('nw-spin')}
+  try{const jobs=[];
+    if(t==='plastic'){jobs.push(nwLoadPrices());const p=NW_PILLS.find(x=>x[0]===NWS.pill);jobs.push(nwLoadList($('#nwList'),'plastic:'+p[0],p[2],true))}else jobs.push(nwLoadList($('#nwList'),t,NW_FEEDS[t],true));
+    await Promise.all([...jobs,new Promise(r=>setTimeout(r,700))]);NWS.live=new Date();const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')}
+  finally{NW_BUSY=false;const b2=$('#nwLive');if(b2){b2.disabled=false;b2.classList.remove('nw-spin')}}}
 function viewNews(){
-  $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Tổng hợp tiêu điểm Ngành Nhựa (JWELL · Starlinger · Boretech), Công nghệ (VnExpress · GenK) &amp; Tài chính Thời gian thực (TradingView · CafeF)</p></div>
+  $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Dữ liệu online · chỉ tải tab đang xem</p></div>
    <div id="nwTabs" class="flex gap-1 mb-4 border-b border-line overflow-x-auto">${NW_TABS.map(([k,l,ic])=>`<button type="button" data-nwt="${k}" class="px-5 py-3 text-base whitespace-nowrap border-b-4 text-mute hover:text-ink" style="border-color:transparent"><i class="fa-solid ${ic} mr-2"></i>${l}</button>`).join('')}</div><div id="nwBody"></div>`;
-  document.querySelectorAll('#nwTabs [data-nwt]').forEach(btn=>{
-    btn.onclick=ev=>{ev.stopPropagation();NWS.tab=btn.dataset.nwt;try{localStorage.setItem('nwtab',NWS.tab)}catch(x){}nwTab()};
-  });
   $('#view').onclick=e=>{let b;
     if(b=e.target.closest('[data-nwt]')){NWS.tab=b.dataset.nwt;try{localStorage.setItem('nwtab',NWS.tab)}catch(x){}nwTab()}
     else if(b=e.target.closest('[data-nwp]')){NWS.pill=b.dataset.nwp;nwTab()}
-    else if(b=e.target.closest('[data-nwtp]')){NWS.techPill=b.dataset.nwtp;nwTab()}
-    else if(b=e.target.closest('[data-edit-resin]')){nwEditPricesModal(parseInt(b.dataset.editResin,10))}
-    else if(e.target.closest('#nwEditPriceBtn')){nwEditPricesModal()}};
+    else if(e.target.closest('#nwLive')||e.target.closest('[data-nwretry]'))nwRefresh()};
   nwTab()}
 function renderView(name,pid,target){
   {const v_=$('#view');v_.onclick=v_.onchange=v_.ondragstart=v_.ondragend=v_.ondragover=v_.ondrop=null}   // gỡ listener ủy quyền của view trước
