@@ -754,6 +754,7 @@ function card(p){
     ${adm?stat('Thực chi',spent[0],spent[1],over?'text-red-600':''):stat('Thực chi','<i class="fa-solid fa-lock text-sm text-mute"></i>','')}
     ${stat('Đầu việc',done,'/'+s.leaf.length)}</div>
    <div><div class="flex justify-between text-xs text-mute"><span>Tiến độ tổng thể</span><b class="mono text-ink">${s.pct}%</b></div>${bar(s.pct)}</div>
+   <button type="button" data-cprep="${p.id}" class="text-xs font-semibold text-brand hover:underline text-left">📋 Copy báo cáo dự án</button>
    <div class="text-xs text-mute truncate" title="${nxt?esc(nxt.name):''}">📌 Việc tiếp theo: ${nxt?`<b class="text-ink">${esc(nxt.name)}</b>${nxt.due_date?' · '+fmtD(nxt.due_date):''}`:'<span>Không còn việc tồn đọng</span>'}</div>
    <div class="flex items-center justify-between gap-2 min-h-[1.75rem]">
     ${adm?`<span class="mono text-xs text-mute truncate">NS duyệt: <b class="text-ink">${plan[0]}${plan[1]?' '+plan[1]:''} đ</b></span>`:`<span class="text-xs text-mute"><i class="fa-solid fa-lock mr-1"></i>Ngân sách chỉ Admin xem</span>`}
@@ -926,6 +927,7 @@ function viewProjects(){
     const g=sel=>e.target.closest(sel);let el;
     if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
     if(el=g('#pjView')){PJV=PJV==='table'?'grid':'table';try{localStorage.setItem('pjv',PJV)}catch(x){}el.innerHTML=`<i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span>`;pjList();return}
+    if(el=g('[data-cprep]')){e.stopPropagation();pjCopyOne(el.dataset.cprep);return}
     if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
     if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
     if(el=g('[data-perm]')){e.stopPropagation();permModal(el.dataset.perm);return}
@@ -977,6 +979,58 @@ function projectForm(id){
   };
 }
 
+/* ---- Bảng "cần lưu ý" (2 bảng) lưu trong extra_tasks của dự án: note = [WT]{json} (việc) | [WC]{json} (chi phí). Đồng bộ Supabase qua db.save ---- */
+const xPlain=x=>!/^\[W[TC]\]/.test(x.note||'');
+const xRows=pid=>db.list('extra_tasks').filter(x=>x.project_id===pid&&xPlain(x));
+const wRows=(pid,k)=>db.list('extra_tasks').filter(x=>x.project_id===pid&&String(x.note||'').startsWith('['+k+']')).map(x=>{let j={};try{j=JSON.parse(x.note.slice(4))}catch(e){}return{x,...j}}).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9'))||String(a.x.created_at).localeCompare(String(b.x.created_at)));
+const W_ST={todo:['Chưa xử lý','bg-slate-200 text-slate-700'],doing:['Đang xử lý','bg-blue-100 text-blue-700'],done:['Đã xong','bg-green-100 text-green-700']};
+const W_AP={pending:['Chờ duyệt','bg-amber-100 text-amber-700'],approved:['Đã duyệt','bg-green-100 text-green-700'],rejected:['Từ chối','bg-red-100 text-red-700']};
+function wModal(p,k,id){
+  const r=id?wRows(p.id,k).find(z=>z.x.id===id):null,T=k==='WT';
+  const f=(l,i,v,t='text',ph='')=>`<label class="text-xs text-mute block">${l}<input id="${i}" type="${t}" class="inp" value="${esc(v==null?'':v)}" placeholder="${ph}"></label>`;
+  const sel=(l,i,o,v)=>`<label class="text-xs text-mute block">${l}<select id="${i}" class="inp">${Object.entries(o).map(([a,b])=>`<option value="${a}" ${v===a?'selected':''}>${b[0]}</option>`).join('')}</select></label>`;
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-lg p-5 max-h-[90vh] overflow-auto"><h3 class="font-bold text-lg mb-2">${T?'⚠️ Việc cần lưu ý':'💰 Chi phí phát sinh'} — ${r?'Sửa':'Thêm'}</h3>
+   ${T?f('Nội dung công việc','wA',r&&r.x.title)+f('Người phụ trách','wB',r&&r.owner)+f('Hạn xử lý','wC',r&&r.due,'date')+sel('Trạng thái','wD',W_ST,r?(r.x.done?'done':r.status||'todo'):'todo')+f('Ghi chú','wE',r&&r.note)
+      :f('Hạng mục phát sinh','wA',r&&r.x.title)+f('Số tiền dự kiến (VNĐ)','wB',r&&r.planned,'number')+f('Số tiền thực tế (VNĐ)','wC',r&&r.actual,'number')+f('Nguyên nhân / Nhà cung cấp','wE',r&&r.cause)+sel('Trạng thái duyệt','wD',W_AP,r?r.appr||'pending':'pending')}
+   <div id="wErr" class="text-red-600 text-xs h-4"></div><div class="flex justify-end gap-2 mt-2"><button id="wNo" class="btn-ghost" type="button">Hủy</button><button id="wOk" class="btn" type="button">Lưu</button></div></div></div>`;
+  $('#wNo').onclick=closeModal;$('#wA').focus();
+  $('#wOk').onclick=()=>{const a=$('#wA').value.trim();if(!a){$('#wErr').textContent='Nhập nội dung';return}
+    const j=T?{owner:$('#wB').value.trim(),due:$('#wC').value||'',status:$('#wD').value,note:$('#wE').value.trim()}:{planned:+$('#wB').value||0,actual:+$('#wC').value||0,cause:$('#wE').value.trim(),appr:$('#wD').value};
+    const row={title:a,note:'['+k+']'+JSON.stringify(j),done:T&&j.status==='done'};
+    if(r)db.save('extra_tasks',db.list('extra_tasks').map(z=>z.id===r.x.id?{...z,...row}:z));
+    else db.save('extra_tasks',[...db.list('extra_tasks'),{id:uid(),project_id:p.id,...row,created_by:currentUser().id,created_at:new Date().toISOString()}]);
+    closeModal();viewDashboard(p)}}
+function wTables(p,adm){
+  const ed=canTask(p.id),btn=(k,id,ic,c)=>`<button data-w${k}="${id}" class="p-1.5 text-mute hover:${c}" aria-label="${k}"><i class="fa-solid ${ic}"></i></button>`;
+  const T=wRows(p.id,'WT'),C=wRows(p.id,'WC'),th='class="px-2 py-1.5 text-left"',td='class="px-2 py-1.5 align-top"';
+  const hd=(t,k,n)=>`<div class="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-line"><div class="font-semibold">${t} <span class="text-xs text-mute">(${n})</span></div>${ed?`<button data-wadd="${k}" class="btn" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button>`:''}</div>`;
+  const act=(x)=>ed?`<td ${td} style="white-space:nowrap">${btn('edit',x,'fa-pen','text-brand')}${btn('del',x,'fa-trash','text-red-600')}</td>`:'<td></td>';
+  const t1=`<div class="card overflow-hidden min-w-0">${hd('⚠️ Bảng công việc cần lưu ý','WT',T.length)}<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs uppercase text-mute"><tr><th ${th}>Nội dung</th><th ${th}>Phụ trách</th><th ${th}>Hạn xử lý</th><th ${th}>Trạng thái / Ghi chú</th><th></th></tr></thead><tbody>
+   ${T.map(r=>{const st=r.x.done?'done':r.status||'todo',late=st!=='done'&&r.due&&r.due<today();return `<tr class="border-t border-line"><td ${td}><span class="${st==='done'?'line-through text-mute':'font-medium'} break-words">${esc(r.x.title)}</span></td><td ${td}>${esc(r.owner||'—')}</td><td ${td} style="white-space:nowrap;${late?'color:#dc2626;font-weight:600':''}">${fmtD(r.due)}</td><td ${td}><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${W_ST[st][1]}">${W_ST[st][0]}</span>${r.note?`<div class="text-xs text-mute break-words">${esc(r.note)}</div>`:''}</td>${act(r.x.id)}</tr>`}).join('')||'<tr><td colspan="5" class="p-4 text-center text-mute text-sm">Chưa có công việc cần lưu ý.</td></tr>'}</tbody></table></div></div>`;
+  const t2=adm?`<div class="card overflow-hidden min-w-0">${hd('💰 Bảng chi phí phát sinh cần lưu ý','WC',C.length)}<div class="overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs uppercase text-mute"><tr><th ${th}>Hạng mục</th><th ${th}>Dự kiến / Thực tế</th><th ${th}>Nguyên nhân / NCC</th><th ${th}>Duyệt</th><th></th></tr></thead><tbody>
+   ${C.map(r=>`<tr class="border-t border-line"><td ${td}><span class="font-medium break-words">${esc(r.x.title)}</span></td><td ${td} class="mono" style="white-space:nowrap"><div class="mono px-2">${fmtVND(r.planned||0)}</div><div class="mono px-2 ${r.actual>r.planned?'text-red-600':''}">${fmtVND(r.actual||0)}</div></td><td ${td}>${esc(r.cause||'—')}</td><td ${td}><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${(W_AP[r.appr]||W_AP.pending)[1]}">${(W_AP[r.appr]||W_AP.pending)[0]}</span></td>${act(r.x.id)}</tr>`).join('')||'<tr><td colspan="5" class="p-4 text-center text-mute text-sm">Chưa có chi phí phát sinh.</td></tr>'}</tbody></table></div></div>`
+   :`<div class="card p-4 text-sm text-mute"><i class="fa-solid fa-lock mr-1"></i>Bảng chi phí phát sinh chỉ dành cho người có quyền ngân sách.</div>`;
+  return `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4" id="wTables">${t1}${t2}</div>`}
+/* ---- Copy báo cáo từng dự án: Tên, Tiến độ, Thực chi/Ngân sách, 2-3 việc trọng tâm (ghim hoặc tự chọn) ---- */
+const pinKey=pid=>'pins_'+pid;
+const pinGet=pid=>{try{return JSON.parse(localStorage.getItem(pinKey(pid))||'[]')}catch(e){return[]}};
+function pinTasks(p,s){const open=s.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100),pin=pinGet(p.id).map(id=>open.find(t=>t.id===id)).filter(Boolean);
+  return pin.length?pin.slice(0,3):open.slice().sort((a,b)=>((b.status==='in_progress')-(a.status==='in_progress'))||String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))).slice(0,3)}
+async function copyText(text){try{await navigator.clipboard.writeText(text);return true}catch(e){const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0;top:0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(x){}ta.remove();return ok}}
+async function pjCopyOne(pid){
+  const p=db.list('projects').find(x=>x.id===pid);if(!p)return;const s=projStats(pid),tk=pinTasks(p,s);
+  const L=[`📊 BÁO CÁO DỰ ÁN: ${p.name}${p.code?' ('+p.code+')':''}`,`📅 ${fmtD(today())}`,`• Tiến độ: ${s.pct}%`];
+  if(canBudget(pid))L.push(`• Thực chi / Ngân sách: ${fmtVND(s.actual)} / ${fmtVND(s.planned)}${s.planned?' ('+Math.round(s.actual/s.planned*100)+'%)':''}`);
+  if(s.overdue.length)L.push(`• ⚠️ ${s.overdue.length} việc trễ hạn`);
+  L.push('• Việc trọng tâm:');tk.forEach((t,i)=>L.push(`   ${i+1}. ${t.name} — hạn ${fmtD(t.due_date)} (${t.progress||0}%)`));if(!tk.length)L.push('   (Không còn việc tồn đọng)');
+  if(await copyText(L.join('\n')))toast('Đã copy báo cáo để gửi Zalo/Teams!',false);else toast('Không copy được — trình duyệt chặn clipboard')}
+function pinModal(p){
+  const s=projStats(p.id),open=s.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100).sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))),cur=new Set(pinGet(p.id));
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-lg p-5 max-h-[90vh] overflow-auto"><h3 class="font-bold text-lg">📌 Ghim 2–3 việc trọng tâm</h3><p class="text-xs text-mute mb-2">Không ghim: tự lấy 3 việc đang làm / sắp đến hạn nhất.</p>
+   <div id="pnL" class="space-y-1">${open.map(t=>`<label class="flex gap-2 items-start text-sm border-b border-line py-1"><input type="checkbox" value="${t.id}" ${cur.has(t.id)?'checked':''} style="margin-top:.2rem"><span class="min-w-0 break-words">${esc(t.name)} <span class="text-xs text-mute">· ${fmtD(t.due_date)}</span></span></label>`).join('')||'<div class="text-mute text-sm">Không có việc tồn đọng.</div>'}</div>
+   <div class="flex justify-end gap-2 mt-3"><button id="pnNo" class="btn-ghost" type="button">Hủy</button><button id="pnOk" class="btn" type="button">Lưu</button></div></div></div>`;
+  const L=$('#pnL');L.onchange=e=>{if(L.querySelectorAll('input:checked').length>3){e.target.checked=false;toast('Chỉ ghim tối đa 3 việc')}};
+  $('#pnNo').onclick=closeModal;$('#pnOk').onclick=()=>{try{localStorage.setItem(pinKey(p.id),JSON.stringify([...L.querySelectorAll('input:checked')].map(i=>i.value)))}catch(e){}closeModal();toast('Đã lưu việc trọng tâm',false)}}
 function viewDashboard(p){
   const adm=canBudget(p.id),s=projStats(p.id),st=STATUS[p.status],over=s.planned&&s.actual>s.planned,ob=adm?overBudget(s):[],isL=leafFn(s.tk);
   const kpi=(l,v,sub,ic,bg,fg,cls='')=>`<div class="card p-4"><div class="kpi"><div class="min-w-0"><div class="lbl">${l}</div><div class="text-2xl font-bold mt-1 mono ${cls}">${v}</div></div><span class="kpi-ic" style="background:${bg};color:${fg}"><i class="fa-solid ${ic}"></i></span></div>${sub}</div>`;
@@ -992,9 +1046,10 @@ function viewDashboard(p){
      ${own?`<span class="grid place-items-center rounded-full text-white text-[10px] font-bold shrink-0" style="width:1.9rem;height:1.9rem;background:var(--brand)">${esc(own.slice(0,2).toUpperCase())}</span>`:''}
      <i class="fa-solid fa-arrow-right text-mute"></i></a>`};
   const bcard=b=>`<a href="#/p/${p.id}/budget/${b.id}" class="imp" style="--ac:#dc2626"><span class="kpi-ic" style="background:rgba(220,38,38,.12);color:#dc2626"><i class="fa-solid fa-wallet"></i></span><div class="flex-1 min-w-0"><div class="font-semibold truncate" style="color:#dc2626">Vượt ngân sách: ${esc(b.name)}</div><div class="text-xs text-mute">Dự kiến ${nfmt(b.planned_amount)} · Thực tế ${nfmt(b.actual_amount)}</div></div><b class="mono" style="color:#dc2626">+${fmtVND(b.actual_amount-b.planned_amount)}</b><i class="fa-solid fa-arrow-right text-mute"></i></a>`;
-  const xo=db.list('extra_tasks').filter(x=>x.project_id===p.id&&!x.done).length;
+  const xo=xRows(p.id).filter(x=>!x.done).length;
   $('#view').innerHTML=`<div class="flex flex-wrap items-center gap-2 mb-4"><h2 class="text-2xl font-bold">${esc(p.name)}</h2><span class="pill ${st[1]}">${st[0]}</span><span class="pill ${p.approved?'bg-green-100 text-green-800':'bg-amber-100 text-amber-800'}">${p.approved?'✓ Đã duyệt':'Chờ duyệt'}</span><span class="text-xs text-mute mono">${esc(p.code)} · ${fmtD(p.start_date)} → ${fmtD(p.end_date)}</span>
-   ${isMgr(p.id)?`<span class="ml-auto flex gap-2">${isAdmin()?`<button id="dApr" class="btn-ghost"><i class="fa-solid fa-circle-check mr-1"></i>${p.approved?'Bỏ duyệt':'Duyệt dự án'}</button>`:''}<button id="dPerm" class="btn"><i class="fa-solid fa-user-shield mr-1"></i>Phân quyền</button></span>`:''}</div>
+   <span class="ml-auto flex gap-2"><button id="dCopy" class="btn-ghost" type="button">📋 Copy báo cáo dự án</button>${canTask(p.id)?'<button id="dPin" class="btn-ghost" type="button" title="Ghim 2-3 việc trọng tâm cho báo cáo">📌 Việc trọng tâm</button>':''}</span>
+   ${isMgr(p.id)?`<span class="flex gap-2">${isAdmin()?`<button id="dApr" class="btn-ghost"><i class="fa-solid fa-circle-check mr-1"></i>${p.approved?'Bỏ duyệt':'Duyệt dự án'}</button>`:''}<button id="dPerm" class="btn"><i class="fa-solid fa-user-shield mr-1"></i>Phân quyền</button></span>`:''}</div>
    ${p.description?`<p class="text-sm text-mute mb-4">${esc(p.description)}</p>`:''}
    <div class="grid grid-cols-2 ${adm?'lg:grid-cols-4':'lg:grid-cols-2'} gap-3 mb-4">
     ${kpi('Tiến độ tổng thể',s.pct+'%',bar(s.pct)+`<div class="text-xs text-mute mt-1">Đã xong ${s.leaf.filter(t=>t.status==='done').length}/${s.leaf.length} việc</div>`,'fa-bars-progress','rgba(37,99,235,.12)','#2563eb')}
@@ -1005,9 +1060,15 @@ function viewDashboard(p){
    <div class="grid ${adm?'lg:grid-cols-2':'lg:grid-cols-1'} gap-4 mb-5">
     ${adm?`<div class="card p-4"><div class="font-semibold mb-2">Chi phí thực tế theo hạng mục</div><div class="h-64"><canvas id="pie"></canvas></div></div>`:''}
     <div class="card p-4"><div class="font-semibold mb-2">Tiến độ theo giai đoạn (%)</div><div class="h-64"><canvas id="bars"></canvas></div></div></div>
-   <div class="flex items-center justify-between mb-2"><div class="zone-h" style="margin:0"><i class="fa-solid fa-flag" style="color:#dc2626"></i>Danh mục công việc quan trọng cần lưu ý</div><a href="#/p/${p.id}/todo" class="text-xs" style="color:var(--brand)">Xem tất cả →</a></div>
+   <div class="zone-h"><i class="fa-solid fa-flag" style="color:#dc2626"></i>Danh mục công việc cần lưu ý</div>
+   ${wTables(p,adm)}
+   <details class="mb-4"><summary class="zone-h cursor-pointer" style="margin:0"><i class="fa-solid fa-flag" style="color:#dc2626"></i>Cảnh báo tự động (ưu tiên cao / trễ hạn / vượt ngân sách)</summary><div class="mt-2">
    <div class="flex flex-wrap gap-3 text-xs text-mute mb-2"><span><span class="sw" style="background:#dc2626"></span>Ưu tiên cao</span><span><span class="sw" style="background:#eab308"></span>Trung bình</span><span><span class="sw" style="background:#16a34a"></span>Thấp</span></div>
-   <div class="space-y-2">${imp.map(card).join('')+ob.map(bcard).join('')||'<div class="card p-5 text-sm text-mute">Mọi thứ đang ổn: không có việc ưu tiên cao, quá hạn hay vượt ngân sách.</div>'}</div>`;
+   <div class="space-y-2">${imp.map(card).join('')+ob.map(bcard).join('')||'<div class="card p-5 text-sm text-mute">Mọi thứ đang ổn: không có việc ưu tiên cao, quá hạn hay vượt ngân sách.</div>'}</div></details>`;  $('#dCopy').onclick=()=>pjCopyOne(p.id);if($('#dPin'))$('#dPin').onclick=()=>pinModal(p);
+  $('#view').onclick=e=>{let b;const ok=canTask(p.id);if(!ok)return;
+    if(b=e.target.closest('[data-wadd]'))wModal(p,b.dataset.wadd);
+    else if(b=e.target.closest('[data-wedit]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.wedit);if(x)wModal(p,x.note.slice(1,3),x.id)}
+    else if(b=e.target.closest('[data-wdel]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.wdel);if(x)ask(`Xóa "${x.title}"?`,()=>{db.save('extra_tasks',db.list('extra_tasks').filter(r=>r.id!==x.id));viewDashboard(p)})}};
   if($('#dApr'))$('#dApr').onclick=()=>toggleApprove(p.id);if($('#dPerm'))$('#dPerm').onclick=()=>permModal(p.id)
   drawCharts(s);
 }
@@ -1115,7 +1176,7 @@ function route(keep){
 
 function updateBadges(){
   const pid=curPid;if(!pid||!$('#bnav'))return;
-  const tk=taskRows(pid),isL=leafFn(tk),open=tk.filter(t=>isL(t)&&t.status!=='done').length+db.list('extra_tasks').filter(x=>x.project_id===pid&&!x.done).length;
+  const tk=taskRows(pid),isL=leafFn(tk),open=tk.filter(t=>isL(t)&&t.status!=='done').length+xRows(pid).filter(x=>!x.done).length;
   const set=(t,n)=>{const e=$(`#bnav [data-tab=${t}] [data-bd]`);if(e)e.textContent=n||''};
   set('progress',tk.filter(t=>!t.parent_id).length);set('todo',open);
 }
@@ -2225,7 +2286,7 @@ function xSave(p,row){const v=row.querySelector('.xt-in').value.trim();if(!v){ro
   db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===row.dataset.xid?{...r,title:v,note:n?n.value.trim():(r.note||'')}:r));XEDIT=null;drawExtra(p)}
 
 function drawExtra(p){
-  const ed=canTask(p.id),all=db.list('extra_tasks').filter(x=>x.project_id===p.id).sort((a,b)=>(a.done-b.done)||a.created_at.localeCompare(b.created_at));
+  const ed=canTask(p.id),all=xRows(p.id).sort((a,b)=>(a.done-b.done)||a.created_at.localeCompare(b.created_at));
   const nOpen=all.filter(x=>!x.done).length,rows=XF==='open'?all.filter(x=>!x.done):XF==='done'?all.filter(x=>x.done):all;
   $('#xTabs').innerHTML=[['all','Tất cả ('+all.length+')'],['open','Chưa xong ('+nOpen+')'],['done','Đã xong ('+(all.length-nOpen)+')']].map(([k,l])=>`<button data-xf="${k}" class="seg px-3 py-1.5 ${XF===k?'on':''}">${l}</button>`).join('');
   $('#xList').innerHTML=rows.map(x=>`<div class="xt ${x.done?'done':''}" data-xid="${x.id}"><input type="checkbox" data-act="xdone" ${x.done?'checked':''} ${ed?'':'disabled'} aria-label="Đã xong">
@@ -2688,12 +2749,13 @@ function assignModal(uid_){
 /* ===================== VIỆC CẦN LÀM (#/todos): List + Kanban, kéo thả HTML5 native, bình luận ===================== */
 const TD_PRI={urgent:['Urgent','bg-red-100 text-red-700'],high:['High','bg-amber-100 text-amber-700'],medium:['Medium','bg-blue-100 text-blue-700'],low:['Low','bg-slate-200 text-slate-700']};
 const TD_COLS=[['todo','Chưa làm','#64748b'],['in_progress','Đang làm','#2563eb'],['done','Hoàn thành','#16a34a']];
+const TD_VIS=TD_COLS.slice(0,2);   // Kanban chỉ hiện 2 cột: Chưa làm / Đang làm
 const TD_PRI_ORD={urgent:0,high:1,medium:2,low:3};
 let TDV=(()=>{try{return localStorage.getItem('tdv')||'kanban'}catch(e){return'kanban'}})(),TDF={p:'',pri:'',q:''};
 const tdCol=t=>t.status==='done'||(t.progress||0)>=100?'done':t.status==='todo'?'todo':'in_progress';
 function tdTasks(){
   const ps=myProjects(),pm=Object.fromEntries(ps.map(p=>[p.id,p])),all=db.list('tasks').filter(t=>pm[t.project_id]),par=new Set(all.map(t=>t.parent_id).filter(Boolean)),q=nk0(TDF.q).trim();
-  return all.filter(t=>!par.has(t.id)&&(!TDF.p||t.project_id===TDF.p)&&(!TDF.pri||(t.priority||'medium')===TDF.pri)&&(!q||nk0(t.name+' '+(t.wbs_code||'')+' '+pm[t.project_id].name+' '+pm[t.project_id].code).includes(q))).map(t=>({t,p:pm[t.project_id]}))
+  return all.filter(t=>!par.has(t.id)&&t.task_source!=='BECOS'&&tdCol(t)!=='done'&&(!TDF.p||t.project_id===TDF.p)&&(!TDF.pri||(t.priority||'medium')===TDF.pri)&&(!q||nk0(t.name+' '+(t.wbs_code||'')+' '+pm[t.project_id].name+' '+pm[t.project_id].code).includes(q))).map(t=>({t,p:pm[t.project_id]}))
     .sort((a,b)=>(TD_PRI_ORD[a.t.priority||'medium']??2)-(TD_PRI_ORD[b.t.priority||'medium']??2)||String(a.t.due_date||'9999').localeCompare(String(b.t.due_date||'9999')))}
 const tdPriBadge=t=>{const pr=TD_PRI[t.priority||'medium']||TD_PRI.medium;return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${pr[1]}">${pr[0]}</span>`};
 const tdDue=t=>{if(!t.due_date)return'<span class="text-mute">—</span>';const d=daysBetween(today(),t.due_date),done=tdCol(t)==='done';return `<span class="${!done&&d<0?'text-red-600 font-semibold':!done&&d<=3?'text-amber-600 font-semibold':''}" title="${done?'':d<0?'Trễ '+(-d)+' ngày':d===0?'Hôm nay':'Còn '+d+' ngày'}">${fmtD(t.due_date)}</span>`};
@@ -2707,13 +2769,13 @@ function tdCard({t,p}){
 function tdDraw(){
   const rows=tdTasks(),box=$('#tdBody');if(!box)return;
   $('#tdCount').textContent=rows.length+' việc';
-  if(!rows.length){box.innerHTML='<div class="text-mute p-6 text-center">Không có việc phù hợp.</div>';return}
+  if(!rows.length){box.innerHTML='<div class="text-mute p-6 text-center">Không có việc phù hợp (chỉ hiện việc Check list chưa hoàn thành).</div>';return}
   if(TDV==='list'){
     box.innerHTML=`<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Tiêu đề</th><th class="px-3 py-2">Dự án</th><th class="px-3 py-2">Người phụ trách</th><th class="px-3 py-2">Hạn chót</th><th class="px-3 py-2">Ưu tiên</th><th class="px-3 py-2">Trạng thái</th></tr></thead><tbody>
      ${rows.map(x=>{const{t,p}=x,can=canTask(t.project_id);return `<tr class="border-t border-line hover:bg-black/5 cursor-pointer" data-tid="${t.id}"><td class="px-3 py-2 font-medium" style="max-width:22rem"><div class="truncate" title="${esc(t.name)}">${esc(t.name)}</div></td><td class="px-3 py-2 whitespace-nowrap"><span class="mono text-[10px] rounded px-1.5" style="background:rgba(127,127,127,.16)" title="${esc(p.name)}">${esc(p.code||'')}</span> <span class="text-xs text-mute">${esc(p.name)}</span></td>
       <td class="px-3 py-2 text-xs">${esc(tdOwner(t))||'—'}</td><td class="px-3 py-2 whitespace-nowrap">${tdDue(t)}</td><td class="px-3 py-2">${tdPriBadge(t)}</td>
       <td class="px-3 py-2"><select data-tdst="${t.id}" class="cell q" style="width:auto;font-size:.75rem" ${can?'':'disabled'} aria-label="Trạng thái">${TD_COLS.map(c=>`<option value="${c[0]}" ${tdCol(t)===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select></td></tr>`}).join('')}</tbody></table></div>`;return}
-  box.innerHTML=`<div class="grid gap-3 md:grid-cols-3">${TD_COLS.map(([k,l,c])=>{let items=rows.filter(x=>tdCol(x.t)===k),more=0;if(k==='done'&&items.length>40){more=items.length-40;items=items.slice().sort((a,b)=>String(b.t.updated_at||'').localeCompare(String(a.t.updated_at||''))).slice(0,40)}
+  box.innerHTML=`<div class="grid gap-3 grid-cols-1 md:grid-cols-2" style="width:100%">${TD_VIS.map(([k,l,c])=>{let items=rows.filter(x=>tdCol(x.t)===k),more=0;if(k==='done'&&items.length>40){more=items.length-40;items=items.slice().sort((a,b)=>String(b.t.updated_at||'').localeCompare(String(a.t.updated_at||''))).slice(0,40)}
     return `<div class="td-col rounded-2xl p-2 min-w-0" data-col="${k}" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface));border-top:3px solid ${c}"><div class="flex items-center justify-between px-1 py-1.5 mb-1"><b class="text-sm" style="color:${c}">${l}</b><span class="text-xs font-semibold rounded-full px-2 py-0.5" style="background:rgba(127,127,127,.18)">${rows.filter(x=>tdCol(x.t)===k).length}</span></div>
      <div class="space-y-2 overflow-y-auto" style="max-height:calc(100vh - 15rem);min-height:6rem">${items.map(tdCard).join('')||'<div class="text-xs text-mute text-center py-6">Kéo thẻ vào đây</div>'}${more?`<div class="text-xs text-mute text-center">… và ${more} việc hoàn thành cũ hơn</div>`:''}</div></div>`}).join('')}</div>`}
 /* Chuyển trạng thái (kéo thả / chọn): cập nhật tasks qua db.save (cục bộ ngay, đồng bộ Supabase) */
@@ -2748,30 +2810,40 @@ function tdProjectView(){
 let TDT=(()=>{try{return localStorage.getItem('tdt')||'project'}catch(e){return'project'}})(),PTF='open',PT_LOADED=false,PT_ERR='';
 const ptRows=()=>db.list('extra_tasks').filter(x=>!x.project_id&&CUR&&x.created_by===CUR.id).sort((a,b)=>(a.done-b.done)||String(b.created_at||'').localeCompare(String(a.created_at||'')));
 async function ptLoad(){PT_ERR='';try{await fetchTable('extra_tasks','created_by',[CUR.id]);PT_LOADED=true}catch(e){console.error(e);PT_ERR=sbErr(e,'tải việc cá nhân (bảng extra_tasks)')}}
+const PT_TAG=/^\s*\[PRI:(urgent|high|medium|low)\]\s*/i;
+const ptParse=x=>{const m=PT_TAG.exec(x.note||'');return{pri:m?m[1].toLowerCase():'medium',note:(x.note||'').replace(PT_TAG,'').trim()}};
+const ptEnc=(pri,note)=>`[PRI:${pri}]${note?' '+note:''}`;
+const ptBadge=pri=>{const p=TD_PRI[pri]||TD_PRI.medium;return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${p[1]}">${p[0]}</span>`};
 function ptDraw(){
-  const box=$('#ptList');if(!box)return;const all=ptRows(),rows=all.filter(x=>PTF==='all'||(PTF==='open'?!x.done:x.done));
-  $('#ptCount').textContent=`${all.filter(x=>!x.done).length} chưa xong · ${all.filter(x=>x.done).length} đã xong`;
-  box.innerHTML=rows.length?rows.map(x=>`<div class="flex items-start gap-3 px-3 py-2.5 border-b border-line last:border-0" data-pid="${x.id}">
+  const box=$('#ptList');if(!box)return;const all=ptRows().map(x=>({x,...ptParse(x)})).sort((a,b)=>(a.x.done-b.x.done)||(TD_PRI_ORD[a.pri]-TD_PRI_ORD[b.pri])||String(b.x.created_at||'').localeCompare(String(a.x.created_at||''))),rows=all.filter(r=>PTF==='all'||(PTF==='open'?!r.x.done:r.x.done));
+  $('#ptCount').textContent=`${all.filter(r=>!r.x.done).length} chưa xong · ${all.filter(r=>r.x.done).length} đã xong`;
+  const st=$('#ptStat');if(st)st.innerHTML=Object.entries(TD_PRI).map(([k,v])=>`<div class="rounded-xl p-3 text-center ${v[1]}"><div class="text-2xl font-extrabold mono">${all.filter(r=>!r.x.done&&r.pri===k).length}</div><div class="text-[11px] font-bold uppercase">${v[0]}</div></div>`).join('');
+  box.innerHTML=rows.length?rows.map(({x,pri,note})=>`<div class="flex items-start gap-3 px-3 py-2.5 border-b border-line last:border-0" data-pid="${x.id}">
     <input type="checkbox" data-ptdone="${x.id}" ${x.done?'checked':''} style="width:1.1rem;height:1.1rem;margin-top:.2rem" aria-label="Hoàn thành">
-    <div class="min-w-0 flex-1"><div class="${x.done?'line-through text-mute':'font-medium'} break-words">${esc(x.title)}</div>${x.note?`<div class="text-xs text-mute break-words">${esc(x.note)}</div>`:''}<div class="text-[10px] text-mute mt-0.5">${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div></div>
+    <div class="min-w-0 flex-1"><div class="flex items-center gap-2 flex-wrap"><span class="${x.done?'line-through text-mute':'font-medium'} break-words">${esc(x.title)}</span>${ptBadge(pri)}</div>${note?`<div class="text-xs text-mute break-words">${esc(note)}</div>`:''}<div class="text-[10px] text-mute mt-0.5">${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div></div>
     <button data-ptedit="${x.id}" class="p-1.5 text-mute hover:text-brand" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button><button data-ptdel="${x.id}" class="p-1.5 text-mute hover:text-red-600" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button></div>`).join(''):'<div class="text-mute text-sm p-6 text-center">Chưa có việc cá nhân nào ở mục này.</div>'}
 async function tdPersonalView(){
-  $('#tdHost').innerHTML=`<div class="max-w-2xl"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><div class="font-bold">🙋 Việc cá nhân của tôi</div><div class="text-xs text-mute">Riêng tư, không gắn dự án · <span id="ptCount"></span></div></div>
+  $('#tdHost').innerHTML=`<div style="width:100%"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><div class="font-bold">🙋 Việc cá nhân của tôi</div><div class="text-xs text-mute">Riêng tư, không gắn dự án · <span id="ptCount"></span></div></div>
     <div class="inline-flex rounded-xl border border-line overflow-hidden text-xs bg-surface">${[['open','Chưa xong'],['done','Đã xong'],['all','Tất cả']].map(([k,l])=>`<button data-ptf="${k}" class="px-3 py-1.5 ${PTF===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div></div>
-    <div class="flex gap-2 mb-3"><input id="ptTitle" class="inp" style="margin:0" placeholder="Thêm việc cá nhân mới... (Enter)" maxlength="200" aria-label="Tên việc"><input id="ptNote" class="inp" style="margin:0;max-width:11rem" placeholder="Ghi chú" aria-label="Ghi chú"><button id="ptAdd" class="btn" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button></div>
-    <div id="ptErr" class="text-xs mb-2" style="color:#dc2626">${esc(PT_ERR)}</div><div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden">${SPIN_HTML}</div></div>`;
+   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start" style="width:100%">
+    <div class="space-y-4"><div class="bg-surface border border-line rounded-2xl p-4 space-y-2"><div class="font-semibold text-sm">➕ Thêm việc mới</div>
+      <input id="ptTitle" class="inp" style="margin:0" placeholder="Tên việc... (Enter)" maxlength="200" aria-label="Tên việc"><input id="ptNote" class="inp" style="margin:0" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú">
+      <select id="ptPri" class="inp" style="margin:0" aria-label="Mức ưu tiên">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${k==='medium'?'selected':''}>Ưu tiên: ${v[0]}</option>`).join('')}</select>
+      <button id="ptAdd" class="btn" type="button" style="width:100%"><i class="fa-solid fa-plus mr-1"></i>Thêm</button></div>
+     <div class="bg-surface border border-line rounded-2xl p-4"><div class="font-semibold text-sm mb-2">📊 Thống kê nhanh (việc chưa xong)</div><div id="ptStat" class="grid grid-cols-2 gap-2"></div></div></div>
+    <div class="lg:col-span-2 min-w-0"><div id="ptErr" class="text-xs mb-2" style="color:#dc2626">${esc(PT_ERR)}</div><div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden" style="width:100%">${SPIN_HTML}</div></div></div></div>`;
   const add=()=>{const t=$('#ptTitle').value.trim();if(!t){$('#ptTitle').focus();return}
-    db.save('extra_tasks',[...db.list('extra_tasks'),{id:uid(),project_id:null,title:t,note:$('#ptNote').value.trim(),done:false,created_by:CUR.id,created_at:new Date().toISOString()}]);
+    db.save('extra_tasks',[...db.list('extra_tasks'),{id:uid(),project_id:null,title:t,note:ptEnc($('#ptPri').value,$('#ptNote').value.trim()),done:false,created_by:CUR.id,created_at:new Date().toISOString()}]);
     $('#ptTitle').value='';$('#ptNote').value='';$('#ptTitle').focus();ptDraw()};
   $('#ptAdd').onclick=add;$('#ptTitle').onkeydown=e=>{if(e.key==='Enter')add()};$('#ptNote').onkeydown=e=>{if(e.key==='Enter')add()};
   const v=$('#view');
   v.onclick=e=>{let b;
     if(b=e.target.closest('[data-ptf]')){PTF=b.dataset.ptf;tdPersonalView()}
     else if(b=e.target.closest('[data-ptdel]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.ptdel);ask(`Xóa "${x.title}"?`,()=>{db.save('extra_tasks',db.list('extra_tasks').filter(r=>r.id!==x.id));ptDraw()})}
-    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=db.list('extra_tasks').find(r=>r.id===id),row=b.closest('[data-pid]');
-      row.querySelector('.min-w-0').innerHTML=`<input class="inp" style="margin:0 0 .25rem" id="ptET" value="${esc(x.title)}"><input class="inp" style="margin:0" id="ptEN" value="${esc(x.note||'')}" placeholder="Ghi chú">`;
-      const save=()=>{const t=$('#ptET').value.trim();if(t)db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===id?{...r,title:t,note:$('#ptEN').value.trim()}:r));ptDraw()};
-      row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus();row.querySelectorAll('input')[1].onblur=()=>setTimeout(()=>{if($('#ptET'))save()},150)}};
+    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=db.list('extra_tasks').find(r=>r.id===id),row=b.closest('[data-pid]'),pp=ptParse(x);
+      row.querySelector('.min-w-0').innerHTML=`<input class="inp" style="margin:0 0 .25rem" id="ptET" value="${esc(x.title)}"><div class="flex gap-2"><select id="ptEP" class="inp" style="margin:0;width:auto">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${pp.pri===k?'selected':''}>${v[0]}</option>`).join('')}</select><input class="inp" style="margin:0" id="ptEN" value="${esc(pp.note)}" placeholder="Ghi chú"><button id="ptEOK" class="btn" type="button"><i class="fa-solid fa-check"></i></button></div>`;
+      const save=()=>{const t=$('#ptET').value.trim();if(t)db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===id?{...r,title:t,note:ptEnc($('#ptEP').value,$('#ptEN').value.trim())}:r));ptDraw()};
+      $('#ptEOK').onclick=save;row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus()}};
   v.onchange=e=>{const c=e.target.closest('[data-ptdone]');if(c){db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===c.dataset.ptdone?{...r,done:c.checked}:r));ptDraw()}};
   v.ondragstart=v.ondragend=v.ondragover=v.ondrop=null;
   if(!PT_LOADED){await ptLoad();if(!$('#ptList'))return;$('#ptErr').textContent=PT_ERR}
@@ -2819,8 +2891,9 @@ const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
 const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
 /* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài */
 const NW_TABS=[['plastic','Tin Ngành Nhựa','fa-recycle','#16a34a'],['tech','Tin Công Nghệ','fa-microchip','#2563eb'],['finance','Tin Tài Chính','fa-chart-line','#ca8a04']];
-const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[GN('ngành nhựa tái chế',true),GN('plastic recycling PET HDPE market')]]];
-const NW_FEEDS={tech:['https://vnexpress.net/rss/so-hoa.rss','https://tinhte.vn/rss','https://genk.vn/rss/home.rss'],finance:['https://vneconomy.vn/tai-chinh.rss','https://cafef.vn/thi-truong-chung-khoan.rss','https://vnexpress.net/rss/kinh-doanh.rss']};
+const NW_PLASTIC='https://news.google.com/rss/search?q=ngành+nhựa+OR+hạt+nhựa+OR+nhựa+tái+chế&hl=vi&gl=VN&ceid=VN:vi';
+const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[NW_PLASTIC]]];
+const NW_FEEDS={tech:['https://tinhte.vn/rss','https://genk.vn/tin-ict.rss'],finance:['https://cafef.vn/thi-truong-chung-khoan.rss','https://vietstock.vn/830/chung-khoan/co-phieu.rss']};
 const NW_PRICES=[['PET Virgin',['petvirgin']],['HDPE Virgin',['hdpevirgin']],['RPET Clear',['rpetclear','rpet']],['RHDPE Natural',['rhdpenatural','rhdpe']]];
 const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',price:undefined,priceErr:'',live:null};
 const NW_CACHE={},NW_TTL=5*60e3;let NW_CH=null,NW_TOK=0;
@@ -2845,7 +2918,7 @@ function nwChg(c){if(c==null||c==='')return'<span class="text-xs text-mute">—<
 const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
 const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
 function nwItem(it){
-  const html=it.content||it.description||'';let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
+  const html=(it.content||'')+' '+(it.description||'');let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
   if(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn)/i.test(img)){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')))||img||''}
   let sm=nwText(it.description||it.content||'');const title=String(it.title||'').trim();if(sm.startsWith(title))sm=sm.slice(title.length).replace(/^[\s\-–—:|·]+/,'');
   if(sm.length>240)sm=sm.slice(0,237).replace(/\s+\S*$/,'')+'…';
@@ -2857,53 +2930,21 @@ function nwParseXml(xml){
   const d=new DOMParser().parseFromString(String(xml||''),'text/xml');if(d.querySelector('parsererror'))throw new Error('RSS không hợp lệ');
   const tx=(e,n)=>{const x=e.getElementsByTagName(n)[0];return x?(x.textContent||'').trim():''},at=(e,n,a)=>{const x=e.getElementsByTagName(n)[0];return x?x.getAttribute(a)||'':''};
   return[...d.querySelectorAll('item, entry')].map(e=>{const pd=tx(e,'pubDate')||tx(e,'published')||tx(e,'updated')||tx(e,'dc:date'),t=Date.parse(pd);
-    return nwItem({title:tx(e,'title'),link:tx(e,'link')||at(e,'link','href'),description:tx(e,'description')||tx(e,'summary'),content:tx(e,'content:encoded')||tx(e,'content'),pubDate:isNaN(t)?'':new Date(t).toISOString(),
+    return nwItem({title:tx(e,'title'),link:tx(e,'link')||at(e,'link','href')||tx(e,'guid'),description:tx(e,'description')||tx(e,'summary'),content:tx(e,'content:encoded')||tx(e,'content'),pubDate:isNaN(t)?'':new Date(t).toISOString(),
       thumbnail:at(e,'media:thumbnail','url')||at(e,'media:content','url'),enclosure:{link:at(e,'enclosure','url')}})}).filter(x=>x.title)}
 const NW_PROXIES=[
-  async url=>{const r=await nwTimed('https://api.allorigins.win/get?url='+encodeURIComponent(url),7000),j=await r.json();if(!j||!j.contents)throw new Error('allorigins rỗng');return nwParseXml(j.contents)},
-  async url=>{const r=await nwTimed('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url),7000),j=await r.json();if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');return(j.items||[]).map(nwItem).filter(x=>x.title)}];
+  async url=>nwParseXml(await(await nwTimed('https://corsproxy.io/?url='+encodeURIComponent(url),8000)).text()),
+  async url=>nwParseXml(await(await nwTimed('https://api.allorigins.win/raw?url='+encodeURIComponent(url),8000)).text()),
+  async url=>{const r=await nwTimed('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(url),8000),j=await r.json();if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');return(j.items||[]).map(nwItem).filter(x=>x.title)}];
 async function nwFetchOne(url){let last=null;for(const px of NW_PROXIES){try{const it=await px(url);if(it.length)return it}catch(e){last=e}}throw last||new Error('Proxy không trả dữ liệu')}
-/* Dữ liệu MẪU (offline) — chỉ dùng khi mọi proxy đều lỗi; luôn gắn nhãn "Dữ liệu mẫu", không có link / ngày giả */
-const NW_SAMPLE={
- plastic:[['jwell','Công nghệ đùn tấm PET nhiều lớp: những điểm cần kiểm soát khi chạy dây chuyền','Tổng hợp các thông số then chốt của dây chuyền đùn tấm PET: độ ẩm hạt, nhiệt độ vùng nung chảy, độ nhớt nội tại (IV) và cách hạn chế vệt đục trên bề mặt tấm.'],
-  ['jwell','Máy đùn trục vít đôi cho tái chế: chọn tỷ số L/D và cấu hình trục vít theo loại phế liệu','Vì sao nhựa tái chế cần cấu hình trục vít khác nhựa nguyên sinh, và cách cân bằng giữa công suất, mức tiêu hao điện năng và chất lượng hạt.'],
-  ['starlinger','Giải pháp tái chế PET food-grade: các công đoạn khử nhiễm và tăng IV ở trạng thái rắn (SSP)','Mô tả luồng công nghệ từ mảnh PET rửa sạch đến hạt rPET đạt chuẩn tiếp xúc thực phẩm, các chỉ tiêu AA, Benzen và Limonene cần theo dõi.'],
-  ['starlinger','Tối ưu hiệu suất dây chuyền: bảo trì dự phòng và theo dõi OEE trên máy lọc nóng chảy','Các chỉ số vận hành nên ghi nhận mỗi ca và ngưỡng cảnh báo giúp giảm dừng máy ngoài kế hoạch ở dây chuyền tạo hạt.'],
-  ['boretech','Dây chuyền rửa chai PET: bể tuyển nổi, rửa nóng và kiểm soát tạp chất PVC','Những điểm nghẽn thường gặp ở khâu rửa – tách, cách đo hiệu quả loại tạp chất và ảnh hưởng của PVC lên chỉ số màu b của hạt thành phẩm.'],
-  ['boretech','Hệ thống tách kim loại và tách màu: khi nào nên đầu tư thêm cho dây chuyền tái chế','Phân tích kinh tế đơn giản giữa chi phí thiết bị tách và mức tăng tỷ lệ thu hồi / giá bán phế phẩm theo cấp chất lượng.'],
-  ['general','Giá hạt nhựa PET, HDPE chịu tác động từ giá dầu và nhu cầu bao bì: các yếu tố nên theo dõi','Khung phân tích nhanh các biến số ảnh hưởng giá nhựa nguyên sinh và nhựa tái chế để lập kế hoạch mua nguyên liệu theo quý.'],
-  ['general','Nhựa tái chế và trách nhiệm mở rộng của nhà sản xuất (EPR): doanh nghiệp cần chuẩn bị gì','Tóm tắt các nội dung nhà máy tái chế nên rà soát: truy xuất nguồn gốc nguyên liệu, chứng nhận chất lượng và hồ sơ môi trường.'],
-  ['general','Chỉ số IV, AA và màu L/a/b: cách đọc báo cáo chất lượng hạt rPET','Hướng dẫn đọc nhanh các chỉ tiêu trong phiếu kiểm nghiệm và đối chiếu với tiêu chuẩn của khách hàng.'],
-  ['general','Quản lý CAPEX dự án nhà máy tái chế: các hạng mục thường bị bỏ sót khi lập dự toán','Danh mục kiểm tra chi phí hạ tầng, đường ống, tủ điện, hệ thống phụ trợ và dự phòng trượt giá khi lập ngân sách dự án.']],
- tech:[['Tự động hóa nhà máy: bắt đầu từ dữ liệu vận hành thay vì từ thiết bị','Lộ trình ba bước: thu thập dữ liệu, chuẩn hóa chỉ số, rồi mới tự động hóa các điểm nghẽn có tác động lớn nhất.'],
-  ['IoT công nghiệp: chọn cảm biến và giao thức kết nối cho dây chuyền hiện hữu','So sánh nhanh các phương án đọc tín hiệu từ PLC và đồng hồ cũ để đưa lên bảng theo dõi mà không cần dừng sản xuất.'],
-  ['AI trong quản lý dự án: những việc có thể giao cho trợ lý ngay hôm nay','Tóm tắt biên bản họp, lập báo cáo tiến độ, đối chiếu ngân sách – những tác vụ lặp lại phù hợp để tự động hóa.'],
-  ['Bảo mật tài khoản làm việc: bật xác thực hai lớp và quản lý mật khẩu đúng cách','Các bước đơn giản giúp giảm rủi ro lộ dữ liệu dự án khi dùng chung thiết bị hoặc làm việc từ xa.'],
-  ['Bảng điều khiển dữ liệu (dashboard) hiệu quả: ít chỉ số hơn nhưng đúng chỗ hơn','Nguyên tắc chọn chỉ số, màu sắc và bố cục để người xem nắm tình hình trong vài giây.'],
-  ['Điện mặt trời áp mái cho nhà xưởng: cách ước tính công suất và thời gian hoàn vốn','Công thức tính nhanh dựa trên diện tích mái, số giờ nắng và biểu giá điện của nhà máy.'],
-  ['Bảo trì dự đoán: dùng dữ liệu rung và nhiệt độ để báo trước hỏng hóc','Những tín hiệu cơ bản cho động cơ, bơm, quạt và cách đặt ngưỡng cảnh báo hợp lý.'],
-  ['Excel hay công cụ web nhẹ cho quản lý khối lượng và dự toán?','Khi nào nên giữ bảng tính và khi nào nên chuyển sang công cụ web có phân quyền để tránh sai lệch số liệu.'],
-  ['Sao lưu dữ liệu dự án: quy tắc 3-2-1 áp dụng cho nhóm nhỏ','Ba bản sao, hai loại phương tiện, một bản lưu ngoài địa điểm – cách triển khai gọn nhẹ.'],
-  ['Chuẩn hóa tên tệp và thư mục dự án để tìm kiếm nhanh hơn','Mẫu quy ước đặt tên theo mã dự án, hạng mục và phiên bản giúp cả nhóm truy xuất tài liệu nhanh.']],
- finance:[['Lập kế hoạch dòng tiền cá nhân: quy tắc ngân sách và quỹ khẩn cấp','Cách chia thu nhập thành chi tiêu thiết yếu, tiết kiệm và đầu tư; mức quỹ dự phòng nên có trước khi đầu tư.'],
-  ['Cổ phiếu cổ tức: cách đọc tỷ suất, tỷ lệ chi trả và độ bền của dòng tiền','Các chỉ số cần xem để phân biệt cổ tức bền vững với cổ tức cao nhất thời.'],
-  ['Vàng trong danh mục tích sản: tỷ trọng hợp lý và rủi ro chênh lệch mua – bán','Phân tích vai trò phòng thủ của vàng và chi phí giao dịch khi nắm giữ dài hạn.'],
-  ['Lãi suất tiền gửi và lạm phát: lãi thực dương nghĩa là gì','Cách tính lãi suất thực và ý nghĩa với quyết định gửi tiết kiệm hay đầu tư.'],
-  ['Đòn bẩy khi mua nhà: kiểm tra khả năng trả nợ trước khi vay','Nguyên tắc tỷ lệ nợ trên thu nhập và kịch bản lãi suất tăng để đánh giá mức vay an toàn.'],
-  ['Phân bổ tài sản theo giai đoạn cuộc sống: lập gia đình, mua nhà, nghỉ hưu sớm','Gợi ý khung phân bổ giữa tiền mặt, cổ phiếu, vàng và bất động sản theo mục tiêu.'],
-  ['Đọc báo cáo tài chính doanh nghiệp: ba chỉ số nên xem đầu tiên','Biên lợi nhuận, nợ vay trên vốn chủ và dòng tiền hoạt động – cách đọc nhanh.'],
-  ['Quản lý CAPEX và dòng tiền dự án: dự phòng trượt giá và chậm tiến độ','Phương pháp đặt dự phòng theo mức rủi ro hạng mục và theo dõi thực chi so với ngân sách.'],
-  ['Chi phí vốn và quyết định đầu tư thiết bị: NPV, IRR và thời gian hoàn vốn','Khi nào dùng chỉ số nào và những giả định dễ làm sai lệch kết quả.'],
-  ['Tự do tài chính (FI/RE): quy tắc 4% và những giới hạn cần biết','Cách ước tính số vốn mục tiêu và các yếu tố làm thay đổi tỷ lệ rút an toàn.']]};
-function nwSample(key){
-  let arr;if(key.startsWith('plastic')){const pill=key.split(':')[1]||'general',a=NW_SAMPLE.plastic;arr=[...a.filter(x=>x[0]===pill),...a.filter(x=>x[0]!==pill)].map(x=>({title:x[1],summary:x[2]}))}
-  else arr=NW_SAMPLE[key].map(x=>({title:x[0],summary:x[1]}));
-  return arr.slice(0,10).map(x=>({title:x.title,summary:x.summary,link:'',img:'',time:null,sample:true}))}
 async function nwFeed(key,urls,force){
-  const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return{items:c.items,sample:false};
-  const deadline=Date.now()+16000;
-  for(const u of urls){if(Date.now()>deadline)break;try{const items=await nwFetchOne(u);if(items.length){items.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));const out=items.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return{items:out,sample:false}}}catch(e){console.warn('RSS',u,e&&e.message)}}
-  return{items:nwSample(key),sample:true}}   // mọi proxy lỗi -> dữ liệu mẫu, không hiện lỗi trắng trang
+  const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return{items:c.items,err:''};
+  const rs=await Promise.allSettled(urls.map(nwFetchOne));let all=[],errs=[];
+  rs.forEach(r=>r.status==='fulfilled'?all.push(...r.value):errs.push(r.reason&&r.reason.message));
+  const seen=new Set();all=all.filter(a=>{const k=a.link||a.title;if(seen.has(k))return false;seen.add(k);return true});
+  all.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));
+  if(!all.length)return{items:[],err:errs[0]||'Nguồn không có bài viết'};
+  const out=all.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return{items:out,err:''}}
 function nwCard(a){
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
   const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
@@ -2916,7 +2957,7 @@ const nwSkel=()=>Array.from({length:4},()=>'<div class="rounded-2xl border borde
 async function nwLoadList(host,key,urls,force){
   const tok=++NW_TOK;host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
   const r=await nwFeed(key,urls,force);if(tok!==NW_TOK)return;
-  host.innerHTML=(r.sample?'<div class="rounded-xl px-4 py-2.5 mb-3 text-sm flex items-center justify-between gap-2 flex-wrap" style="background:rgba(100,116,139,.12)"><span><i class="fa-solid fa-plug-circle-xmark mr-2"></i>Chưa kết nối được nguồn tin trực tuyến — đang hiển thị <b>dữ liệu mẫu</b>.</span><button type="button" class="underline font-semibold" data-nwretry="1">Thử kết nối lại</button></div>':'')+`<div class="space-y-3">${r.items.map(nwCard).join('')}</div>`}
+  host.innerHTML=r.err?`<div class="rounded-xl px-4 py-3 text-sm flex items-center justify-between gap-2 flex-wrap" style="background:rgba(220,38,38,.1)"><span><i class="fa-solid fa-plug-circle-xmark mr-2"></i>Không tải được tin từ nguồn gốc (${esc(r.err)}). Các proxy RSS có thể đang bận.</span><button type="button" class="underline font-semibold" data-nwretry="1">Thử lại</button></div>`:`<div class="space-y-3">${r.items.map(nwCard).join('')}</div>`}
 /* ---- Giá hạt nhựa (4 thẻ): ưu tiên market_news (realtime); thiếu / lỗi -> giá THAM CHIẾU chuẩn (gắn nhãn) ---- */
 const NW_REF={'PET Virgin':[1050,0.8],'HDPE Virgin':[1120,-0.4],'RPET Clear':[1450,1.2],'RHDPE Natural':[1600,-0.6]};
 function nwPriceCards(){
