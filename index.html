@@ -214,6 +214,8 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 .xt{display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;background:var(--surface);border:1px solid var(--line);border-radius:.8rem;margin-bottom:.4rem}
 .xt.done .xt-t{text-decoration:line-through;opacity:.55}
 .xt input[type=checkbox]{width:1.1rem;height:1.1rem;accent-color:var(--brand);flex-shrink:0}
+.td-card.td-drag{opacity:.4}.td-col.td-over{outline:2px dashed var(--brand);outline-offset:-2px}.td-card:active{cursor:grabbing}
+.nw-flash{animation:nwf 1.6s ease}@keyframes nwf{0%{background:rgba(250,204,21,.35)}100%{background:transparent}}
 </style>
 </head>
 <body class="min-h-screen">
@@ -288,10 +290,10 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
       <a href="#/projects" class="flex items-center gap-2 px-1 pb-4 pt-1 font-bold text-lg" style="color:#fff"><span class="logo-sq"><i class="fa-solid fa-gears"></i></span>Tech<span style="color:var(--brand)">PM</span></a>
       <div id="sideProj"></div>
       <nav class="space-y-1">
-        <a class="nav-item" data-route="projects" href="#/projects"><i class="fa-solid fa-folder-tree w-5"></i>Danh sách dự án</a>
-        <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-users w-5"></i>Nhân sự &amp; PMS</a>
-        <div class="text-xs uppercase tracking-wide px-3 pt-4 pb-1 opacity-60" style="color:var(--sidetx)">Dự án của bạn</div>
-        <div id="sideProjects" class="space-y-1"></div>
+        <a class="nav-item" data-route="projects" href="#/projects"><i class="fa-solid fa-folder-tree w-5"></i>📁 Danh sách dự án</a>
+        <a class="nav-item" data-route="todos" href="#/todos"><i class="fa-solid fa-list-check w-5"></i>✅ Việc cần làm</a>
+        <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-users w-5"></i>👥 Nhân sự &amp; PMS</a>
+        <a class="nav-item" data-route="news" href="#/news"><i class="fa-solid fa-newspaper w-5"></i>📰 Tin tức thị trường</a>
       </nav>
     </aside>
 
@@ -398,6 +400,7 @@ const TB={
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
   extra_tasks:{t:'extra_tasks',pk:['id'],cols:['id','project_id','title','note','done','created_by','created_at'],ord:['created_at','id'],txt:['title','note']},
   master_gantt:{t:'master_gantt',pk:['id'],wrap:true,ord:['id']},
+  task_comments:{t:'task_comments',pk:['id'],cols:['id','task_id','user_id','author_name','body','created_at'],ord:['created_at','id'],txt:['author_name','body']},   // bình luận việc: tải khi mở task
   pms_evaluations:{t:'pms_evaluations',pk:['user_id'],cols:['user_id','grade','score','kpi_pct','note','evaluated_by','evaluated_at','updated_at'],ord:['user_id'],txt:['note']}   // PMS: bảng riêng trên Supabase (supabase_pms.sql), KHÔNG lưu trong users.prefs
 };
 /* quyền trong dự án: viewer (chỉ xem) | editor (sửa task) | manager (quản lý dự án). 'owner' = người tạo dự án (Admin); 'member' là giá trị cũ = editor */
@@ -893,7 +896,7 @@ function viewProjects(){
   const bs0=st.filter(x=>x.s.planned>0||x.s.actual>0||x.s.pct>0),bs=(bs0.length?bs0:st).slice().sort(adm?((a,b)=>(b.s.planned+b.s.actual)-(a.s.planned+a.s.actual)||b.s.pct-a.s.pct):((a,b)=>b.s.pct-a.s.pct)),chH=Math.max(150,bs.length*(adm?46:32)+70);
   const kpi=(l,v,sub,ic,c)=>`<div class="card bg-surface border border-line rounded-2xl p-4 flex items-center gap-3 min-w-0" style="box-shadow:0 4px 18px -8px rgba(0,0,0,.25)"><div class="shrink-0 w-11 h-11 rounded-xl grid place-items-center text-white" style="background:${c}"><i class="fa-solid ${ic}"></i></div><div class="min-w-0"><div class="text-[11px] uppercase tracking-wide text-mute font-semibold truncate">${l}</div><div class="text-2xl font-extrabold leading-tight truncate">${v}</div><div class="text-xs text-mute truncate">${sub}</div></div></div>`;
   $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">Quản lý tổng dự án</h2><p class="text-mute text-sm">${ps.length} dự án bạn tham gia</p></div>
-   <div class="flex gap-2 flex-wrap"><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
+   <div class="flex gap-2 flex-wrap items-center"><div class="relative" id="qsWrap"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-mute pointer-events-none"></i><input id="pjQ" type="search" autocomplete="off" class="inp" style="margin:0;padding:.45rem .8rem .45rem 2.1rem;width:16rem" placeholder="Tìm nhanh dự án...  ( / )" value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"><div id="qsBox" class="hidden absolute right-0 mt-1 w-[22rem] max-w-[90vw] bg-surface border border-line rounded-xl shadow-2xl z-40 overflow-hidden"></div></div><button id="pptBtn" class="btn" style="background:#ea580c;color:#fff" title="Xuất báo cáo tổng hợp tiến độ & chi phí"><i class="fa-solid fa-file-export mr-1"></i>📊 Xuất Báo cáo PowerPoint (.pptx)</button>${adm?'<button id="newBtn" class="btn"><i class="fa-solid fa-plus mr-1"></i>Dự án mới</button>':''}</div></div>
    <div id="pmo" class="mb-4"><div class="grid gap-3 grid-cols-2 xl:grid-cols-4 mb-3">
     ${adm?kpi('Tổng ngân sách quản lý',fmtVND(totB),'Đã chi '+fmtVND(totA)+(totB?' ('+Math.round(totA/totB*100)+'%)':''),'fa-wallet','#2563eb'):kpi('Dự án của tôi',ps.length,'Được Admin gán','fa-folder-open','#2563eb')}
     ${kpi('Dự án đang triển khai',act,'Trên tổng '+ps.length+' dự án','fa-diagram-project','#059669')}
@@ -901,7 +904,6 @@ function viewProjects(){
     ${kpi('Việc trễ hạn',ovT,'Tổng các dự án','fa-triangle-exclamation',ovT?'#dc2626':'#059669')}</div>
    <div class="card bg-surface border border-line rounded-2xl p-3 min-w-0"><div class="text-sm font-semibold mb-1">${adm?'Ngân sách theo dự án (triệu VNĐ) — giảm dần':'Tiến độ hoàn thành theo dự án (%) — giảm dần'}</div><div style="position:relative;height:${chH}px"><canvas id="pjBar"></canvas></div></div></div>
    <div class="flex items-center gap-2 mb-3 border-b border-line" id="pjTabs"><div class="flex gap-1 overflow-x-auto flex-1 min-w-0">${PJTABS.map(([k,l])=>`<button data-pjf="${k}" class="px-3 py-2 text-sm whitespace-nowrap border-b-2 ${PJF===k?'border-brand text-brand font-semibold':'border-transparent text-mute hover:text-ink'}">${l} <span class="text-xs opacity-70">${cnt(k)}</span></button>`).join('')}</div>
-    <div class="relative shrink-0 pb-1"><i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-mute" style="margin-top:-2px"></i><input id="pjQ" type="search" class="inp" style="margin:0;padding:.3rem .6rem .3rem 1.7rem;width:11rem" placeholder="Tìm dự án..." value="${esc(PJQ)}" aria-label="Tìm nhanh dự án"></div>
     <button id="pjView" class="btn-ghost shrink-0 mb-1" title="Chuyển Thẻ (Grid) ⇄ Bảng (Table)" aria-label="Đổi chế độ xem"><i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span></button></div>
    <div id="pjList"></div>`;
   pjList();
@@ -915,7 +917,20 @@ function viewProjects(){
     if(el=g('[data-perm]')){e.stopPropagation();permModal(el.dataset.perm);return}
     if(el=g('[data-appr]')){e.stopPropagation();toggleApprove(el.dataset.appr);return}
     if(el=g('[data-open]'))go(`#/p/${el.dataset.open}/overview`)};
-  $('#pjQ').oninput=debounce(e=>{PJQ=e.target.value;pjList()},200);
+  /* Quick Search: lọc danh sách + gợi ý nhảy thẳng vào dự án (↑↓ chọn, Enter mở, Esc đóng, phím / để focus) */
+  const qi=$('#pjQ'),qb=$('#qsBox');let qSel=0,qHits=[];
+  const qDraw=()=>{const q=nk0(qi.value).trim();
+    qHits=q?myProjects().filter(p=>nk0(p.name+' '+p.code+' '+(p.client||'')).includes(q)).slice(0,8):[];
+    qb.classList.toggle('hidden',!qHits.length);if(qSel>=qHits.length)qSel=0;
+    qb.innerHTML=qHits.map((p,i)=>`<button type="button" data-qs="${p.id}" class="w-full text-left flex items-center gap-2 px-3 py-2 text-sm ${i===qSel?'bg-black/10':'hover:bg-black/5'}"><span class="mono text-[10px] rounded px-1.5" style="background:rgba(127,127,127,.16)">${esc(p.code||'')}</span><span class="truncate" title="${esc(p.name)}">${esc(p.name)}</span><span class="ml-auto text-xs text-mute">Vào →</span></button>`).join('')};
+  qi.oninput=debounce(()=>{PJQ=qi.value;qSel=0;pjList();qDraw()},150);
+  qi.onfocus=qDraw;
+  qi.onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!qHits.length)return;e.preventDefault();qSel=(qSel+(e.key==='ArrowDown'?1:qHits.length-1))%qHits.length;qDraw()}
+    else if(e.key==='Enter'&&qHits[qSel]){go(`#/p/${qHits[qSel].id}/overview`)}
+    else if(e.key==='Escape'){qb.classList.add('hidden');qi.blur()}};
+  qb.onmousedown=e=>{const b=e.target.closest('[data-qs]');if(b){e.preventDefault();go(`#/p/${b.dataset.qs}/overview`)}};
+  qi.onblur=()=>setTimeout(()=>qb.classList.add('hidden'),120);
+  if(!window.__qsKey){window.__qsKey=1;document.addEventListener('keydown',e=>{if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const q=$('#pjQ');if(q){e.preventDefault();q.focus()}})}
   if(adm){$('#newBtn').onclick=()=>projectForm()}
   $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
   charts.forEach(c=>c.destroy());charts=[];
@@ -1049,12 +1064,12 @@ function applyFont(n){
   patchSession({font:n});
 }
 
+const SIDE_ROUTES=['users','todos','news'];
+function sideRouteName(){const m=curHash.replace(/^#\/?/,'').split('/')[0];return SIDE_ROUTES.includes(m)?m:'projects'}
 function renderSide(pid){
-  const onUsers=/^#?\/?users/.test(curHash);
-  document.querySelectorAll('.nav-item[data-route]').forEach(a=>a.classList.toggle('active',!pid&&(a.dataset.route==='users')===onUsers));
+  const cur=sideRouteName();
+  document.querySelectorAll('.nav-item[data-route]').forEach(a=>a.classList.toggle('active',a.dataset.route===cur));   // đang ở trong 1 dự án -> mục "Danh sách dự án" sáng
   const nu=$('#navUsers');if(nu)nu.classList.toggle('hidden',!isAdmin());
-  $('#sideProjects').innerHTML=myProjects().map(p=>`<a class="nav-item ${p.id===pid?'active':''}" href="#/p/${p.id}/overview" title="${esc(p.code?p.code+' · ':'')+esc(p.name)}"><i class="fa-solid fa-diagram-project w-5 shrink-0"></i><span class="min-w-0 flex flex-col leading-tight"><span class="mono text-[10px] opacity-60 truncate">${esc(p.code||'')}</span><span class="truncate">${esc(p.name)}</span></span></a>`).join('')
-    ||'<div class="text-xs px-3 opacity-60" style="color:var(--sidetx)">Chưa có dự án</div>';
 }
 
 let LOADING_R=false;
@@ -1062,7 +1077,7 @@ function route(keep){
   flushNotes();
   const parts=(curHash.replace(/^#\/?/,'')||'projects').split('/');
   const pid=parts[0]==='p'?parts[1]:null;
-  let name=pid?(parts[2]||'overview'):(parts[0]==='users'?'users':'projects');name=TAB_ALIAS[name]||name;
+  let name=pid?(parts[2]||'overview'):(SIDE_ROUTES.includes(parts[0])?parts[0]:'projects');name=TAB_ALIAS[name]||name;
   if(name==='users'&&!isAdmin()){go('#/projects');return}
   if(pid&&(!TABS.some(t=>t[0]===name)||(name==='budget'&&!canBudget(pid))))name='overview';
   const target=parts[3],pr=pid?myProjects().find(x=>x.id===pid):null;
@@ -1084,7 +1099,7 @@ function route(keep){
   $('#bnav').classList.toggle('off',!inP);$('#view').classList.toggle('has-bnav',inP);
   if(inP)document.querySelectorAll('#bnav .bn-tab').forEach(a=>{a.href=`#/p/${pid}/${a.dataset.tab}`;a.classList.toggle('active',a.dataset.tab===name)});
   const tl=Object.fromEntries(TABS);
-  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+(name==='users'?' / Nhân sự &amp; PMS':'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
+  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+({users:' / Nhân sự &amp; PMS',todos:' / Việc cần làm',news:' / Tin tức thị trường'}[name]||'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
   if(inP)$('#projSw').onchange=e=>go(`#/p/${e.target.value}/${name}`);
   const v=$('#view'),sc=v.scrollTop;
   renderView(name,pid,target);
@@ -2664,11 +2679,159 @@ function assignModal(uid_){
       next.push({project_id:pid,user_id:uid_,role:old!=null&&disp(old)===sel?old:sel})});   // giữ nguyên quyền cũ nếu không đổi (vd. owner)
     try{const r=await saveAssignments(uid_,next);toast(`Đã lưu phân bổ (${next.length} dự án; +${r.ups} cập nhật, −${r.del} gỡ)`,false);closeModal();viewUsers();renderSide(curPid)}
     catch(e){console.error(e);const msg=sbErr(e,'phân bổ dự án (project_members)');$('#asErr').textContent=msg;toast(msg);b.disabled=false}}}
+/* ===================== VIỆC CẦN LÀM (#/todos): List + Kanban, kéo thả HTML5 native, bình luận ===================== */
+const TD_PRI={urgent:['Urgent','bg-red-100 text-red-700'],high:['High','bg-amber-100 text-amber-700'],medium:['Medium','bg-blue-100 text-blue-700'],low:['Low','bg-slate-200 text-slate-700']};
+const TD_COLS=[['todo','Chưa làm','#64748b'],['in_progress','Đang làm','#2563eb'],['done','Hoàn thành','#16a34a']];
+const TD_PRI_ORD={urgent:0,high:1,medium:2,low:3};
+let TDV=(()=>{try{return localStorage.getItem('tdv')||'kanban'}catch(e){return'kanban'}})(),TDF={p:'',pri:'',q:''};
+const tdCol=t=>t.status==='done'||(t.progress||0)>=100?'done':t.status==='todo'?'todo':'in_progress';
+function tdTasks(){
+  const ps=myProjects(),pm=Object.fromEntries(ps.map(p=>[p.id,p])),all=db.list('tasks').filter(t=>pm[t.project_id]),par=new Set(all.map(t=>t.parent_id).filter(Boolean)),q=nk0(TDF.q).trim();
+  return all.filter(t=>!par.has(t.id)&&(!TDF.p||t.project_id===TDF.p)&&(!TDF.pri||(t.priority||'medium')===TDF.pri)&&(!q||nk0(t.name+' '+(t.wbs_code||'')+' '+pm[t.project_id].name+' '+pm[t.project_id].code).includes(q))).map(t=>({t,p:pm[t.project_id]}))
+    .sort((a,b)=>(TD_PRI_ORD[a.t.priority||'medium']??2)-(TD_PRI_ORD[b.t.priority||'medium']??2)||String(a.t.due_date||'9999').localeCompare(String(b.t.due_date||'9999')))}
+const tdPriBadge=t=>{const pr=TD_PRI[t.priority||'medium']||TD_PRI.medium;return `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${pr[1]}">${pr[0]}</span>`};
+const tdDue=t=>{if(!t.due_date)return'<span class="text-mute">—</span>';const d=daysBetween(today(),t.due_date),done=tdCol(t)==='done';return `<span class="${!done&&d<0?'text-red-600 font-semibold':!done&&d<=3?'text-amber-600 font-semibold':''}" title="${done?'':d<0?'Trễ '+(-d)+' ngày':d===0?'Hôm nay':'Còn '+d+' ngày'}">${fmtD(t.due_date)}</span>`};
+const tdOwner=t=>(t.owner_depts||[]).join(', ');
+function tdCard({t,p}){
+  const can=canTask(t.project_id),own=tdOwner(t);
+  return `<div class="td-card bg-surface border border-line rounded-xl p-3 shadow-sm" draggable="${can}" data-tid="${t.id}" style="${can?'cursor:grab':''}">
+   <div class="flex items-center justify-between gap-2 mb-1.5"><span class="mono text-[10px] rounded px-1.5 py-0.5 truncate" style="background:rgba(127,127,127,.16)" title="${esc(p.name)}">${esc(p.code||'')} · ${esc(p.name)}</span>${tdPriBadge(t)}</div>
+   <div class="text-sm font-semibold leading-snug break-words">${esc(t.name)}</div>
+   <div class="flex items-center justify-between gap-2 mt-2 text-xs text-mute"><span class="truncate" title="Người phụ trách"><i class="fa-regular fa-user mr-1"></i>${own?esc(own):'—'}</span><span class="whitespace-nowrap"><i class="fa-regular fa-clock mr-1"></i>${tdDue(t)}</span></div></div>`}
+function tdDraw(){
+  const rows=tdTasks(),box=$('#tdBody');if(!box)return;
+  $('#tdCount').textContent=rows.length+' việc';
+  if(!rows.length){box.innerHTML='<div class="text-mute p-6 text-center">Không có việc phù hợp.</div>';return}
+  if(TDV==='list'){
+    box.innerHTML=`<div class="bg-surface border border-line rounded-2xl overflow-auto"><table class="w-full text-sm"><thead><tr class="text-left text-xs uppercase text-mute" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface))"><th class="px-3 py-2">Tiêu đề</th><th class="px-3 py-2">Dự án</th><th class="px-3 py-2">Người phụ trách</th><th class="px-3 py-2">Hạn chót</th><th class="px-3 py-2">Ưu tiên</th><th class="px-3 py-2">Trạng thái</th></tr></thead><tbody>
+     ${rows.map(x=>{const{t,p}=x,can=canTask(t.project_id);return `<tr class="border-t border-line hover:bg-black/5 cursor-pointer" data-tid="${t.id}"><td class="px-3 py-2 font-medium" style="max-width:22rem"><div class="truncate" title="${esc(t.name)}">${esc(t.name)}</div></td><td class="px-3 py-2 whitespace-nowrap"><span class="mono text-[10px] rounded px-1.5" style="background:rgba(127,127,127,.16)" title="${esc(p.name)}">${esc(p.code||'')}</span> <span class="text-xs text-mute">${esc(p.name)}</span></td>
+      <td class="px-3 py-2 text-xs">${esc(tdOwner(t))||'—'}</td><td class="px-3 py-2 whitespace-nowrap">${tdDue(t)}</td><td class="px-3 py-2">${tdPriBadge(t)}</td>
+      <td class="px-3 py-2"><select data-tdst="${t.id}" class="cell q" style="width:auto;font-size:.75rem" ${can?'':'disabled'} aria-label="Trạng thái">${TD_COLS.map(c=>`<option value="${c[0]}" ${tdCol(t)===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select></td></tr>`}).join('')}</tbody></table></div>`;return}
+  box.innerHTML=`<div class="grid gap-3 md:grid-cols-3">${TD_COLS.map(([k,l,c])=>{let items=rows.filter(x=>tdCol(x.t)===k),more=0;if(k==='done'&&items.length>40){more=items.length-40;items=items.slice().sort((a,b)=>String(b.t.updated_at||'').localeCompare(String(a.t.updated_at||''))).slice(0,40)}
+    return `<div class="td-col rounded-2xl p-2 min-w-0" data-col="${k}" style="background:color-mix(in srgb,var(--ink) 4%,var(--surface));border-top:3px solid ${c}"><div class="flex items-center justify-between px-1 py-1.5 mb-1"><b class="text-sm" style="color:${c}">${l}</b><span class="text-xs font-semibold rounded-full px-2 py-0.5" style="background:rgba(127,127,127,.18)">${rows.filter(x=>tdCol(x.t)===k).length}</span></div>
+     <div class="space-y-2 overflow-y-auto" style="max-height:calc(100vh - 15rem);min-height:6rem">${items.map(tdCard).join('')||'<div class="text-xs text-mute text-center py-6">Kéo thẻ vào đây</div>'}${more?`<div class="text-xs text-mute text-center">… và ${more} việc hoàn thành cũ hơn</div>`:''}</div></div>`}).join('')}</div>`}
+/* Chuyển trạng thái (kéo thả / chọn): cập nhật tasks qua db.save (cục bộ ngay, đồng bộ Supabase) */
+function tdMove(id,to){
+  const t=db.list('tasks').find(x=>x.id===id);if(!t||tdCol(t)===to)return;
+  if(!canTask(t.project_id)){toast('Bạn không có quyền sửa việc ở dự án này');return}
+  const td=today(),now=new Date().toISOString();let u={status:to,updated_at:now};
+  if(to==='done'){const as=t.actual_start_date||td,ae=t.actual_end_date||td;u={...u,progress:100,actual_start_date:as,actual_end_date:ae,actual_days:daysBetween(as,ae)+1}}
+  else if(to==='in_progress')u={...u,progress:(t.progress||0)>=100?90:(t.progress||0),actual_start_date:t.actual_start_date||td,actual_end_date:null,actual_days:null};
+  else u={...u,progress:0,actual_start_date:null,actual_end_date:null,actual_days:null};
+  db.save('tasks',db.list('tasks').map(x=>x.id===id?{...x,...u}:x));renderBell();tdDraw()}
+function viewTodos(){
+  const ps=myProjects();
+  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">✅ Việc cần làm</h2><p class="text-mute text-sm"><span id="tdCount"></span> từ ${ps.length} dự án · kéo thả thẻ để đổi trạng thái</p></div>
+   <div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface" role="group" aria-label="Chế độ xem">${[['kanban','Kanban','fa-table-columns'],['list','Danh sách','fa-list']].map(([k,l,ic])=>`<button data-tdv="${k}" class="px-3 py-1.5 ${TDV===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}"><i class="fa-solid ${ic} mr-1"></i>${l}</button>`).join('')}</div></div>
+   <div class="flex gap-2 flex-wrap mb-3"><input id="tdQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm việc / dự án..." value="${esc(TDF.q)}" aria-label="Tìm việc">
+    <select id="tdP" class="inp" style="margin:0;width:auto;max-width:16rem" aria-label="Lọc dự án"><option value="">Tất cả dự án</option>${ps.map(p=>`<option value="${p.id}" ${TDF.p===p.id?'selected':''}>${esc(p.code||'')} · ${esc(p.name)}</option>`).join('')}</select>
+    <select id="tdPri" class="inp" style="margin:0;width:auto" aria-label="Lọc ưu tiên"><option value="">Mọi ưu tiên</option>${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${TDF.pri===k?'selected':''}>${v[0]}</option>`).join('')}</select></div><div id="tdBody"></div>`;
+  tdDraw();const v=$('#view');
+  v.onclick=e=>{let el;if(el=e.target.closest('[data-tdv]')){TDV=el.dataset.tdv;try{localStorage.setItem('tdv',TDV)}catch(x){}viewTodos();return}
+    if(e.target.closest('select'))return;if(el=e.target.closest('[data-tid]'))tdModal(el.dataset.tid)};
+  v.onchange=e=>{const t=e.target;if(t.id==='tdP'){TDF.p=t.value;tdDraw()}else if(t.id==='tdPri'){TDF.pri=t.value;tdDraw()}else if(t.dataset.tdst)tdMove(t.dataset.tdst,t.value)};
+  $('#tdQ').oninput=debounce(e=>{TDF.q=e.target.value;tdDraw()},200);
+  /* Drag & Drop native */
+  let dragId=null;
+  v.ondragstart=e=>{const c=e.target.closest&&e.target.closest('.td-card');if(!c||c.getAttribute('draggable')!=='true'){return}dragId=c.dataset.tid;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',dragId)}catch(x){}requestAnimationFrame(()=>c.classList.add('td-drag'))};
+  v.ondragend=()=>{dragId=null;v.querySelectorAll('.td-drag,.td-over').forEach(x=>x.classList.remove('td-drag','td-over'))};
+  v.ondragover=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col||!dragId)return;e.preventDefault();e.dataTransfer.dropEffect='move';v.querySelectorAll('.td-over').forEach(x=>x!==col&&x.classList.remove('td-over'));col.classList.add('td-over')};
+  v.ondrop=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col)return;e.preventDefault();const id=dragId||(e.dataTransfer&&e.dataTransfer.getData('text/plain'));dragId=null;if(id)tdMove(id,col.dataset.col)}}
+/* Modal chi tiết việc + bình luận (task_comments, tải khi mở) */
+async function tdModal(tid){
+  const t=db.list('tasks').find(x=>x.id===tid),p=t&&db.list('projects').find(x=>x.id===t.project_id);if(!t||!p)return;
+  const can=canTask(t.project_id),dis=can?'':'disabled';
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-xl p-5 max-h-[90vh] overflow-auto">
+   <div class="flex justify-between items-start gap-2 mb-1"><div class="min-w-0"><div class="text-xs text-mute mono">${esc(p.code||'')} · ${esc(p.name)}${t.wbs_code?' · '+esc(t.wbs_code):''}</div><h3 class="font-bold text-lg break-words">${esc(t.name)}</h3></div><button id="tmX" class="ibtn" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div>
+   <div class="grid grid-cols-2 gap-2 my-3 text-sm">
+    <label class="text-xs text-mute">Trạng thái<select id="tmSt" class="inp" ${dis}>${TD_COLS.map(c=>`<option value="${c[0]}" ${tdCol(t)===c[0]?'selected':''}>${c[1]}</option>`).join('')}</select></label>
+    <label class="text-xs text-mute">Ưu tiên<select id="tmPri" class="inp" ${dis}>${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${(t.priority||'medium')===k?'selected':''}>${v[0]}</option>`).join('')}</select></label>
+    <label class="text-xs text-mute">Hạn chót<input id="tmDue" type="date" class="inp" value="${t.due_date||''}" ${dis}></label>
+    <label class="text-xs text-mute">Người phụ trách (phân tách bằng dấu phẩy)<input id="tmOwn" class="inp" value="${esc(tdOwner(t))}" ${dis}></label></div>
+   <div class="flex items-center justify-between mb-3"><a href="#/p/${p.id}/progress/${t.id}" class="text-xs text-brand hover:underline" id="tmGo">Mở trong dự án →</a>${can?'<button id="tmSave" class="btn" type="button"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu thay đổi</button>':'<span class="text-xs text-mute"><i class="fa-solid fa-lock mr-1"></i>Chỉ xem</span>'}</div>
+   <div class="border-t border-line pt-3"><div class="text-sm font-semibold mb-2">💬 Bình luận <span id="tmCn" class="text-xs text-mute"></span></div><div id="tmCm" class="space-y-2 mb-3" style="max-height:14rem;overflow:auto">${SPIN_HTML}</div>
+    <div class="flex gap-2 items-end"><textarea id="tmIn" rows="2" class="inp" style="margin:0" placeholder="Viết bình luận... (Ctrl+Enter để gửi)"></textarea><button id="tmSend" class="btn" type="button">Gửi</button></div></div></div></div>`;
+  const close=()=>{closeModal();if(curTab==='todos')tdDraw()};
+  $('#tmX').onclick=close;$('#tmGo').onclick=closeModal;
+  if(can)$('#tmSave').onclick=()=>{
+    const own=$('#tmOwn').value.split(',').map(x=>x.trim()).filter(Boolean),due=$('#tmDue').value||null,pri=$('#tmPri').value,st=$('#tmSt').value;
+    db.save('tasks',db.list('tasks').map(x=>x.id===tid?{...x,owner_depts:own,due_date:due,priority:pri,updated_at:new Date().toISOString()}:x));
+    if(st!==tdCol(db.list('tasks').find(x=>x.id===tid)))tdMove(tid,st);toast('Đã lưu',false);close()};
+  const draw=()=>{const cs=db.list('task_comments').filter(c=>c.task_id===tid).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))),me=CUR&&CUR.id;
+    $('#tmCn').textContent=cs.length?'('+cs.length+')':'';
+    $('#tmCm').innerHTML=cs.map(c=>`<div class="rounded-xl px-3 py-2 text-sm" style="background:color-mix(in srgb,var(--ink) 5%,var(--surface))"><div class="flex items-center justify-between gap-2 text-xs text-mute"><span><b class="text-ink">${esc(c.author_name||'Ẩn danh')}</b> · ${new Date(c.created_at).toLocaleString('vi-VN')}</span>${(c.user_id===me||isAdmin())?`<button data-cdel="${c.id}" class="hover:text-red-600" aria-label="Xóa bình luận"><i class="fa-solid fa-xmark"></i></button>`:''}</div><div class="whitespace-pre-wrap break-words mt-0.5">${esc(c.body)}</div></div>`).join('')||'<div class="text-xs text-mute">Chưa có bình luận nào.</div>'};
+  try{await fetchTable('task_comments','task_id',[tid]);draw()}catch(e){console.error(e);$('#tmCm').innerHTML=`<div class="text-xs" style="color:#dc2626">${esc(sbErr(e,'tải bình luận (bảng task_comments)'))}</div>`}
+  const send=async()=>{const body=$('#tmIn').value.trim();if(!body)return;const b=$('#tmSend');b.disabled=true;
+    const row={id:uid(),task_id:tid,user_id:CUR.id,author_name:CUR.full_name||CUR.email,body,created_at:new Date().toISOString()};
+    try{await Q;const{error}=await sb.from('task_comments').insert(toDB('task_comments',row));if(error)throw error;setCache('task_comments',[...db.list('task_comments'),row]);$('#tmIn').value='';draw();$('#tmCm').scrollTop=1e9}
+    catch(e){console.error(e);toast(sbErr(e,'gửi bình luận'))}finally{b.disabled=false}};
+  $('#tmSend').onclick=send;$('#tmIn').onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();send()}};
+  $('#tmCm').onclick=async e=>{const b=e.target.closest('[data-cdel]');if(!b)return;const cid=b.dataset.cdel;
+    try{await Q;const{data,error}=await sb.from('task_comments').delete().eq('id',cid).select('id');if(error)throw error;if(!data||!data.length)throw Object.assign(new Error('row-level security: không xóa được bình luận'),{code:'42501'});setCache('task_comments',db.list('task_comments').filter(c=>c.id!==cid));draw()}
+    catch(er){console.error(er);toast(sbErr(er,'xóa bình luận'))}}}
+
+/* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): On-Demand + Realtime Singleton ===================== */
+const NW_CATS=[['plastic','🟢 Thị trường Hạt Nhựa','#16a34a','Giá PET, HDPE... và phân tích mới nhất'],['tech','🔵 Tin tức Công nghệ','#2563eb','Tinh tế / GenK / CafeF...'],['finance','🟡 Tin tức Tài chính - Kinh tế','#ca8a04','CafeF / FireAnt...']];
+const NW_COLS='category,title,summary,thumbnail_url,source_name,source_url,extra_data,published_at';
+const NW_FB="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#e2e8f0"/><text x="50%" y="50%" fill="#94a3b8" font-family="Arial" font-size="28" text-anchor="middle" dominant-baseline="middle">Không có ảnh</text></svg>');
+let NEWS={plastic:null,tech:null,finance:null},NW_CH=null,NW_ERR={};
+const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
+const timeAgo=iso=>{if(!iso)return'';const m=Math.round((Date.now()-Date.parse(iso))/6e4);if(isNaN(m))return'';return m<1?'vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'};
+/* Chuẩn hóa extra_data -> [{name,price,unit,chg}] (chấp nhận object / mảng / có bọc prices|items|data) */
+function nwPrices(ex){
+  if(typeof ex==='string'){try{ex=JSON.parse(ex)}catch(e){return{rows:[],meta:{}}}}
+  if(!ex||typeof ex!=='object')return{rows:[],meta:{}};
+  const pick=(o,ks)=>{for(const k of ks)if(o[k]!=null&&o[k]!=='')return o[k]};
+  const row=(name,v)=>{if(v&&typeof v==='object'&&!Array.isArray(v)){const pr=pick(v,['price','gia','value','avg','average']);if(pr==null)return null;return{name,price:pr,unit:pick(v,['unit','don_vi','donvi','currency'])||'',chg:pick(v,['change','chg','delta','diff','change_pct','percent'])??null}}
+    if(v==null||typeof v==='object')return null;return{name,price:v,unit:'',chg:null}};
+  let src=ex;for(const k of ['prices','items','data','products','gia'])if(ex[k]&&typeof ex[k]==='object'){src=ex[k];break}
+  const rows=[];
+  if(Array.isArray(src))src.forEach((o,i)=>{if(o&&typeof o==='object'){const r=row(String(pick(o,['name','label','type','grade','product','ten'])||'#'+(i+1)),o);if(r)rows.push(r)}});
+  else Object.entries(src).forEach(([k,v])=>{if(/^(updated_at|date|as_of|source|note|unit|currency)$/i.test(k))return;const r=row(k.replace(/_/g,' '),v);if(r)rows.push(r)});
+  return{rows:rows.slice(0,8),meta:{unit:ex.unit||ex.currency||'',at:ex.updated_at||ex.date||ex.as_of||''}}}
+const nwFmt=v=>typeof v==='number'?v.toLocaleString('vi-VN'):esc(v);
+function nwChg(c){if(c==null||c==='')return'';const n=parseFloat(String(c).replace(',','.')),neg=isNaN(n)?String(c).trim().startsWith('-'):n<0,zero=!isNaN(n)&&n===0;
+  return `<span class="text-xs font-semibold" style="color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(String(c).replace(/^[-+]/,''))}</span>`}
+function nwArticle(r,c){
+  const url=safeUrl(r.source_url),img=safeUrl(r.thumbnail_url);
+  return `<div class="${c==='plastic'?'mt-3 pt-3 border-t border-line':''}">${img?`<img src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl mb-2 object-cover" style="aspect-ratio:16/9;background:#e2e8f0" onerror="this.onerror=null;this.src=NW_FB">`:`<img src="${NW_FB}" alt="" loading="lazy" class="w-full rounded-xl mb-2 object-cover" style="aspect-ratio:16/9">`}
+   <div class="font-semibold leading-snug break-words">${esc(r.title||'(Không có tiêu đề)')}</div>
+   ${r.summary?`<div class="text-sm text-mute mt-1" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(r.summary)}</div>`:''}
+   <div class="flex items-center justify-between gap-2 mt-2 text-xs text-mute"><span class="truncate">${esc(r.source_name||'Nguồn')} · ${timeAgo(r.published_at)}</span>${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="text-brand font-semibold whitespace-nowrap hover:underline">Đọc nguồn →</a>`:''}</div></div>`}
+function nwDraw(c,flash){
+  const box=document.getElementById('nw-'+c);if(!box)return;const r=NEWS[c],err=NW_ERR[c];
+  if(err){box.innerHTML=`<div class="text-sm p-3 rounded-xl" style="background:rgba(220,38,38,.08);color:#b91c1c">${esc(err)}</div>`;return}
+  if(r===undefined){box.innerHTML=SPIN_HTML;return}
+  if(!r){box.innerHTML='<div class="text-sm text-mute p-4 text-center">Chưa có bài viết nào.</div>';return}
+  let html='';
+  if(c==='plastic'){const{rows,meta}=nwPrices(r.extra_data);
+    html=rows.length?`<div class="rounded-xl overflow-hidden border border-line"><table class="w-full text-sm"><tbody>${rows.map(x=>`<tr class="border-b border-line last:border-0"><td class="px-3 py-2 font-semibold uppercase text-xs">${esc(x.name)}</td><td class="px-3 py-2 text-right mono font-bold">${nwFmt(x.price)}${x.unit?` <span class="text-xs text-mute font-normal">${esc(x.unit)}</span>`:''}</td><td class="px-3 py-2 text-right whitespace-nowrap">${nwChg(x.chg)}</td></tr>`).join('')}</tbody></table></div>${meta.at?`<div class="text-[11px] text-mute mt-1">Cập nhật: ${esc(String(meta.at))}</div>`:''}`:'<div class="text-xs text-mute">Chưa có bảng giá trong extra_data.</div>'}
+  box.innerHTML=html+nwArticle(r,c);
+  if(flash){box.classList.remove('nw-flash');void box.offsetWidth;box.classList.add('nw-flash')}}
+async function nwLoad(){
+  NW_ERR={};NW_CATS.forEach(([c])=>{if(NEWS[c]===null)NEWS[c]=undefined;nwDraw(c)});
+  await Promise.all(NW_CATS.map(async([c])=>{
+    try{const{data,error}=await sb.from('market_news').select(NW_COLS).eq('category',c).order('published_at',{ascending:false}).limit(1);if(error)throw error;NEWS[c]=(data&&data[0])||null}
+    catch(e){console.error(e);NEWS[c]=null;NW_ERR[c]=sbErr(e,'tải tin '+c+' (bảng market_news)');toast(NW_ERR[c])}
+    nwDraw(c)}))}
+/* Realtime: kênh Singleton — chỉ tạo 1 lần duy nhất (lần đầu vào #/news), tự cập nhật widget khi có bài/giá mới */
+function nwRealtime(){
+  if(NW_CH||!sb||typeof sb.channel!=='function')return;
+  NW_CH=sb.channel('realtime_market_news').on('postgres_changes',{event:'*',schema:'public',table:'market_news'},pl=>{
+    const r=pl.new;if(!r||!NEWS.hasOwnProperty(r.category))return;
+    const cur=NEWS[r.category];if(cur&&cur.published_at&&r.published_at&&Date.parse(r.published_at)<Date.parse(cur.published_at))return;   // bài cũ hơn bài đang hiển thị -> bỏ qua
+    NEWS[r.category]=Object.fromEntries(NW_COLS.split(',').map(k=>[k,r[k]]));delete NW_ERR[r.category];nwDraw(r.category,true)}).subscribe()}
+function viewNews(){
+  $('#view').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Mỗi chuyên mục hiển thị bài mới nhất · tự cập nhật real-time</p></div><button id="nwRef" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button></div>
+   <div class="grid gap-3 lg:grid-cols-3">${NW_CATS.map(([c,t,col,sub])=>`<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${col}"><div class="font-bold" style="color:${col}">${t}</div><div class="text-xs text-mute mb-3">${sub}</div><div id="nw-${c}"></div></div>`).join('')}</div>`;
+  $('#nwRef').onclick=nwLoad;nwLoad();nwRealtime()}
 function renderView(name,pid,target){
-  $('#view').onclick=null;$('#view').onchange=null;   // gỡ listener ủy quyền của view trước
+  {const v_=$('#view');v_.onclick=v_.onchange=v_.ondragstart=v_.ondragend=v_.ondragover=v_.ondrop=null}   // gỡ listener ủy quyền của view trước
   renderBell();
   if(name==='projects')return viewProjects();
   if(name==='users')return viewUsers();
+  if(name==='todos')return viewTodos();
+  if(name==='news')return viewNews();
   const p=myProjects().find(x=>x.id===pid);
   if(!p){go('#/projects');return}
   ({overview:viewDashboard,progress:viewProgress,gantt:viewGantt,budget:viewBudget,todo:viewTodo,notes:viewNotes})[name](p,target);
