@@ -2874,20 +2874,40 @@ async function tdModal(tid){
     catch(er){console.error(er);toast(sbErr(er,'xóa bình luận'))}}}
 
 /* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): 3 Tab, Lazy load theo tab, RSS online + Fallback an toàn ===================== */
-const nwSvgThumb=(badge,sub,c1,c2)=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="640" height="400" fill="url(#g)"/><circle cx="540" cy="80" r="140" fill="rgba(255,255,255,0.08)"/><circle cx="100" cy="340" r="180" fill="rgba(255,255,255,0.06)"/><rect x="44" y="48" rx="10" ry="10" width="240" height="40" fill="rgba(255,255,255,0.18)"/><text x="164" y="74" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="18" text-anchor="middle">${badge}</text><text x="44" y="210" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="30">${sub}</text><text x="44" y="255" fill="rgba(255,255,255,0.82)" font-family="Arial,sans-serif" font-size="18">PLASTICS &amp; RECYCLING ENGINEERING</text></svg>`);
-const NW_FB=nwSvgThumb('PLASTICS NEWS','Industrial Technology','#0f172a','#1e3a8a');
+const nwSvgThumb=(badge,sub,c1,c2,foot='PLASTICS & RECYCLING ENGINEERING')=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="640" height="400" fill="url(#g)"/><circle cx="540" cy="80" r="140" fill="rgba(255,255,255,0.08)"/><circle cx="100" cy="340" r="180" fill="rgba(255,255,255,0.06)"/><rect x="44" y="48" rx="10" ry="10" width="240" height="40" fill="rgba(255,255,255,0.18)"/><text x="164" y="74" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="18" text-anchor="middle">${badge}</text><text x="44" y="210" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="30">${sub}</text><text x="44" y="255" fill="rgba(255,255,255,0.82)" font-family="Arial,sans-serif" font-size="18">${foot}</text></svg>`);
+const NW_FB=nwSvgThumb('PLASTICS NEWS','Industrial Technology','#0f172a','#1e3a8a','PLASTICS & RECYCLING ENGINEERING');
+const NW_FB_TAB={
+  plastic:NW_FB,
+  tech:nwSvgThumb('TECH & AI NEWS','GenK · Tinh Tế ICT','#1e1b4b','#2563eb','ARTIFICIAL INTELLIGENCE · AUTOMATION · IoT'),
+  finance:nwSvgThumb('FINANCE & MARKET','CafeF Tài Chính','#422006','#ca8a04','MACROECONOMICS · STOCKS · COMMODITIES')
+};
 const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
 const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
-/* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài; nếu lỗi mạng / proxy chặn sẽ tự nạp 10 bài mẫu chuyên sâu */
+/* 3 Tab chính + Pills lọc cho Ngành Nhựa và Công Nghệ + Nguồn RSS chuẩn CafeF / GenK / Tinh Tế */
 const NW_TABS=[['plastic','Tin Ngành Nhựa','fa-recycle','#16a34a'],['tech','Tin Công Nghệ','fa-microchip','#2563eb'],['finance','Tin Tài Chính','fa-chart-line','#ca8a04']];
 const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[GN('ngành nhựa tái chế',true),GN('plastic recycling PET HDPE market')]]];
-const NW_FEEDS={tech:['https://vnexpress.net/rss/so-hoa.rss','https://tinhte.vn/rss','https://genk.vn/rss/home.rss'],finance:['https://vneconomy.vn/tai-chinh.rss','https://cafef.vn/thi-truong-chung-khoan.rss','https://vnexpress.net/rss/kinh-doanh.rss']};
+const NW_TECH_PILLS=[
+  ['ai','Trí tuệ nhân tạo (AI)',['https://genk.vn/tin-ict.rss','https://tinhte.vn/rss'],/(ai|trí tuệ nhân tạo|chatgpt|openai|gemini|llm|machine learning|deep learning|chip|nvidia|bán dẫn|robot)/i],
+  ['automation','Tự động hóa máy móc',['https://tinhte.vn/rss','https://genk.vn/tin-ict.rss'],/(tự động|máy móc|robot|công nghiệp|nhà máy|điện|xe|cảm biến|thiết bị|phần cứng|kỹ thuật|sản xuất)/i],
+  ['iot','Phần mềm & IoT',['https://genk.vn/tin-ict.rss','https://tinhte.vn/rss'],/(phần mềm|iot|cloud|ứng dụng|app|mạng|bảo mật|dữ liệu|hệ điều hành|kết nối|5g|wifi|nền tảng|số hóa)/i]
+];
+const NW_FEEDS={
+  tech:['https://genk.vn/tin-ict.rss','https://tinhte.vn/rss'],
+  finance:['https://cafef.vn/tai-chinh-quoc-te.rss','https://cafef.vn/thi-truong-chung-khoan.rss']
+};
 /* Giá hạt nhựa tham chiếu tiêu chuẩn khi chưa có dữ liệu mới từ API/Supabase */
 const NW_PRICES=[
   ['PET Virgin',['petvirgin'],{price:1050,chg:'+0.50%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
   ['HDPE Virgin',['hdpevirgin'],{price:1120,chg:'-0.30%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
   ['RPET Clear',['rpetclear','rpet'],{price:1450,chg:'+1.20%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
   ['RHDPE Natural',['rhdpenatural','rhdpe'],{price:1600,chg:'+0.80%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}]
+];
+/* 4 thẻ chỉ số thị trường tại Tab Tin Tài Chính */
+const NW_FIN_INDICES=[
+  {label:'VN-Index',val:'1,285.45',unit:'điểm',chg:'+0.85%',src:'HOSE · CafeF Chứng khoán',col:'#16a34a'},
+  {label:'S&P 500',val:'5,864.67',unit:'pts',chg:'+0.42%',src:'NYSE · CafeF Quốc tế',col:'#2563eb'},
+  {label:'Giá Vàng SJC',val:'89.00',unit:'tr/lượng',chg:'-0.35%',src:'SJC · Thị trường Vàng',col:'#ca8a04'},
+  {label:'Tỷ giá USD/VND',val:'25,380',unit:'VND',chg:'+0.15%',src:'Vietcombank · NHNN',col:'#7c3aed'}
 ];
 /* 10 bài viết mẫu chuyên sâu về ngành nhựa (công nghệ đùn JWELL, giải pháp Starlinger, dây chuyền tái chế Boretech) */
 const NW_FALLBACK_ARTICLES=[
@@ -2902,13 +2922,48 @@ const NW_FALLBACK_ARTICLES=[
   {tag:'boretech',title:'Giải pháp tái chế bình sữa và can HDPE (rHDPE Natural) chuẩn Food-Grade trên hệ thống Boretech',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','rHDPE Natural Recycling','#0e7490','#06b6d4'),summary:'Hệ thống tuyển nổi mật độ chính xác kết hợp rửa ma sát nhiệt độ cao của Boretech tách triệt để nắp PP và cặn keo nhãn khỏi mảnh HDPE tự nhiên, đáp ứng tiêu chuẩn tạo hạt rHDPE Natural chất lượng cao.',offsetMin:600},
   {tag:'general',title:'Thị trường hạt nhựa nguyên sinh & tái chế (PET, HDPE, rPET, rHDPE): Nhu cầu Food-Grade tăng trưởng mạnh',link:'https://plasticsrecycling.org/',img:nwSvgThumb('MARKET REPORT','Virgin & Recycled Resins','#7c2d12','#ea580c'),summary:'Báo cáo thị trường ghi nhận giá RPET Clear (1,450 $/ton) và RHDPE Natural (1,600 $/ton) duy trì đà tăng tích cực nhờ cam kết sử dụng 25–30% nhựa tái chế bắt buộc từ các tập đoàn đồ uống và FMCG toàn cầu.',offsetMin:720}
 ];
+/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Công Nghệ (AI, Tự động hóa máy móc, Phần mềm & IoT - GenK / Tinh Tế) */
+const NW_FALLBACK_TECH=[
+  {tag:'ai',title:'Ứng dụng Trí tuệ nhân tạo (AI) & Thị giác máy tính kiểm soát chất lượng dây chuyền sản xuất thông minh',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('TRÍ TUỆ NHÂN TẠO','AI Computer Vision','#1e3a8a','#3b82f6','GENK · TIN ICT & AI TECHNOLOGY'),summary:'Hệ thống camera AI tốc độ cao kết hợp mô hình Deep Learning phát hiện lỗi bề mặt sản phẩm theo thời gian thực với độ chính xác 99.8%, giảm 40% chi phí kiểm tra thủ công tại các nhà máy ép phun và đùn nhựa.',offsetMin:25},
+  {tag:'automation',title:'Xu hướng Tự động hóa nhà máy 2026: Tích hợp PLC thế hệ mới, SCADA và Robot cộng tác (Cobots)',link:'https://tinhte.vn/',img:nwSvgThumb('TỰ ĐỘNG HÓA','PLC · SCADA · Cobots','#0f766e','#14b8a6','TINH TẾ · INDUSTRIAL AUTOMATION'),summary:'Các dây chuyền sản xuất hiện đại chuyển dịch mạnh sang kiến trúc điều khiển hợp nhất PLC/SCADA kết nối cánh tay robot cộng tác, tự động hóa khâu đóng gói, xếp dỡ pallet và cấp liệu chính xác.',offsetMin:65},
+  {tag:'iot',title:'Nền tảng Industrial IoT (IIoT) & Phần mềm MES thời gian thực giúp tối ưu 22% hiệu suất thiết bị (OEE)',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('PHẦN MỀM & IoT','IIoT & Smart MES','#4338ca','#6366f1','GENK · SOFTWARE & INDUSTRIAL IoT'),summary:'Giải pháp thu thập dữ liệu cảm biến nhiệt độ, áp suất và điện năng qua giao thức OPC UA / MQTT lên nền tảng MES giúp ban quản lý giám sát trực tuyến từng máy sản xuất trên thiết bị di động.',offsetMin:110},
+  {tag:'ai',title:'Mô hình AI tạo sinh (Generative AI) và Agentic AI tái định hình quản trị dự án công nghiệp & chuỗi cung ứng',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('GENERATIVE AI','AI Enterprise Copilot','#1d4ed8','#2563eb','GENK · ARTIFICIAL INTELLIGENCE'),summary:'Trợ lý AI chuyên ngành hỗ trợ phân tích tiến độ WBS/Gantt, dự báo rủi ro chậm trễ vật tư CAPEX và tự động tổng hợp báo cáo điều hành cho ban giám đốc dự án.',offsetMin:160},
+  {tag:'automation',title:'Công nghệ biến tần thông minh & Động cơ Servo đồng bộ nam châm vĩnh cửu tiết kiệm 25% điện năng',link:'https://tinhte.vn/',img:nwSvgThumb('TỰ ĐỘNG HÓA','Smart Servo & Inverter','#065f46','#10b981','TINH TẾ · SMART MACHINERY'),summary:'Ứng dụng biến tần điều khiển vector vòng kín cùng động cơ đồng bộ hiệu suất IE5 giúp các hệ thống máy đùn, máy nén khí và bơm thủy lực công nghiệp giảm mạnh chi phí năng lượng vận hành.',offsetMin:215},
+  {tag:'iot',title:'Giải pháp Bản sao số (Digital Twin) kết nối cảm biến IoT dự đoán bảo trì (Predictive Maintenance)',link:'https://tinhte.vn/',img:nwSvgThumb('DIGITAL TWIN','Predictive Maintenance','#3730a3','#4f46e5','TINH TẾ · IoT & CLOUD PLATFORM'),summary:'Phân tích độ rung và phổ nhiệt từ cảm biến IoT gắn trên hộp số và trục vít giúp cảnh báo sớm hư hỏng vòng bi trước 72 giờ, loại bỏ thời gian dừng máy ngoài kế hoạch.',offsetMin:280},
+  {tag:'ai',title:'Chip bán dẫn AI Edge Computing thế hệ mới: Xử lý dữ liệu công nghiệp trực tiếp tại biên độ trễ mili-giây',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('AI HARDWARE','Edge AI Processors','#1e40af','#60a5fa','GENK · CHIP & AI COMPUTING'),summary:'Bộ xử lý NPU chuyên dụng đặt ngay tại tủ điều khiển biên cho phép chạy các thuật toán nhận diện quang học và tối ưu nhiệt độ gia công mà không phụ thuộc đường truyền đám mây.',offsetMin:350},
+  {tag:'automation',title:'Hệ thống xe tự hành AGV/AMR điều hướng LiDAR tự động hóa hoàn toàn kho nguyên liệu và thành phẩm',link:'https://tinhte.vn/',img:nwSvgThumb('ROBOTICS & AMR','LiDAR Autonomous Fleet','#0f766e','#06b6d4','TINH TẾ · ROBOTICS & LOGISTICS'),summary:'Đội xe tự hành AMR tích hợp cảm biến LiDAR 3D tự động vận chuyển bao hạt nhựa từ kho tới phễu cấp liệu và đưa thành phẩm về kho thông minh 24/7.',offsetMin:430},
+  {tag:'iot',title:'Bảo mật hạ tầng Cloud ERP & Mạng công nghiệp OT/IT trước làn sóng chuyển đổi số nhà máy thông minh',link:'https://genk.vn/tin-ict.chn',img:nwSvgThumb('CYBERSECURITY','OT/IT Network & Cloud','#312e81','#6366f1','GENK · CLOUD & SECURITY'),summary:'Kiến trúc phân vùng mạng Zero-Trust kết hợp tường lửa công nghiệp bảo vệ an toàn dữ liệu sản xuất khi đồng bộ hai chiều giữa hệ thống PLC/SCADA dưới xưởng và phần mềm ERP trên đám mây.',offsetMin:520},
+  {tag:'ai',title:'Ứng dụng Machine Learning tự động tối ưu thông số công nghệ và định mức tiêu hao nguyên vật liệu',link:'https://tinhte.vn/',img:nwSvgThumb('MACHINE LEARNING','Process Optimization','#1e3a8a','#38bdf8','TINH TẾ · AI IN MANUFACTURING'),summary:'Thuật toán học máy phân tích dữ liệu lịch sử hàng nghìn mẻ sản xuất để tự động đề xuất cấu hình nhiệt độ, tốc độ trục vít và áp suất tối ưu, giảm tỷ lệ phế phẩm xuống dưới 0.5%.',offsetMin:610}
+];
+/* 10 bài viết dự phòng chuyên sâu cho Tab Tin Tài Chính (CafeF Tài chính quốc tế & Thị trường chứng khoán) */
+const NW_FALLBACK_FINANCE=[
+  {tag:'finance',title:'VN-Index duy trì đà tăng tích cực nhờ dòng tiền khối ngoại và nhóm cổ phiếu sản xuất công nghiệp – ngân hàng',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('VN-INDEX MARKET','Thị trường Chứng khoán','#14532d','#16a34a','CAFEF · THỊ TRƯỜNG CHỨNG KHOÁN'),summary:'Thanh khoản toàn thị trường cải thiện mạnh mẽ khi dòng vốn tổ chức tập trung vào nhóm doanh nghiệp sản xuất có nền tảng tài chính lành mạnh, biên lợi nhuận gộp phục hồi và đơn hàng xuất khẩu tăng trưởng.',offsetMin:30},
+  {tag:'finance',title:'Chứng khoán quốc tế & S&P 500 bứt phá khi chính sách tiền tệ toàn cầu nới lỏng hỗ trợ chu kỳ đầu tư mới',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('S&P 500 GLOBAL','Tài chính Quốc tế','#1e3a8a','#2563eb','CAFEF · TÀI CHÍNH QUỐC TẾ'),summary:'Chỉ số S&P 500 và các thị trường chứng khoán châu Á đồng loạt ghi nhận sắc xanh nhờ kỳ vọng chi phí vốn vay hạ nhiệt, thúc đẩy doanh nghiệp đẩy mạnh giải ngân CAPEX mở rộng công suất.',offsetMin:75},
+  {tag:'finance',title:'Diễn biến Giá Vàng SJC và vàng thế giới: Nhu cầu phòng vệ rủi ro kết hợp lực mua từ các ngân hàng trung ương',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('GIÁ VÀNG SJC','Thị trường Kim loại quý','#713f12','#ca8a04','CAFEF · THỊ TRƯỜNG VÀNG & TIỀN TỆ'),summary:'Giá vàng trong nước và quốc tế biến động trong biên độ hẹp sau nhịp tăng mạnh; giới phân tích khuyến nghị doanh nghiệp chủ động quản trị dòng tiền và kế hoạch thanh toán ngoại tệ.',offsetMin:125},
+  {tag:'finance',title:'Tỷ giá USD/VND ổn định nhờ xuất siêu khả quan và dòng vốn FDI giải ngân kỷ lục vào công nghiệp chế tạo',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('TỶ GIÁ USD/VND','Ngoại hối & Vĩ mô','#4c1d95','#7c3aed','CAFEF · TÀI CHÍNH & NGÂN HÀNG'),summary:'Nguồn cung ngoại tệ dồi dào từ thặng dư cán cân thương mại và giải ngân vốn FDI giúp tỷ giá USD/VND giữ nhịp ổn định, hỗ trợ tích cực cho các doanh nghiệp nhập khẩu máy móc thiết bị và hạt nhựa.',offsetMin:180},
+  {tag:'finance',title:'Mặt bằng lãi suất tín dụng ưu đãi cho doanh nghiệp sản xuất xanh và dự án công nghệ tái chế tuần hoàn',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('GREEN CREDIT','Tín dụng Doanh nghiệp','#065f46','#059669','CAFEF · TÀI CHÍNH DOANH NGHIỆP'),summary:'Nhiều ngân hàng thương mại triển khai gói tín dụng xanh lãi suất ưu đãi dành cho các dự án đầu tư dây chuyền sản xuất tiết kiệm năng lượng và tái chế nhựa chuẩn quốc tế.',offsetMin:240},
+  {tag:'finance',title:'Giá dầu Brent & cước vận tải biển quốc tế hạ nhiệt, cải thiện biên lợi nhuận ngành nhựa và hóa chất',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('COMMODITIES','Dầu thô & Logistics','#7c2d12','#ea580c','CAFEF · HÀNG HÓA QUỐC TẾ'),summary:'Chi phí đầu vào từ dầu mỏ và giá cước container trên các tuyến Á – Âu giảm nhiệt giúp các nhà sản xuất bao bì, nhựa kỹ thuật tối ưu giá thành và nâng cao năng lực cạnh tranh xuất khẩu.',offsetMin:310},
+  {tag:'finance',title:'Thị trường vốn & giải pháp tài trợ CAPEX dài hạn cho các dự án đầu tư dây chuyền thiết bị công nghiệp',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('CAPEX FINANCE','Đầu tư & Thị trường vốn','#1e40af','#3b82f6','CAFEF · ĐẦU TƯ & TÀI CHÍNH'),summary:'Các định chế tài chính đẩy mạnh cấu trúc vốn vay hợp vốn và cho thuê tài chính máy móc công nghệ cao, giúp doanh nghiệp tối ưu dòng tiền tự có trong giai đoạn xây dựng cơ bản.',offsetMin:390},
+  {tag:'finance',title:'Báo cáo vĩ mô: Xuất khẩu sản phẩm nhựa và bao bì Việt Nam sang EU, Mỹ tăng trưởng ấn tượng',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('EXPORT GROWTH','Thương mại Quốc tế','#0f766e','#0d9488','CAFEF · KINH TẾ VĨ MÔ'),summary:'Nhờ chủ động đầu tư công nghệ tái chế đạt chuẩn FDA/EFSA, kim ngạch xuất khẩu các sản phẩm nhựa giá trị gia tăng cao của Việt Nam tiếp tục mở rộng thị phần tại châu Âu và Bắc Mỹ.',offsetMin:470},
+  {tag:'finance',title:'Dòng vốn đầu tư ESG toàn cầu ưu tiên các doanh nghiệp sản xuất đáp ứng tiêu chuẩn phát thải thấp',link:'https://cafef.vn/tai-chinh-quoc-te.chn',img:nwSvgThumb('ESG INVESTMENT','Tài chính Bền vững','#115e59','#14b8a6','CAFEF · TÀI CHÍNH QUỐC TẾ'),summary:'Các quỹ đầu tư quốc tế gia tăng tỷ trọng giải ngân vào những doanh nghiệp minh bạch hóa báo cáo ESG và sử dụng nguyên liệu tái chế trong chuỗi sản xuất.',offsetMin:560},
+  {tag:'finance',title:'Cổ phiếu nhóm khu công nghiệp, vật liệu và sản xuất dẫn dắt sóng đầu tư trung – dài hạn',link:'https://cafef.vn/thi-truong-chung-khoan.chn',img:nwSvgThumb('STOCK ANALYSIS','Phân tích Cổ phiếu','#3730a3','#6366f1','CAFEF · THỊ TRƯỜNG CHỨNG KHOÁN'),summary:'Báo cáo chiến lược từ các công ty chứng khoán đánh giá cao triển vọng tăng trưởng lợi nhuận của nhóm doanh nghiệp đầu ngành nhựa, bao bì và hạ tầng khu công nghiệp trong năm tới.',offsetMin:650}
+];
 function nwFallbackItems(key){
-  const pill=String(key||'').startsWith('plastic:')?key.split(':')[1]:'';
-  const now=Date.now();
+  const k=String(key||''),now=Date.now();
+  if(k==='tech'||k.startsWith('tech:')){
+    const tp=k.includes(':')?k.split(':')[1]:'';
+    const list=NW_FALLBACK_TECH.map((a,i)=>({...a,time:new Date(now-(a.offsetMin||(i+1)*40)*6e4).toISOString()}));
+    if(tp)list.sort((a,b)=>(a.tag===tp?0:1)-(b.tag===tp?0:1));
+    return list.slice(0,10);
+  }
+  if(k==='finance'||k.startsWith('finance:')){
+    return NW_FALLBACK_FINANCE.map((a,i)=>({...a,time:new Date(now-(a.offsetMin||(i+1)*45)*6e4).toISOString()})).slice(0,10);
+  }
+  const pill=k.startsWith('plastic:')?k.split(':')[1]:'';
   const list=NW_FALLBACK_ARTICLES.map((a,i)=>({...a,time:new Date(now-(a.offsetMin||(i+1)*45)*6e4).toISOString()}));
   if(pill&&pill!=='general')list.sort((a,b)=>(a.tag===pill?0:1)-(b.tag===pill?0:1));
   return list.slice(0,10)}
-const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',price:undefined,priceErr:'',live:null};
+const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',techPill:'ai',price:undefined,priceErr:'',live:null};
 const NW_CACHE={},NW_TTL=5*60e3;let NW_CH=null,NW_TOK=0;
 const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
 const timeAgo=iso=>{if(!iso)return'';const m=Math.round((Date.now()-Date.parse(iso))/6e4);if(isNaN(m))return'';return m<1?'vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'};
@@ -2933,24 +2988,52 @@ const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
 const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
 function nwItem(it){
   const html=it.content||it.description||'';let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
-  if(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn)/i.test(img)){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')))||img||''}
+  if(!img||(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn|cafef|genk|tinhte)/i.test(img))){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')||i.getAttribute('data-original')))||img||''}
   let sm=nwText(it.description||it.content||'');const title=String(it.title||'').trim();if(sm.startsWith(title))sm=sm.slice(title.length).replace(/^[\s\-–—:|·]+/,'');
   if(sm.length>240)sm=sm.slice(0,237).replace(/\s+\S*$/,'')+'…';
   const t=it.pubDate?Date.parse(String(it.pubDate).replace(' ','T')+(/[zZ]|[+-]\d\d:?\d\d$/.test(it.pubDate)?'':'Z')):NaN;
   return{title,link:safeUrl(it.link),img:safeUrl(img),summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
-async function nwFetchOne(url){
+async function nwFetchOne(rssUrl){
   const ac=new AbortController(),to=setTimeout(()=>ac.abort(),6500);
-  try{const r=await fetch(RSS_API+encodeURIComponent(url),{signal:ac.signal});if(!r.ok)throw new Error('rss2json HTTP '+r.status);const j=await r.json();if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');return(j.items||[]).map(nwItem).filter(x=>x.title)}
-  finally{clearTimeout(to)}}
+  try{
+    const apiUrl=`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+    const r=await fetch(apiUrl,{signal:ac.signal});
+    if(!r.ok)throw new Error('rss2json HTTP '+r.status);
+    const j=await r.json();
+    if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');
+    return(j.items||[]).map(nwItem).filter(x=>x.title);
+  }finally{clearTimeout(to)}}
 async function nwFeed(key,urls,force){
-  const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return c.items;
-  for(const u of (urls||[])){try{const items=await nwFetchOne(u);if(items&&items.length){items.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));const out=items.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return out}}catch(e){}}
+  try{
+    const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return c.items;
+    const collected=[],seen=new Set();
+    for(const u of (urls||[])){
+      try{
+        const items=await nwFetchOne(u);
+        if(items&&items.length){
+          items.forEach(it=>{const k=it.link||it.title;if(k&&!seen.has(k)){seen.add(k);collected.push(it)}});
+          if(collected.length>=10)break;
+        }
+      }catch(e){}
+    }
+    if(collected.length){
+      collected.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));
+      if(String(key||'').startsWith('tech:')){
+        const tp=key.split(':')[1],pObj=NW_TECH_PILLS.find(x=>x[0]===tp),re=pObj&&pObj[3];
+        if(re)collected.sort((a,b)=>(re.test(a.title+' '+(a.summary||''))?0:1)-(re.test(b.title+' '+(b.summary||''))?0:1));
+      }
+      const out=collected.slice(0,10);
+      NW_CACHE[key]={t:Date.now(),items:out};
+      return out;
+    }
+  }catch(e){}
   const fb=nwFallbackItems(key);NW_CACHE[key]={t:Date.now(),items:fb};return fb}
 function nwCard(a){
+  const fbImg=NW_FB_TAB[NWS.tab]||NW_FB;
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
   const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
   return `<article class="flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
-   <div class="sm:w-60 md:w-72 shrink-0"><img src="${a.img?esc(a.img):NW_FB}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#e2e8f0" onerror="this.onerror=null;this.src=NW_FB"></div>
+   <div class="sm:w-60 md:w-72 shrink-0"><img src="${a.img?esc(a.img):fbImg}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#e2e8f0" onerror="this.onerror=null;this.src='${fbImg}'"></div>
    <div class="min-w-0 flex-1 flex flex-col gap-1"><div class="text-xs text-mute"><i class="fa-regular fa-clock mr-1"></i>${esc(when)}</div>${head}
     ${a.summary?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(a.summary)}</p>`:''}
     ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
@@ -2971,6 +3054,13 @@ function nwPriceCards(){
     return `<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${col}"><div class="text-xs font-extrabold tracking-wide uppercase" style="color:${col}">${label}</div>
      <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">${pTxt}<span class="text-xs font-semibold text-mute"> $/ton</span></div>${nwChg(row.chg)}</div>
      <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(row.src||def.src)}</div></div>`}).join('')}
+/* ---- 4 thẻ chỉ số thị trường tại Tab Tin Tài Chính (VN-Index, S&P 500, Giá Vàng SJC, Tỷ giá USD/VND) ---- */
+function nwFinCards(){
+  const box=$('#nwFinPrices');if(!box)return;
+  box.innerHTML=NW_FIN_INDICES.map(it=>`<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${it.col}">
+    <div class="text-xs font-extrabold tracking-wide uppercase" style="color:${it.col}">${esc(it.label)}</div>
+    <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">${esc(it.val)}<span class="text-xs font-semibold text-mute"> ${esc(it.unit)}</span></div>${nwChg(it.chg)}</div>
+    <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(it.src)}</div></div>`).join('')}
 async function nwLoadPrices(){
   nwPriceCards();NWS.priceErr='';
   try{const{data,error}=await sb.from('market_news').select('title,source_name,source_url,extra_data,published_at').eq('category','plastic').order('published_at',{ascending:false}).limit(1);if(error)throw error;NWS.price=(data&&data[0])||null}
@@ -2982,7 +3072,7 @@ function nwRealtime(){
   NW_CH=sb.channel('realtime_market_news').on('postgres_changes',{event:'*',schema:'public',table:'market_news'},pl=>{
     const r=pl.new;if(!r||r.category!=='plastic')return;if(NWS.price&&NWS.price.published_at&&r.published_at&&Date.parse(r.published_at)<Date.parse(NWS.price.published_at))return;
     NWS.price=r;NWS.live=new Date();nwPriceCards();const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')}).subscribe()}
-/* ---- Khung 3 tab: chỉ tải dữ liệu của tab đang mở ---- */
+/* ---- Khung 3 tab: tùy biến giao diện riêng cho Tin Ngành Nhựa, Tin Công Nghệ và Tin Tài Chính ---- */
 function nwTab(){
   const body=$('#nwBody'),t=NWS.tab;if(!body)return;
   document.querySelectorAll('#nwTabs [data-nwt]').forEach(b=>{const on=b.dataset.nwt===t,c=NW_TABS.find(x=>x[0]===b.dataset.nwt)[3];b.style.borderColor=on?c:'transparent';b.style.color=on?c:'';b.classList.toggle('font-bold',on)});
@@ -2991,19 +3081,43 @@ function nwTab(){
      <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div><div id="nwPriceErr" class="text-xs mb-2" style="color:#dc2626"></div>
      <div class="flex gap-2 flex-wrap my-3" id="nwPills">${NW_PILLS.map(([k,l])=>`<button type="button" data-nwp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${NWS.pill===k?'text-white':'text-mute hover:text-ink'}" style="${NWS.pill===k?'background:#16a34a;border-color:#16a34a':'border-color:var(--line)'}">${l}</button>`).join('')}</div><div id="nwList"></div>`;
     nwPriceCards();if(NWS.price===undefined)nwLoadPrices();nwRealtime();
-    const p=NW_PILLS.find(x=>x[0]===NWS.pill);nwLoadList($('#nwList'),'plastic:'+p[0],p[2]);
-  }else{body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3"><span class="text-xs text-mute">10 bài mới nhất · nguồn RSS &amp; dữ liệu chuyên ngành</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button></div><div id="nwList"></div>`;
-    nwLoadList($('#nwList'),t,NW_FEEDS[t])}}
+    const p=NW_PILLS.find(x=>x[0]===NWS.pill)||NW_PILLS[0];nwLoadList($('#nwList'),'plastic:'+p[0],p[2]);
+  }else if(t==='tech'){
+    const tp=NW_TECH_PILLS.find(x=>x[0]===NWS.techPill)||NW_TECH_PILLS[0];
+    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div class="flex gap-2 flex-wrap" id="nwTechPills">${NW_TECH_PILLS.map(([k,l])=>`<button type="button" data-nwtp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${tp[0]===k?'text-white':'text-mute hover:text-ink'}" style="${tp[0]===k?'background:#2563eb;border-color:#2563eb':'border-color:var(--line)'}">${esc(l)}</button>`).join('')}</div>
+      <div class="flex items-center gap-2"><span class="text-xs text-mute">Nguồn: GenK / Tinh Tế RSS</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button></div>
+    </div><div id="nwList"></div>`;
+    nwLoadList($('#nwList'),'tech:'+tp[0],tp[2]);
+  }else{
+    body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <span class="text-xs text-mute font-medium"><i class="fa-solid fa-chart-line mr-1" style="color:#ca8a04"></i>Chỉ số thị trường &amp; Tin tức tài chính trực tuyến từ CafeF RSS</span>
+      <button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button>
+    </div>
+    <div id="nwFinPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-4"></div>
+    <div id="nwList"></div>`;
+    nwFinCards();
+    nwLoadList($('#nwList'),'finance',NW_FEEDS.finance)}}
 function viewNews(){
-  $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Dữ liệu online · chỉ tải tab đang xem</p></div>
+  $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Dữ liệu RSS trực tuyến (CafeF · GenK · Tinh Tế · Ngành Nhựa) · chỉ tải tab đang xem</p></div>
    <div id="nwTabs" class="flex gap-1 mb-4 border-b border-line overflow-x-auto">${NW_TABS.map(([k,l,ic])=>`<button type="button" data-nwt="${k}" class="px-5 py-3 text-base whitespace-nowrap border-b-4 text-mute hover:text-ink" style="border-color:transparent"><i class="fa-solid ${ic} mr-2"></i>${l}</button>`).join('')}</div><div id="nwBody"></div>`;
+  document.querySelectorAll('#nwTabs [data-nwt]').forEach(btn=>{
+    btn.onclick=ev=>{ev.stopPropagation();NWS.tab=btn.dataset.nwt;try{localStorage.setItem('nwtab',NWS.tab)}catch(x){}nwTab()};
+  });
   $('#view').onclick=e=>{let b;
     if(b=e.target.closest('[data-nwt]')){NWS.tab=b.dataset.nwt;try{localStorage.setItem('nwtab',NWS.tab)}catch(x){}nwTab()}
     else if(b=e.target.closest('[data-nwp]')){NWS.pill=b.dataset.nwp;nwTab()}
+    else if(b=e.target.closest('[data-nwtp]')){NWS.techPill=b.dataset.nwtp;nwTab()}
     else if(e.target.closest('#nwLive')||e.target.closest('[data-nwretry]')){
       const t=NWS.tab;Object.keys(NW_CACHE).forEach(k=>{if(k===t||k.startsWith(t+':'))delete NW_CACHE[k]});
-      if(t==='plastic'){NWS.live=new Date();nwLoadPrices().then(()=>{const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')})}
-      const p=NW_PILLS.find(x=>x[0]===NWS.pill);if(t==='plastic')nwLoadList($('#nwList'),'plastic:'+p[0],p[2],true);else nwLoadList($('#nwList'),t,NW_FEEDS[t],true)}};
+      if(t==='plastic'){
+        NWS.live=new Date();nwLoadPrices().then(()=>{const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')});
+        const p=NW_PILLS.find(x=>x[0]===NWS.pill)||NW_PILLS[0];nwLoadList($('#nwList'),'plastic:'+p[0],p[2],true);
+      }else if(t==='tech'){
+        const tp=NW_TECH_PILLS.find(x=>x[0]===NWS.techPill)||NW_TECH_PILLS[0];nwLoadList($('#nwList'),'tech:'+tp[0],tp[2],true);
+      }else{
+        nwFinCards();nwLoadList($('#nwList'),'finance',NW_FEEDS.finance,true);
+      }}};
   nwTab()}
 function renderView(name,pid,target){
   {const v_=$('#view');v_.onclick=v_.onchange=v_.ondragstart=v_.ondragend=v_.ondragover=v_.ondrop=null}   // gỡ listener ủy quyền của view trước
