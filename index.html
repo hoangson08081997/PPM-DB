@@ -2680,7 +2680,7 @@ function assignModal(uid_){
     try{const r=await saveAssignments(uid_,next);toast(`Đã lưu phân bổ (${next.length} dự án; +${r.ups} cập nhật, −${r.del} gỡ)`,false);closeModal();viewUsers();renderSide(curPid)}
     catch(e){console.error(e);const msg=sbErr(e,'phân bổ dự án (project_members)');$('#asErr').textContent=msg;toast(msg);b.disabled=false}}}
 /* ===================== VIỆC CẦN LÀM (#/todos): List + Kanban, kéo thả HTML5 native, bình luận ===================== */
-const TD_PRI={urgent:['Urgent','bg-red-100 text-red-700'],high:['High','bg-amber-100 text-amber-700'],medium:['Medium','bg-blue-100 text-blue-700'],low:['Low','bg-slate-200 text-slate-700']};
+const TD_PRI={urgent:['Khẩn cấp','bg-red-100 text-red-700'],high:['Cao','bg-amber-100 text-amber-700'],medium:['Trung bình','bg-blue-100 text-blue-700'],low:['Thấp','bg-slate-200 text-slate-700']};
 const TD_COLS=[['todo','Chưa làm','#64748b'],['in_progress','Đang làm','#2563eb'],['done','Hoàn thành','#16a34a']];
 const TD_PRI_ORD={urgent:0,high:1,medium:2,low:3};
 let TDV=(()=>{try{return localStorage.getItem('tdv')||'kanban'}catch(e){return'kanban'}})(),TDF={p:'',pri:'',q:''};
@@ -2718,10 +2718,10 @@ function tdMove(id,to){
   if(to==='done'){const as=t.actual_start_date||td,ae=t.actual_end_date||td;u={...u,progress:100,actual_start_date:as,actual_end_date:ae,actual_days:daysBetween(as,ae)+1}}
   else if(to==='in_progress')u={...u,progress:(t.progress||0)>=100?90:(t.progress||0),actual_start_date:t.actual_start_date||td,actual_end_date:null,actual_days:null};
   else u={...u,progress:0,actual_start_date:null,actual_end_date:null,actual_days:null};
-  db.save('tasks',db.list('tasks').map(x=>x.id===id?{...x,...u}:x));renderBell();tdDraw()}
+  db.save('tasks',db.list('tasks').map(x=>x.id===id?{...x,...u}:x));renderBell();tdDraw();tdRefreshTabs()}
 function tdProjectView(){
   const ps=myProjects();
-  $('#tdHost').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">✅ Việc cần làm</h2><p class="text-mute text-sm"><span id="tdCount"></span> từ ${ps.length} dự án · kéo thả thẻ để đổi trạng thái</p></div>
+  $('#tdHost').innerHTML=`<div class="flex items-center justify-between mb-3 gap-2 flex-wrap"><div><h2 class="text-xl font-bold">✅ Việc của dự án</h2><p class="text-mute text-sm"><span id="tdCount"></span> từ ${ps.length} dự án · kéo thả thẻ để đổi trạng thái</p></div>
    <div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface" role="group" aria-label="Chế độ xem">${[['kanban','Kanban','fa-table-columns'],['list','Danh sách','fa-list']].map(([k,l,ic])=>`<button data-tdv="${k}" class="px-3 py-1.5 ${TDV===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}"><i class="fa-solid ${ic} mr-1"></i>${l}</button>`).join('')}</div></div>
    <div class="flex gap-2 flex-wrap mb-3"><input id="tdQ" type="search" class="inp" style="margin:0;width:15rem" placeholder="Tìm việc / dự án..." value="${esc(TDF.q)}" aria-label="Tìm việc">
     <select id="tdP" class="inp" style="margin:0;width:auto;max-width:16rem" aria-label="Lọc dự án"><option value="">Tất cả dự án</option>${ps.map(p=>`<option value="${p.id}" ${TDF.p===p.id?'selected':''}>${esc(p.code||'')} · ${esc(p.name)}</option>`).join('')}</select>
@@ -2738,40 +2738,106 @@ function tdProjectView(){
   v.ondragover=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col||!dragId)return;e.preventDefault();e.dataTransfer.dropEffect='move';v.querySelectorAll('.td-over').forEach(x=>x!==col&&x.classList.remove('td-over'));col.classList.add('td-over')};
   v.ondrop=e=>{const col=e.target.closest&&e.target.closest('.td-col');if(!col)return;e.preventDefault();const id=dragId||(e.dataTransfer&&e.dataTransfer.getData('text/plain'));dragId=null;if(id)tdMove(id,col.dataset.col)}}
 
-/* ---- Việc cá nhân của tôi: bảng extra_tasks với project_id = null, created_by = người dùng hiện tại ---- */
-let TDT=(()=>{try{return localStorage.getItem('tdt')||'project'}catch(e){return'project'}})(),PTF='open',PT_LOADED=false,PT_ERR='';
-const ptRows=()=>db.list('extra_tasks').filter(x=>!x.project_id&&CUR&&x.created_by===CUR.id).sort((a,b)=>(a.done-b.done)||String(b.created_at||'').localeCompare(String(a.created_at||'')));
-async function ptLoad(){PT_ERR='';try{await fetchTable('extra_tasks','created_by',[CUR.id]);PT_LOADED=true}catch(e){console.error(e);PT_ERR=sbErr(e,'tải việc cá nhân (bảng extra_tasks)')}}
+/* ---- Việc cá nhân của tôi: đồng bộ localStorage + bảng extra_tasks (project_id = null), hỗ trợ chọn mức ưu tiên ---- */
+let TDT=(()=>{try{return localStorage.getItem('tdt')||'project'}catch(e){return'project'}})(),PTF='open',PTF_PRI='',PT_LOADED=false;
+const ptKey=()=>'ppm_personal_todos_'+(CUR&&CUR.id?CUR.id:'guest');
+function ptParseNote(raw,priFallback){
+  const s=String(raw||''),m=s.match(/^\[PRI:(urgent|high|medium|low)\]\s*/i);
+  return m?{priority:m[1].toLowerCase(),note:s.slice(m[0].length)}:{priority:TD_PRI[priFallback]?priFallback:'medium',note:s}}
+function ptFormatNote(note,pri){const clean=ptParseNote(note).note.trim();return `[PRI:${TD_PRI[pri]?pri:'medium'}]${clean?' '+clean:''}`}
+function ptReadLS(){
+  try{
+    const raw=localStorage.getItem(ptKey())||localStorage.getItem('ppm_personal_todos');
+    const arr=raw?JSON.parse(raw):[];
+    return Array.isArray(arr)?arr.map(x=>{const pn=ptParseNote(x.note,x.priority);return{...x,project_id:null,priority:pn.priority,note:pn.note,done:!!x.done}}):[];
+  }catch(e){return[]}}
+function ptRows(){
+  const uid_=CUR&&CUR.id,ls=ptReadLS(),byId=new Map();
+  ls.forEach(x=>{if(x&&x.id)byId.set(x.id,x)});
+  db.list('extra_tasks').filter(x=>!x.project_id&&(!uid_||!x.created_by||x.created_by===uid_)).forEach(x=>{
+    const prev=byId.get(x.id),pn=ptParseNote(x.note,x.priority||(prev&&prev.priority));
+    byId.set(x.id,{...prev,...x,project_id:null,priority:pn.priority,note:pn.note,done:!!x.done});
+  });
+  return[...byId.values()].sort((a,b)=>(a.done-b.done)||(TD_PRI_ORD[a.priority||'medium']??2)-(TD_PRI_ORD[b.priority||'medium']??2)||String(b.created_at||'').localeCompare(String(a.created_at||'')))}
+function ptSaveAll(rows,changedRow,deletedId){
+  const norm=rows.map(x=>{const pn=ptParseNote(x.note,x.priority);return{id:x.id,project_id:null,title:String(x.title||'').trim(),note:pn.note,priority:pn.priority,done:!!x.done,created_by:x.created_by||(CUR&&CUR.id)||'local',created_at:x.created_at||new Date().toISOString()}});
+  try{const js=JSON.stringify(norm);localStorage.setItem(ptKey(),js);localStorage.setItem('ppm_personal_todos',js)}catch(e){}
+  const others=CACHE.extra_tasks.filter(x=>x.project_id!=null);
+  const forCache=norm.map(x=>({...x,note:ptFormatNote(x.note,x.priority)}));
+  CACHE.extra_tasks=[...others,...forCache];
+  SNAP.extra_tasks=new Map(CACHE.extra_tasks.map(r=>[pkOf(TB.extra_tasks,r),JSON.stringify(toDB('extra_tasks',r))]));
+  if(sb&&CUR&&CUR.id){
+    if(changedRow){
+      const dbRow=toDB('extra_tasks',{...changedRow,project_id:null,created_by:CUR.id,note:ptFormatNote(changedRow.note,changedRow.priority)});
+      sb.from('extra_tasks').upsert([dbRow],{onConflict:'id'}).then(({error})=>{if(error)console.warn('extra_tasks local fallback:',error.message)}).catch(()=>{});
+    }
+    if(deletedId){
+      sb.from('extra_tasks').delete().eq('id',deletedId).then(()=>{}).catch(()=>{});
+    }
+  }
+  tdRefreshTabs()}
+async function ptLoad(){
+  if(!CUR||!CUR.id){PT_LOADED=true;return}
+  try{await fetchTable('extra_tasks','created_by',[CUR.id])}catch(e){}
+  PT_LOADED=true;ptSaveAll(ptRows())}
 function ptDraw(){
-  const box=$('#ptList');if(!box)return;const all=ptRows(),rows=all.filter(x=>PTF==='all'||(PTF==='open'?!x.done:x.done));
-  $('#ptCount').textContent=`${all.filter(x=>!x.done).length} chưa xong · ${all.filter(x=>x.done).length} đã xong`;
-  box.innerHTML=rows.length?rows.map(x=>`<div class="flex items-start gap-3 px-3 py-2.5 border-b border-line last:border-0" data-pid="${x.id}">
-    <input type="checkbox" data-ptdone="${x.id}" ${x.done?'checked':''} style="width:1.1rem;height:1.1rem;margin-top:.2rem" aria-label="Hoàn thành">
-    <div class="min-w-0 flex-1"><div class="${x.done?'line-through text-mute':'font-medium'} break-words">${esc(x.title)}</div>${x.note?`<div class="text-xs text-mute break-words">${esc(x.note)}</div>`:''}<div class="text-[10px] text-mute mt-0.5">${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div></div>
-    <button data-ptedit="${x.id}" class="p-1.5 text-mute hover:text-brand" aria-label="Sửa"><i class="fa-solid fa-pen"></i></button><button data-ptdel="${x.id}" class="p-1.5 text-mute hover:text-red-600" aria-label="Xóa"><i class="fa-solid fa-trash"></i></button></div>`).join(''):'<div class="text-mute text-sm p-6 text-center">Chưa có việc cá nhân nào ở mục này.</div>'}
+  const box=$('#ptList');if(!box)return;
+  const all=ptRows(),rows=all.filter(x=>(PTF==='all'||(PTF==='open'?!x.done:x.done))&&(!PTF_PRI||(x.priority||'medium')===PTF_PRI));
+  const cnt=$('#ptCount');if(cnt)cnt.textContent=`${all.filter(x=>!x.done).length} chưa xong · ${all.filter(x=>x.done).length} đã xong`;
+  box.innerHTML=rows.length?rows.map(x=>{const pr=TD_PRI[x.priority||'medium']||TD_PRI.medium;return `<div class="flex items-start gap-3 px-3.5 py-3 border-b border-line last:border-0 hover:bg-black/5 transition-colors" data-pid="${x.id}">
+    <input type="checkbox" data-ptdone="${x.id}" ${x.done?'checked':''} style="width:1.15rem;height:1.15rem;margin-top:.2rem;cursor:pointer" aria-label="Hoàn thành">
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2 flex-wrap"><span class="${x.done?'line-through text-mute':'font-semibold'} break-words">${esc(x.title)}</span><span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${pr[1]}">${pr[0]}</span></div>
+      ${x.note?`<div class="text-xs text-mute break-words mt-0.5">${esc(x.note)}</div>`:''}
+      <div class="text-[10px] text-mute mt-1"><i class="fa-regular fa-calendar mr-1"></i>${x.created_at?new Date(x.created_at).toLocaleDateString('vi-VN'):''}</div>
+    </div>
+    <select data-ptpri="${x.id}" class="cell q text-xs" style="width:auto;font-size:.72rem;padding:.2rem .4rem" aria-label="Đổi mức ưu tiên" title="Đổi mức ưu tiên">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${(x.priority||'medium')===k?'selected':''}>${v[0]}</option>`).join('')}</select>
+    <button data-ptedit="${x.id}" class="p-1.5 text-mute hover:text-brand" aria-label="Sửa" title="Sửa"><i class="fa-solid fa-pen"></i></button>
+    <button data-ptdel="${x.id}" class="p-1.5 text-mute hover:text-red-600" aria-label="Xóa" title="Xóa"><i class="fa-solid fa-trash"></i></button></div>`}).join(''):'<div class="text-mute text-sm p-6 text-center">Chưa có việc cá nhân nào ở mục này. Gõ tên việc ở trên rồi nhấn Enter để thêm nhanh!</div>'}
 async function tdPersonalView(){
-  $('#tdHost').innerHTML=`<div class="max-w-2xl"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><div class="font-bold">🙋 Việc cá nhân của tôi</div><div class="text-xs text-mute">Riêng tư, không gắn dự án · <span id="ptCount"></span></div></div>
-    <div class="inline-flex rounded-xl border border-line overflow-hidden text-xs bg-surface">${[['open','Chưa xong'],['done','Đã xong'],['all','Tất cả']].map(([k,l])=>`<button data-ptf="${k}" class="px-3 py-1.5 ${PTF===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div></div>
-    <div class="flex gap-2 mb-3"><input id="ptTitle" class="inp" style="margin:0" placeholder="Thêm việc cá nhân mới... (Enter)" maxlength="200" aria-label="Tên việc"><input id="ptNote" class="inp" style="margin:0;max-width:11rem" placeholder="Ghi chú" aria-label="Ghi chú"><button id="ptAdd" class="btn" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button></div>
-    <div id="ptErr" class="text-xs mb-2" style="color:#dc2626">${esc(PT_ERR)}</div><div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden">${SPIN_HTML}</div></div>`;
+  $('#tdHost').innerHTML=`<div class="max-w-3xl"><div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><div><h2 class="text-xl font-bold">🙋 Việc cá nhân của tôi</h2><div class="text-xs text-mute">Lưu đồng bộ cục bộ (localStorage) &amp; extra_tasks · <span id="ptCount"></span></div></div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <select id="ptFilterPri" class="inp text-xs" style="margin:0;width:auto;padding:.35rem .6rem" aria-label="Lọc mức ưu tiên"><option value="">Mọi mức ưu tiên</option>${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${PTF_PRI===k?'selected':''}>${v[0]}</option>`).join('')}</select>
+      <div class="inline-flex rounded-xl border border-line overflow-hidden text-xs bg-surface">${[['open','Chưa xong'],['done','Đã xong'],['all','Tất cả']].map(([k,l])=>`<button data-ptf="${k}" class="px-3 py-1.5 ${PTF===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div>
+    </div></div>
+    <div class="card p-3 mb-3"><div class="flex gap-2 flex-wrap sm:flex-nowrap">
+      <input id="ptTitle" class="inp" style="margin:0;flex:2;min-width:12rem" placeholder="Thêm nhanh việc cá nhân mới... (Enter)" maxlength="200" aria-label="Tên việc">
+      <select id="ptPri" class="inp" style="margin:0;width:auto;min-width:8.5rem" aria-label="Mức ưu tiên">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${k==='medium'?'selected':''}>Ưu tiên: ${v[0]}</option>`).join('')}</select>
+      <input id="ptNote" class="inp" style="margin:0;flex:1;min-width:9rem" placeholder="Ghi chú (tùy chọn)" aria-label="Ghi chú">
+      <button id="ptAdd" class="btn whitespace-nowrap" type="button"><i class="fa-solid fa-plus mr-1"></i>Thêm</button>
+    </div></div>
+    <div id="ptList" class="bg-surface border border-line rounded-2xl overflow-hidden"></div></div>`;
   const add=()=>{const t=$('#ptTitle').value.trim();if(!t){$('#ptTitle').focus();return}
-    db.save('extra_tasks',[...db.list('extra_tasks'),{id:uid(),project_id:null,title:t,note:$('#ptNote').value.trim(),done:false,created_by:CUR.id,created_at:new Date().toISOString()}]);
+    const pri=$('#ptPri').value||'medium',nt=$('#ptNote').value.trim();
+    const item={id:uid(),project_id:null,title:t,note:nt,priority:pri,done:false,created_by:(CUR&&CUR.id)||'local',created_at:new Date().toISOString()};
+    ptSaveAll([item,...ptRows()],item);
     $('#ptTitle').value='';$('#ptNote').value='';$('#ptTitle').focus();ptDraw()};
   $('#ptAdd').onclick=add;$('#ptTitle').onkeydown=e=>{if(e.key==='Enter')add()};$('#ptNote').onkeydown=e=>{if(e.key==='Enter')add()};
   const v=$('#view');
   v.onclick=e=>{let b;
     if(b=e.target.closest('[data-ptf]')){PTF=b.dataset.ptf;tdPersonalView()}
-    else if(b=e.target.closest('[data-ptdel]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.ptdel);ask(`Xóa "${x.title}"?`,()=>{db.save('extra_tasks',db.list('extra_tasks').filter(r=>r.id!==x.id));ptDraw()})}
-    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=db.list('extra_tasks').find(r=>r.id===id),row=b.closest('[data-pid]');
-      row.querySelector('.min-w-0').innerHTML=`<input class="inp" style="margin:0 0 .25rem" id="ptET" value="${esc(x.title)}"><input class="inp" style="margin:0" id="ptEN" value="${esc(x.note||'')}" placeholder="Ghi chú">`;
-      const save=()=>{const t=$('#ptET').value.trim();if(t)db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===id?{...r,title:t,note:$('#ptEN').value.trim()}:r));ptDraw()};
-      row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus();row.querySelectorAll('input')[1].onblur=()=>setTimeout(()=>{if($('#ptET'))save()},150)}};
-  v.onchange=e=>{const c=e.target.closest('[data-ptdone]');if(c){db.save('extra_tasks',db.list('extra_tasks').map(r=>r.id===c.dataset.ptdone?{...r,done:c.checked}:r));ptDraw()}};
+    else if(b=e.target.closest('[data-ptdel]')){const x=ptRows().find(r=>r.id===b.dataset.ptdel);if(!x)return;ask(`Xóa "${x.title}"?`,()=>{ptSaveAll(ptRows().filter(r=>r.id!==x.id),null,x.id);ptDraw()})}
+    else if(b=e.target.closest('[data-ptedit]')){const id=b.dataset.ptedit,x=ptRows().find(r=>r.id===id),row=b.closest('[data-pid]');if(!x||!row)return;
+      row.querySelector('.min-w-0').innerHTML=`<div class="flex flex-col gap-1.5"><input class="inp" style="margin:0" id="ptET" value="${esc(x.title)}" placeholder="Tên việc"><div class="flex gap-2"><select id="ptEP" class="inp" style="margin:0;width:auto">${Object.entries(TD_PRI).map(([k,v])=>`<option value="${k}" ${(x.priority||'medium')===k?'selected':''}>${v[0]}</option>`).join('')}</select><input class="inp" style="margin:0;flex:1" id="ptEN" value="${esc(x.note||'')}" placeholder="Ghi chú"></div><div class="flex gap-2 mt-1"><button type="button" id="ptESave" class="btn text-xs py-1 px-2.5"><i class="fa-solid fa-check mr-1"></i>Lưu</button><button type="button" id="ptECancel" class="btn-ghost text-xs py-1 px-2.5">Hủy</button></div></div>`;
+      const save=()=>{const t=$('#ptET')&&$('#ptET').value.trim();if(t){const updated={...x,title:t,priority:$('#ptEP').value||'medium',note:$('#ptEN').value.trim()};ptSaveAll(ptRows().map(r=>r.id===id?updated:r),updated)}ptDraw()};
+      $('#ptESave').onclick=save;$('#ptECancel').onclick=()=>ptDraw();
+      row.querySelectorAll('input').forEach(i=>{i.onkeydown=ev=>{if(ev.key==='Enter')save();else if(ev.key==='Escape')ptDraw()}});$('#ptET').focus()}};
+  v.onchange=e=>{
+    if(e.target.id==='ptFilterPri'){PTF_PRI=e.target.value;ptDraw();return}
+    const c=e.target.closest('[data-ptdone]');
+    if(c){const id=c.dataset.ptdone,cur=ptRows(),found=cur.find(r=>r.id===id);if(found){const updated={...found,done:c.checked};ptSaveAll(cur.map(r=>r.id===id?updated:r),updated);ptDraw()}return}
+    const p=e.target.closest('[data-ptpri]');
+    if(p){const id=p.dataset.ptpri,cur=ptRows(),found=cur.find(r=>r.id===id);if(found){const updated={...found,priority:p.value};ptSaveAll(cur.map(r=>r.id===id?updated:r),updated);ptDraw()}}};
   v.ondragstart=v.ondragend=v.ondragover=v.ondrop=null;
-  if(!PT_LOADED){await ptLoad();if(!$('#ptList'))return;$('#ptErr').textContent=PT_ERR}
-  ptDraw()}
+  ptDraw();
+  if(!PT_LOADED){await ptLoad();if($('#ptList'))ptDraw()}}
+function tdRefreshTabs(){
+  const box=$('#tdTabs');if(!box)return;
+  const pOpen=tdTasks().filter(x=>tdCol(x.t)!=='done').length,mOpen=ptRows().filter(x=>!x.done).length;
+  box.innerHTML=[['project','📁 Việc của dự án',pOpen],['mine','🙋 Việc cá nhân của tôi',mOpen]].map(([k,l,n])=>`<button role="tab" type="button" data-tdt="${k}" class="px-4 py-2 flex items-center gap-2 ${TDT===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}"><span>${l}</span><span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${TDT===k?'rgba(255,255,255,.22)':'rgba(127,127,127,.16)'}">${n}</span></button>`).join('')}
 function viewTodos(){
-  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-4" role="tablist" id="tdTabs">${[['project','📁 Việc của dự án'],['mine','🙋 Việc cá nhân của tôi']].map(([k,l])=>`<button role="tab" data-tdt="${k}" class="px-4 py-2 ${TDT===k?'bg-brand text-white font-semibold':'text-mute hover:text-ink'}">${l}</button>`).join('')}</div><div id="tdHost"></div>`;
+  $('#view').innerHTML=`<div class="inline-flex rounded-xl border border-line overflow-hidden text-sm bg-surface mb-4" role="tablist" id="tdTabs"></div><div id="tdHost"></div>`;
+  tdRefreshTabs();
   if(TDT==='mine')tdPersonalView();else tdProjectView();
   $('#tdTabs').onclick=e=>{const t=e.target.closest('[data-tdt]');if(t){TDT=t.dataset.tdt;try{localStorage.setItem('tdt',TDT)}catch(x){}viewTodos()}}}
 /* Modal chi tiết việc + bình luận (task_comments, tải khi mở) */
@@ -2807,15 +2873,41 @@ async function tdModal(tid){
     try{await Q;const{data,error}=await sb.from('task_comments').delete().eq('id',cid).select('id');if(error)throw error;if(!data||!data.length)throw Object.assign(new Error('row-level security: không xóa được bình luận'),{code:'42501'});setCache('task_comments',db.list('task_comments').filter(c=>c.id!==cid));draw()}
     catch(er){console.error(er);toast(sbErr(er,'xóa bình luận'))}}}
 
-/* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): 3 Tab, Lazy load theo tab, RSS online qua rss2json ===================== */
-const NW_FB="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" fill="#e2e8f0"/><text x="50%" y="50%" fill="#94a3b8" font-family="Arial" font-size="28" text-anchor="middle" dominant-baseline="middle">Không có ảnh</text></svg>');
+/* ===================== TIN TỨC & THỊ TRƯỜNG (#/news): 3 Tab, Lazy load theo tab, RSS online + Fallback an toàn ===================== */
+const nwSvgThumb=(badge,sub,c1,c2)=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="640" height="400" fill="url(#g)"/><circle cx="540" cy="80" r="140" fill="rgba(255,255,255,0.08)"/><circle cx="100" cy="340" r="180" fill="rgba(255,255,255,0.06)"/><rect x="44" y="48" rx="10" ry="10" width="240" height="40" fill="rgba(255,255,255,0.18)"/><text x="164" y="74" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="18" text-anchor="middle">${badge}</text><text x="44" y="210" fill="#ffffff" font-family="Arial,sans-serif" font-weight="bold" font-size="30">${sub}</text><text x="44" y="255" fill="rgba(255,255,255,0.82)" font-family="Arial,sans-serif" font-size="18">PLASTICS &amp; RECYCLING ENGINEERING</text></svg>`);
+const NW_FB=nwSvgThumb('PLASTICS NEWS','Industrial Technology','#0f172a','#1e3a8a');
 const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
 const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
-/* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài */
+/* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài; nếu lỗi mạng / proxy chặn sẽ tự nạp 10 bài mẫu chuyên sâu */
 const NW_TABS=[['plastic','Tin Ngành Nhựa','fa-recycle','#16a34a'],['tech','Tin Công Nghệ','fa-microchip','#2563eb'],['finance','Tin Tài Chính','fa-chart-line','#ca8a04']];
 const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[GN('ngành nhựa tái chế',true),GN('plastic recycling PET HDPE market')]]];
 const NW_FEEDS={tech:['https://vnexpress.net/rss/so-hoa.rss','https://tinhte.vn/rss','https://genk.vn/rss/home.rss'],finance:['https://vneconomy.vn/tai-chinh.rss','https://cafef.vn/thi-truong-chung-khoan.rss','https://vnexpress.net/rss/kinh-doanh.rss']};
-const NW_PRICES=[['PET Virgin',['petvirgin']],['HDPE Virgin',['hdpevirgin']],['RPET Clear',['rpetclear','rpet']],['RHDPE Natural',['rhdpenatural','rhdpe']]];
+/* Giá hạt nhựa tham chiếu tiêu chuẩn khi chưa có dữ liệu mới từ API/Supabase */
+const NW_PRICES=[
+  ['PET Virgin',['petvirgin'],{price:1050,chg:'+0.50%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
+  ['HDPE Virgin',['hdpevirgin'],{price:1120,chg:'-0.30%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
+  ['RPET Clear',['rpetclear','rpet'],{price:1450,chg:'+1.20%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}],
+  ['RHDPE Natural',['rhdpenatural','rhdpe'],{price:1600,chg:'+0.80%',src:'Tham chiếu tiêu chuẩn (ICIS / Platts)'}]
+];
+/* 10 bài viết mẫu chuyên sâu về ngành nhựa (công nghệ đùn JWELL, giải pháp Starlinger, dây chuyền tái chế Boretech) */
+const NW_FALLBACK_ARTICLES=[
+  {tag:'jwell',title:'Công nghệ đùn trục vít đôi song song JWELL JSH Series thế hệ mới cho tấm PET & rPET thực phẩm',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL EXTRUSION','Twin-Screw Sheet Line','#065f46','#047857'),summary:'Dây chuyền đùn tấm PET/rPET không cần sấy sơ bộ của JWELL ứng dụng hệ thống thoát khí chân không đa tầng áp suất sâu, duy trì độ nhớt nội tại (IV ≥ 0.78 dL/g) và tiết kiệm tới 18% điện năng tiêu thụ.',offsetMin:35},
+  {tag:'starlinger',title:'Giải pháp Starlinger recoSTAR PET iV+ đạt chuẩn FDA & EFSA cho bao bì rPET Bottle-to-Bottle',link:'https://www.starlinger.com/en/recycling-technology/',img:nwSvgThumb('STARLINGER','recoSTAR PET iV+','#1e3a8a','#2563eb'),summary:'Hệ thống tái chế Bottle-to-Bottle recoSTAR PET iV+ tích hợp quy trình khử nhiễm Super-Clean và trùng ngưng pha rắn (SSP) giúp nâng độ nhớt IV đồng đều, loại bỏ hơn 99.9% tạp chất bay hơi đạt chuẩn tiếp xúc thực phẩm.',offsetMin:80},
+  {tag:'boretech',title:'Dây chuyền tái chế chai PET Boretech ES Process công suất 6.000 kg/h: Tối ưu hóa nước & năng lượng',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','ES Process PET Line','#0f766e','#0d9488'),summary:'Giải pháp rửa và tái chế chai PET ES Process của Boretech tích hợp mô-đun bóc nhãn khô, giặt nóng kiềm tuần hoàn và lọc nước khép kín, giảm mức tiêu hao nước sạch xuống dưới 1.2 m³ trên mỗi tấn mảnh rPET.',offsetMin:130},
+  {tag:'jwell',title:'Dây chuyền đùn ống HDPE đường kính lớn JWELL JWR-1600 phục vụ hạ tầng cấp thoát nước áp lực cao',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL PIPE LINE','HDPE JWR-1600 Series','#047857','#059669'),summary:'Hệ thống đùn ống HDPE/PP đa lớp đường kính tới 1.600 mm của JWELL trang bị đầu khuôn xoắn ốc phân phối dòng chảy tối ưu và định cỡ chân không tự động, kiểm soát dung sai chiều dày thành ống ±1.5%.',offsetMin:195},
+  {tag:'starlinger',title:'Công nghệ khử mùi C+P của Starlinger trên hạt tái chế rHDPE/rPP (PCR) cho bao bì mỹ phẩm cao cấp',link:'https://www.starlinger.com/en/recycling-technology/',img:nwSvgThumb('STARLINGER','Odour Reduction C+P','#1d4ed8','#3b82f6'),summary:'Công nghệ khử mùi ba cấp của Starlinger loại bỏ triệt để các hợp chất mùi hữu cơ phân tử thấp tồn dư trong vỏ bình HDPE/PP sau tiêu dùng, mở rộng ứng dụng hạt nhựa PCR cho ngành hóa mỹ phẩm.',offsetMin:260},
+  {tag:'boretech',title:'Hệ thống phân loại quang học NIR kết hợp rửa ma sát tốc độ cao trên dây chuyền Boretech rPET',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','NIR Optical & Hot Wash','#115e59','#14b8a6'),summary:'Tích hợp cảm biến cận hồng ngoại (NIR) phân tách polymer/màu sắc tốc độ cao cùng bể rửa nóng kiềm hai cấp, giúp dây chuyền Boretech kiểm soát hàm lượng PVC và kim loại dưới 15 ppm cho mảnh rPET Clear.',offsetMin:340},
+  {tag:'jwell',title:'Giải pháp đùn màng BOPET/CPP đa lớp đồng đùn (Co-extrusion) JWELL tích hợp điều khiển tự động APC',link:'https://www.jwell.cn/',img:nwSvgThumb('JWELL FILM TECH','Multi-layer Co-Extrusion','#064e3b','#10b981'),summary:'Dây chuyền cán màng và đùn màng đa lớp JWELL sử dụng trục cán làm mát tuần hoàn xoắn ốc cùng cảm biến đo độ dày trực tuyến APC, cho phép phối trộn tới 50% hạt rPET tái chế mà vẫn giữ độ trong suốt cao.',offsetMin:420},
+  {tag:'starlinger',title:'Kinh tế tuần hoàn bao bì dệt PP: Giải pháp khép kín bao Jumbo/FIBC tái chế từ Starlinger',link:'https://www.starlinger.com/',img:nwSvgThumb('STARLINGER','Circular PP Packaging','#4338ca','#6366f1'),summary:'Quy trình Circular Packaging của Starlinger cho phép thu hồi bao tải dệt PP/FIBC đã qua sử dụng, giặt sạch, tạo hạt recoSTAR dynamic và kéo sợi tape độ bền cao với tỷ lệ rPP đạt trên 30%.',offsetMin:510},
+  {tag:'boretech',title:'Giải pháp tái chế bình sữa và can HDPE (rHDPE Natural) chuẩn Food-Grade trên hệ thống Boretech',link:'https://www.bo-re-tech.com/',img:nwSvgThumb('BORETECH','rHDPE Natural Recycling','#0e7490','#06b6d4'),summary:'Hệ thống tuyển nổi mật độ chính xác kết hợp rửa ma sát nhiệt độ cao của Boretech tách triệt để nắp PP và cặn keo nhãn khỏi mảnh HDPE tự nhiên, đáp ứng tiêu chuẩn tạo hạt rHDPE Natural chất lượng cao.',offsetMin:600},
+  {tag:'general',title:'Thị trường hạt nhựa nguyên sinh & tái chế (PET, HDPE, rPET, rHDPE): Nhu cầu Food-Grade tăng trưởng mạnh',link:'https://plasticsrecycling.org/',img:nwSvgThumb('MARKET REPORT','Virgin & Recycled Resins','#7c2d12','#ea580c'),summary:'Báo cáo thị trường ghi nhận giá RPET Clear (1,450 $/ton) và RHDPE Natural (1,600 $/ton) duy trì đà tăng tích cực nhờ cam kết sử dụng 25–30% nhựa tái chế bắt buộc từ các tập đoàn đồ uống và FMCG toàn cầu.',offsetMin:720}
+];
+function nwFallbackItems(key){
+  const pill=String(key||'').startsWith('plastic:')?key.split(':')[1]:'';
+  const now=Date.now();
+  const list=NW_FALLBACK_ARTICLES.map((a,i)=>({...a,time:new Date(now-(a.offsetMin||(i+1)*45)*6e4).toISOString()}));
+  if(pill&&pill!=='general')list.sort((a,b)=>(a.tag===pill?0:1)-(b.tag===pill?0:1));
+  return list.slice(0,10)}
 const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',price:undefined,priceErr:'',live:null};
 const NW_CACHE={},NW_TTL=5*60e3;let NW_CH=null,NW_TOK=0;
 const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
@@ -2833,9 +2925,10 @@ function nwPrices(ex){
   else Object.entries(src).forEach(([k,v])=>{if(/^(updated_at|date|as_of|source|note|unit|currency)$/i.test(k))return;const r=row(k.replace(/_/g,' '),v);if(r)rows.push(r)});
   return{rows,meta:{src:ex.source||ex.source_name||'',at:ex.updated_at||ex.date||ex.as_of||''}}}
 function nwChg(c){if(c==null||c==='')return'<span class="text-xs text-mute">—</span>';const n=parseFloat(String(c).replace(',','.')),neg=isNaN(n)?String(c).trim().startsWith('-'):n<0,zero=!isNaN(n)&&n===0;
-  let txt=String(c).replace(/^[-+]/,'');if(!isNaN(n)&&!/%/.test(txt))txt+='%';
-  return `<span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${zero?'rgba(100,116,139,.15)':neg?'rgba(220,38,38,.12)':'rgba(22,163,74,.14)'};color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(txt)}</span>`}
-/* ---- RSS -> bài viết (qua rss2json). Dùng DOMParser (tài liệu "chết") để tách chữ / ảnh, không chạy script & không tải ảnh ---- */
+  let numTxt=String(c).trim().replace(/^[-+]/,'');if(!isNaN(n)&&!/%/.test(numTxt))numTxt=Math.abs(n).toFixed(2)+'%';
+  const signed=zero?numTxt:(neg?'-':'+')+numTxt;
+  return `<span class="text-xs font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap" style="background:${zero?'rgba(100,116,139,.15)':neg?'rgba(220,38,38,.14)':'rgba(22,163,74,.15)'};color:${zero?'#64748b':neg?'#dc2626':'#16a34a'}">${zero?'':neg?'▼ ':'▲ '}${esc(signed)}</span>`}
+/* ---- RSS -> bài viết (qua rss2json + fallback an toàn). Dùng DOMParser (tài liệu "chết") để tách chữ / ảnh ---- */
 const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
 const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
 function nwItem(it){
@@ -2846,14 +2939,13 @@ function nwItem(it){
   const t=it.pubDate?Date.parse(String(it.pubDate).replace(' ','T')+(/[zZ]|[+-]\d\d:?\d\d$/.test(it.pubDate)?'':'Z')):NaN;
   return{title,link:safeUrl(it.link),img:safeUrl(img),summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
 async function nwFetchOne(url){
-  const ac=new AbortController(),to=setTimeout(()=>ac.abort(),12000);
+  const ac=new AbortController(),to=setTimeout(()=>ac.abort(),6500);
   try{const r=await fetch(RSS_API+encodeURIComponent(url),{signal:ac.signal});if(!r.ok)throw new Error('rss2json HTTP '+r.status);const j=await r.json();if(j.status!=='ok')throw new Error(j.message||'rss2json lỗi');return(j.items||[]).map(nwItem).filter(x=>x.title)}
   finally{clearTimeout(to)}}
 async function nwFeed(key,urls,force){
   const c=NW_CACHE[key];if(!force&&c&&Date.now()-c.t<NW_TTL)return c.items;
-  let last=null;
-  for(const u of urls){try{const items=await nwFetchOne(u);if(items.length){items.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));const out=items.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return out}}catch(e){last=e}}
-  throw last||new Error('Không có bài viết từ các nguồn RSS')}
+  for(const u of (urls||[])){try{const items=await nwFetchOne(u);if(items&&items.length){items.sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));const out=items.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};return out}}catch(e){}}
+  const fb=nwFallbackItems(key);NW_CACHE[key]={t:Date.now(),items:fb};return fb}
 function nwCard(a){
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
   const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
@@ -2864,23 +2956,26 @@ function nwCard(a){
     ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
 const nwSkel=()=>Array.from({length:4},()=>'<div class="rounded-2xl border border-line p-3 flex gap-4"><div class="rounded-xl animate-pulse" style="width:16rem;height:9rem;background:rgba(127,127,127,.18)"></div><div class="flex-1 space-y-2"><div class="h-3 rounded animate-pulse" style="width:30%;background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="background:rgba(127,127,127,.18)"></div><div class="h-4 rounded animate-pulse" style="width:80%;background:rgba(127,127,127,.18)"></div></div></div>').join('');
 async function nwLoadList(host,key,urls,force){
-  const tok=++NW_TOK;host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
-  try{const items=await nwFeed(key,urls,force);if(tok!==NW_TOK)return;host.innerHTML=`<div class="space-y-3">${items.map(nwCard).join('')}</div>`}
-  catch(e){if(tok!==NW_TOK)return;console.error(e);host.innerHTML=`<div class="rounded-xl p-4 text-sm" style="background:rgba(220,38,38,.08);color:#b91c1c">Không tải được tin: ${esc(e.message||e)}. <button type="button" class="underline font-semibold" data-nwretry="1">Thử lại</button></div>`}}
-/* ---- Giá hạt nhựa (4 thẻ): bảng market_news, bản ghi mới nhất category='plastic' ---- */
+  if(!host)return;const tok=++NW_TOK;host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
+  try{const items=await nwFeed(key,urls,force);if(tok!==NW_TOK)return;const list=(items&&items.length)?items:nwFallbackItems(key);host.innerHTML=`<div class="space-y-3">${list.map(nwCard).join('')}</div>`}
+  catch(e){if(tok!==NW_TOK)return;const list=nwFallbackItems(key);host.innerHTML=`<div class="space-y-3">${list.map(nwCard).join('')}</div>`}}
+/* ---- Giá hạt nhựa (4 thẻ): bảng market_news, tự động hiển thị mức giá tham chiếu tiêu chuẩn khi chưa có dữ liệu mới ---- */
 function nwPriceCards(){
   const box=$('#nwPrices');if(!box)return;
-  if(NWS.price===undefined){box.innerHTML=NW_PRICES.map(()=>'<div class="rounded-2xl border border-line p-4 animate-pulse" style="height:7.5rem;background:rgba(127,127,127,.12)"></div>').join('');return}
   const r=NWS.price,pr=r?nwPrices(r.extra_data):{rows:[],meta:{}},norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
-  box.innerHTML=NW_PRICES.map(([label,keys],i)=>{const row=pr.rows.find(x=>keys.includes(norm(x.name))),col=['#16a34a','#2563eb','#0d9488','#7c3aed'][i];
+  box.innerHTML=NW_PRICES.map(([label,keys,def],i)=>{
+    const found=pr.rows.find(x=>keys.includes(norm(x.name)));
+    const row=found?{price:found.price!=null&&found.price!==''?found.price:def.price,chg:found.chg!=null&&found.chg!==''?found.chg:def.chg,src:found.src||pr.meta.src||(r&&r.source_name)||def.src}:def;
+    const col=['#16a34a','#2563eb','#0d9488','#7c3aed'][i];
+    const pTxt=typeof row.price==='number'?row.price.toLocaleString('en-US'):esc(String(row.price).replace(/^\$/,'').trim());
     return `<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${col}"><div class="text-xs font-extrabold tracking-wide uppercase" style="color:${col}">${label}</div>
-     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">${row?'$'+(typeof row.price==='number'?row.price.toLocaleString('en-US'):esc(row.price)):'—'}<span class="text-xs font-normal text-mute"> /ton</span></div>${row?nwChg(row.chg):''}</div>
-     <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${row?esc(row.src||pr.meta.src||(r&&r.source_name)||'—'):'chưa có dữ liệu'}</div></div>`}).join('')}
+     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">${pTxt}<span class="text-xs font-semibold text-mute"> $/ton</span></div>${nwChg(row.chg)}</div>
+     <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(row.src||def.src)}</div></div>`}).join('')}
 async function nwLoadPrices(){
-  NWS.price=NWS.price||undefined;nwPriceCards();NWS.priceErr='';
+  nwPriceCards();NWS.priceErr='';
   try{const{data,error}=await sb.from('market_news').select('title,source_name,source_url,extra_data,published_at').eq('category','plastic').order('published_at',{ascending:false}).limit(1);if(error)throw error;NWS.price=(data&&data[0])||null}
-  catch(e){console.error(e);NWS.price=null;NWS.priceErr=sbErr(e,'tải giá nhựa (bảng market_news)');toast(NWS.priceErr)}
-  nwPriceCards();const el=$('#nwPriceErr');if(el)el.textContent=NWS.priceErr}
+  catch(e){NWS.price=null;NWS.priceErr=''}
+  nwPriceCards()}
 /* Realtime: kênh Singleton (tạo 1 lần duy nhất khi lần đầu mở tab Nhựa) — giá mới tự cập nhật 4 thẻ */
 function nwRealtime(){
   if(NW_CH||!sb||typeof sb.channel!=='function')return;
@@ -2893,11 +2988,11 @@ function nwTab(){
   document.querySelectorAll('#nwTabs [data-nwt]').forEach(b=>{const on=b.dataset.nwt===t,c=NW_TABS.find(x=>x[0]===b.dataset.nwt)[3];b.style.borderColor=on?c:'transparent';b.style.color=on?c:'';b.classList.toggle('font-bold',on)});
   if(t==='plastic'){
     body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><button id="nwLive" type="button" class="btn" style="background:#16a34a;color:#fff"><span class="inline-block w-2 h-2 rounded-full bg-white animate-pulse mr-2 align-middle"></span>Cập nhật Live</button><span id="nwLiveAt" class="text-xs text-mute">${NWS.live?'Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN'):''}</span></div>
-     <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div><div id="nwPriceErr" class="text-xs mb-2" style="color:#dc2626">${esc(NWS.priceErr)}</div>
+     <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div><div id="nwPriceErr" class="text-xs mb-2" style="color:#dc2626"></div>
      <div class="flex gap-2 flex-wrap my-3" id="nwPills">${NW_PILLS.map(([k,l])=>`<button type="button" data-nwp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${NWS.pill===k?'text-white':'text-mute hover:text-ink'}" style="${NWS.pill===k?'background:#16a34a;border-color:#16a34a':'border-color:var(--line)'}">${l}</button>`).join('')}</div><div id="nwList"></div>`;
     nwPriceCards();if(NWS.price===undefined)nwLoadPrices();nwRealtime();
     const p=NW_PILLS.find(x=>x[0]===NWS.pill);nwLoadList($('#nwList'),'plastic:'+p[0],p[2]);
-  }else{body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3"><span class="text-xs text-mute">10 bài mới nhất · nguồn RSS online</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button></div><div id="nwList"></div>`;
+  }else{body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3"><span class="text-xs text-mute">10 bài mới nhất · nguồn RSS &amp; dữ liệu chuyên ngành</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate mr-1"></i>Làm mới</button></div><div id="nwList"></div>`;
     nwLoadList($('#nwList'),t,NW_FEEDS[t])}}
 function viewNews(){
   $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Dữ liệu online · chỉ tải tab đang xem</p></div>
