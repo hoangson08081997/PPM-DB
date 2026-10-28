@@ -2918,12 +2918,17 @@ function nwChg(c){if(c==null||c==='')return'<span class="text-xs text-mute">—<
 const nwDoc=h=>new DOMParser().parseFromString(String(h||''),'text/html');
 const nwText=h=>(nwDoc(h).body.textContent||'').replace(/\s+/g,' ').trim();
 function nwItem(it){
-  const html=(it.content||'')+' '+(it.description||'');let img=it.thumbnail||(it.enclosure&&(it.enclosure.link||it.enclosure.url))||'';
-  if(!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(img)&&!/^https?:\/\/[^ ]*(image|img|photo|thumb|media|cdn)/i.test(img)){const i=nwDoc(html).querySelector('img');img=(i&&(i.getAttribute('src')||i.getAttribute('data-src')))||img||''}
+  const html=(it.content||'')+' '+(it.description||'');
+  /* chuẩn hóa URL ảnh: // -> https, tương đối -> theo link bài, http -> https (tránh bị chặn mixed content) */
+  const fix=u=>{u=String(u||'').trim().replace(/&amp;/g,'&');if(!u||/^data:/i.test(u))return'';try{const x=new URL(u,it.link||undefined);if(!/^https?:$/.test(x.protocol))return'';x.protocol='https:';return x.href}catch(e){return''}};
+  const bad=u=>/(pixel|1x1|spacer|blank\.gif|emoji|\/icon|\.svg(\?|$)|feedburner|doubleclick)/i.test(u);
+  const cand=[it.thumbnail,it.enclosure&&(it.enclosure.link||it.enclosure.url)];
+  nwDoc(html).querySelectorAll('img').forEach(i=>{['data-src','data-original','data-lazy-src','data-lazy','src'].forEach(a=>cand.push(i.getAttribute(a)));const ss=i.getAttribute('srcset')||i.getAttribute('data-srcset');if(ss)cand.push(ss.split(',')[0].trim().split(/\s+/)[0])});
+  let img='';for(const c of cand){const u=fix(c);if(u&&!bad(u)){img=u;break}}
   let sm=nwText(it.description||it.content||'');const title=String(it.title||'').trim();if(sm.startsWith(title))sm=sm.slice(title.length).replace(/^[\s\-–—:|·]+/,'');
   if(sm.length>240)sm=sm.slice(0,237).replace(/\s+\S*$/,'')+'…';
   const t=it.pubDate?Date.parse(String(it.pubDate).replace(' ','T')+(/[zZ]|[+-]\d\d:?\d\d$/.test(it.pubDate)?'':'Z')):NaN;
-  return{title,link:safeUrl(it.link),img:safeUrl(img),summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
+  return{title,link:safeUrl(it.link),img:img,summary:sm,time:isNaN(t)?null:new Date(t).toISOString()}}
 /* Proxy RSS công cộng chống CORS — thử lần lượt: allorigins (XML thô) -> rss2json (JSON). Mỗi lần có timeout riêng */
 async function nwTimed(url,ms,opt){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms);try{const r=await fetch(url,{...(opt||{}),signal:ac.signal});if(!r.ok)throw new Error('HTTP '+r.status);return r}finally{clearTimeout(to)}}
 function nwParseXml(xml){
