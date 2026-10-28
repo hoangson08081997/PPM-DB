@@ -2901,7 +2901,53 @@ function getFallbackImage(tab,index,title){
   for(const [re,i] of kw){if(re.test(title||'')){st=i;break}}
   return 'https://images.unsplash.com/photo-'+set[((+index||0)+st)%set.length]+NW_UQ}
 /* onerror: lần 1 -> ảnh kho Unsplash theo tab; lần 2 (kho cũng lỗi) -> ảnh gradient không chữ */
-function nwImgErr(el){const s=el.dataset.stage||'0';if(s==='0'){el.dataset.stage='1';el.src=getFallbackImage(el.dataset.tab,el.dataset.i,el.dataset.t)}else{el.onerror=null;el.src=NW_FB}}
+/* ===== Lấy ảnh THẬT trong bài viết: cache localStorage -> Microlink || cào HTML (og:image / <img>) song song -> bọc wsrv.nl ===== */
+const NWI_KEY='news_img_cache_v1',NWI_MAX=200,NWI_PEND={},NWI_FAIL={};let NWI_MEM=null,NWI_Q=[],NWI_QT=null,NWI_SB=true,NWI_PULLED=false;
+const nwiLoad=()=>{if(!NWI_MEM){try{NWI_MEM=JSON.parse(localStorage.getItem(NWI_KEY)||'{}')||{}}catch(e){NWI_MEM={}}}return NWI_MEM};
+function nwiSave(url,img,fromDb){const c=nwiLoad();delete c[url];c[url]=img;const ks=Object.keys(c);if(ks.length>NWI_MAX)ks.slice(0,ks.length-NWI_MAX).forEach(k=>delete c[k]);
+  try{localStorage.setItem(NWI_KEY,JSON.stringify(c))}catch(e){}
+  if(!fromDb&&NWI_SB&&typeof sb!=='undefined'&&sb){NWI_Q.push({article_url:url,image_url:img});clearTimeout(NWI_QT);NWI_QT=setTimeout(nwiPush,2500)}}
+/* Đồng bộ Supabase (bảng news_image_cache — xem supabase_news_img.sql). Lỗi / chưa có bảng -> tự tắt, chỉ dùng localStorage */
+async function nwiPush(){const rows=NWI_Q.splice(0);if(!rows.length||!NWI_SB)return;try{const{error}=await sb.from('news_image_cache').upsert(rows,{onConflict:'article_url'});if(error)throw error}catch(e){NWI_SB=false;console.warn('news_image_cache',e&&e.message)}}
+async function nwiPull(){if(NWI_PULLED||!NWI_SB||typeof sb==='undefined'||!sb)return;NWI_PULLED=true;
+  try{const{data,error}=await sb.from('news_image_cache').select('article_url,image_url').order('created_at',{ascending:false}).limit(NWI_MAX);if(error)throw error;
+    const c=nwiLoad();let n=0;(data||[]).reverse().forEach(r=>{if(r.article_url&&r.image_url&&!c[r.article_url]){nwiSave(r.article_url,r.image_url,true);n++}});if(n)nwScanImgs(document)}
+  catch(e){NWI_SB=false;console.warn('news_image_cache pull',e&&e.message)}}
+const nwWsrv=u=>'https://wsrv.nl/?url='+encodeURIComponent(u)+'&w=480&h=280&fit=cover&output=webp';
+const nwiJunk=u=>/(avatar|logo|icon|emoji|banner|\bads?\b|[\/_.-]ads?[\/_.-]|\.svg(\?|$)|1x1|pixel|sprite|spacer|blank\.|lh3\.googleusercontent|gstatic\.com|news\.google\.)/i.test(u);
+const nwiAbs=(u,base)=>{u=nwDec(String(u||'').trim());if(!u||/^data:/i.test(u))return'';try{const x=new URL(u,base);return/^https?:$/.test(x.protocol)?x.href:''}catch(e){return''}};
+async function nwiFetchTxt(u,ms,opt){return await(await nwTimed(u,ms,opt)).text()}
+/* Luồng B: HTML bài viết -> og:image / twitter:image -> <img> trong thân bài (bỏ avatar/logo/icon/banner/ads/svg/1x1) */
+function nwiFromHtml(html,base){
+  const d=new DOMParser().parseFromString(html,'text/html'),pick=[];
+  d.querySelectorAll('meta[property="og:image"],meta[property="og:image:secure_url"],meta[name="twitter:image"],meta[name="twitter:image:src"],meta[property="twitter:image"]').forEach(m=>pick.push(m.getAttribute('content')));
+  const root=d.querySelector('article,[itemprop="articleBody"],.detail-content,.knc-content,.post-content,.entry-content,#main-detail,main')||d.body;
+  [root,d.body].forEach(r=>r&&r.querySelectorAll('img').forEach(i=>['data-src','data-original','data-lazy-src','src'].forEach(a=>pick.push(i.getAttribute(a)))));
+  for(const p of pick){const u=nwiAbs(p,base);if(u&&!nwiJunk(u))return u}return''}
+const nwiLane=(mk,base)=>async()=>{const u=nwiFromHtml(await mk(),base);if(!u)throw new Error('no img');return u};
+async function nwiScrape(url){
+  const A=async()=>{const j=await(await nwTimed('https://api.microlink.io/?url='+encodeURIComponent(url),7000)).json(),u=nwiAbs(j&&j.data&&j.data.image&&j.data.image.url,url);if(!u||nwiJunk(u))throw new Error('microlink');return u};
+  const B=()=>Promise.any([
+    nwiLane(()=>nwiFetchTxt('https://corsproxy.io/?url='+encodeURIComponent(url),6000),url)(),
+    nwiLane(()=>nwiFetchTxt('https://api.allorigins.win/raw?url='+encodeURIComponent(url),6000),url)(),
+    nwiLane(()=>nwiFetchTxt(SUPABASE_URL+'/functions/v1/rss-proxy?url='+encodeURIComponent(url),7000,{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}),url)()]);
+  return await Promise.any([A(),B()])}
+/* BƯỚC 1 cache (0ms) -> BƯỚC 2 Promise.any(A,B) -> BƯỚC 3 bọc wsrv.nl + gán src + lưu cache. Trả về URL ảnh cuối (hoặc '') */
+async function resolveArticleImage(url,imgEl,skipCache){
+  if(!url)return'';let fin=!skipCache?nwiLoad()[url]:'';
+  if(!fin){if(!skipCache&&NWI_FAIL[url]&&Date.now()-NWI_FAIL[url]<10*60e3)return'';
+    try{fin=await(NWI_PEND[url]||(NWI_PEND[url]=nwiScrape(url).then(nwWsrv).finally(()=>{delete NWI_PEND[url]})));nwiSave(url,fin)}catch(e){NWI_FAIL[url]=Date.now();return''}}
+  if(imgEl&&imgEl.isConnected){const d=imgEl.dataset;d.stage='0';d.wrapped='1';d.resolved='1';imgEl.src=fin}
+  return fin}
+/* quét các <img data-need> trong host, chạy tối đa 3 bài cùng lúc để không nghẽn mạng */
+function nwScanImgs(host){const q=[...(host||document).querySelectorAll('img[data-need="1"][data-article-url]')];q.forEach(i=>i.dataset.need='0');
+  let k=0;const run=async()=>{while(k<q.length){const el=q[k++];try{await resolveArticleImage(el.dataset.articleUrl,el)}catch(e){}}};[run(),run(),run()]}
+/* onerror: gốc -> wsrv(gốc) -> cào ảnh thật trong bài -> ảnh kho Unsplash theo tab -> gradient (không bao giờ hiện khung trống) */
+function nwImgErr(el){const d=el.dataset,s=d.stage||'0';
+  if(s==='0'&&!d.wrapped&&/^https?:/.test(el.src)&&!/wsrv\.nl/.test(el.src)){d.wrapped='1';el.src=nwWsrv(el.src);return}
+  if(s==='0'&&d.articleUrl&&!d.resolved){d.resolved='1';d.stage='r';resolveArticleImage(d.articleUrl,el,true).then(u=>{if(!u)nwImgErr(el)});return}
+  if(s!=='1'){d.stage='1';el.src=getFallbackImage(d.tab,d.i,d.t);return}
+  el.onerror=null;el.src=NW_FB}
 const RSS_API='https://api.rss2json.com/v1/api.json?rss_url=';
 const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=${vi?'vi&gl=VN&ceid=VN:vi':'en-US&gl=US&ceid=US:en'}`;
 /* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài */
@@ -2981,10 +3027,11 @@ async function nwFeed(key,urls,force){
   if(!all.length){const old=nwLsGet(key);return{items:old?old.items:[],err:errs[0]||'Nguồn không có bài viết',stale:old?old.t:0}}
   const out=all.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};nwLsSet(key,{t:Date.now(),items:out});return{items:out,err:''}}
 function nwCard(a,i=0,tab='tech'){
+  const cch=a.img?'':(a.link&&nwiLoad()[a.link])||'';
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
   const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
   return `<article class="flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
-   <div class="sm:w-60 md:w-72 shrink-0"><img src="${esc(a.img||getFallbackImage(tab,i,a.title))}" data-tab="${tab}" data-i="${i}" data-t="${esc(a.title)}" data-stage="${a.img?0:1}" alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#1e3a8a" onerror="nwImgErr(this)"></div>
+   <div class="sm:w-60 md:w-72 shrink-0"><img src="${esc(a.img||cch||getFallbackImage(tab,i,a.title))}" data-tab="${tab}" data-i="${i}" data-t="${esc(a.title)}" ${a.link?`data-article-url="${esc(a.link)}"`:''} data-stage="${a.img||cch?0:1}" ${cch?'data-wrapped="1" data-resolved="1"':''} ${!a.img&&!cch&&a.link?'data-need="1"':''} alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#1e3a8a" onerror="nwImgErr(this)"></div>
    <div class="min-w-0 flex-1 flex flex-col gap-1"><div class="text-xs text-mute">${a.sample?'<span class="font-bold px-2 py-0.5 rounded-full" style="background:rgba(100,116,139,.18)">DỮ LIỆU MẪU</span>':'<i class="fa-regular fa-clock mr-1"></i>'+esc(when)}</div>${head}
     ${a.summary?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(a.summary)}</p>`:''}
     ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
@@ -2992,7 +3039,7 @@ const nwSkel=()=>Array.from({length:4},()=>'<div class="rounded-2xl border borde
 /* Stale-While-Revalidate: có cache (RAM/localStorage) -> render NGAY, rồi fetch ngầm và cập nhật lại */
 async function nwLoadList(host,key,urls,force){
   const tok=++NW_TOK,tab=key.split(':')[0],c=NW_CACHE[key]||nwLsGet(key),has=!!(c&&c.items&&c.items.length);
-  const list=its=>`<div class="space-y-3">${its.map((a,i)=>nwCard(a,i,tab)).join('')}</div>`,sig=its=>its.map(x=>x.link||x.title).join('|');
+  const list=its=>{setTimeout(()=>nwScanImgs(host),0);return `<div class="space-y-3">${its.map((a,i)=>nwCard(a,i,tab)).join('')}</div>`},sig=its=>its.map(x=>x.link||x.title).join('|');
   if(has){host.innerHTML=list(c.items);if(!force&&Date.now()-c.t<60e3)return}else host.innerHTML=`<div class="space-y-3">${nwSkel()}</div>`;
   const r=await nwFeed(key,urls,true);if(tok!==NW_TOK)return;
   const det=esc(r.err),errBox=`<div class="rounded-xl px-4 py-3 text-sm" style="background:rgba(220,38,38,.1)"><div class="flex items-center justify-between gap-2 flex-wrap"><span><i class="fa-solid fa-plug-circle-xmark mr-2"></i>Không tải được tin ${r.stale?'mới':''} từ nguồn gốc — mạng của mày đang chặn các proxy RSS công cộng.</span><button type="button" class="underline font-semibold" data-nwretry="1">Thử lại</button></div><details class="mt-1 text-xs text-mute"><summary class="cursor-pointer">Chi tiết lỗi &amp; cách khắc phục vĩnh viễn</summary><div class="mt-1 break-words">${det}</div><div class="mt-1">Cách ổn định: triển khai Edge Function <b>rss-proxy</b> (file <span class="mono">rss-proxy.ts</span>) trên Supabase — app sẽ dùng nó đầu tiên.</div></details></div>`;
@@ -3048,6 +3095,7 @@ async function nwRefresh(){
     await Promise.all([...jobs,new Promise(r=>setTimeout(r,700))]);NWS.live=new Date();const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')}
   finally{NW_BUSY=false;const b2=$('#nwLive');if(b2){b2.disabled=false;b2.classList.remove('nw-spin')}}}
 function viewNews(){
+  nwiPull();
   $('#view').innerHTML=`<div class="mb-3"><h2 class="text-xl font-bold">📰 Tin tức &amp; Thị trường</h2><p class="text-mute text-sm">Dữ liệu online · chỉ tải tab đang xem</p></div>
    <div id="nwTabs" class="flex gap-1 mb-4 border-b border-line overflow-x-auto">${NW_TABS.map(([k,l,ic])=>`<button type="button" data-nwt="${k}" class="px-5 py-3 text-base whitespace-nowrap border-b-4 text-mute hover:text-ink" style="border-color:transparent"><i class="fa-solid ${ic} mr-2"></i>${l}</button>`).join('')}</div><div id="nwBody"></div>`;
   $('#view').onclick=e=>{let b;
