@@ -2953,10 +2953,11 @@ const GN=(q,vi)=>`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&
 /* Mỗi nguồn có danh sách RSS dự phòng: thử lần lượt tới khi có bài */
 const NW_TABS=[['plastic','Tin Ngành Nhựa','fa-recycle','#16a34a'],['tech','Tin Công Nghệ','fa-microchip','#2563eb'],['finance','Tin Tài Chính','fa-chart-line','#ca8a04']];
 const NW_PLASTIC='https://news.google.com/rss/search?q=ngành+nhựa+OR+hạt+nhựa+OR+nhựa+tái+chế&hl=vi&gl=VN&ceid=VN:vi';
-const NW_PILLS=[['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]],['general','TIN TỨC CHUNG (RSS)',[NW_PLASTIC]]];
+const NW_RR=['https://resource-recycling.com/plastics/feed/','https://resource-recycling.com/recycling/feed/'];
+const NW_PILLS=[['rr','RESOURCE RECYCLING',NW_RR],['jwell','CÔNG NGHỆ JWELL',[GN('JWELL machinery extrusion'),GN('JWELL plastic extruder')]],['starlinger','GIẢI PHÁP STARLINGER',[GN('Starlinger recycling'),GN('Starlinger plastic recycling technology')]],['boretech','TÁI CHẾ BORETECH',[GN('Boretech recycling'),GN('Boretech PET bottle recycling')]]];
 const NW_FEEDS={tech:['https://tinhte.vn/rss','https://genk.vn/tin-ict.rss'],finance:['https://cafef.vn/thi-truong-chung-khoan.rss','https://vietstock.vn/830/chung-khoan/co-phieu.rss']};
 const NW_PRICES=[['PET Virgin',['petvirgin']],['HDPE Virgin',['hdpevirgin']],['RPET Clear',['rpetclear','rpet']],['RHDPE Natural',['rhdpenatural','rhdpe']]];
-const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'jwell',price:undefined,priceErr:'',live:null};
+const NWS={tab:(()=>{try{return localStorage.getItem('nwtab')||'plastic'}catch(e){return'plastic'}})(),pill:'rr',price:undefined,rp:undefined,priceErr:'',live:null};
 const NW_CACHE={},NW_TTL=5*60e3;let NW_CH=null,NW_TOK=0;
 const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'';
 const timeAgo=iso=>{if(!iso)return'';const m=Math.round((Date.now()-Date.parse(iso))/6e4);if(isNaN(m))return'';return m<1?'vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'};
@@ -3027,11 +3028,11 @@ async function nwFeed(key,urls,force){
   if(!all.length){const old=nwLsGet(key);return{items:old?old.items:[],err:errs[0]||'Nguồn không có bài viết',stale:old?old.t:0}}
   const out=all.slice(0,10);NW_CACHE[key]={t:Date.now(),items:out};nwLsSet(key,{t:Date.now(),items:out});return{items:out,err:''}}
 function nwCard(a,i=0,tab='tech'){
-  const cch=a.img?'':(a.link&&nwiLoad()[a.link])||'';
+  const cch=a.img?'':(a.link&&nwiLoad()[a.link])||'',rrw=!!a.img&&/resource-recycling\.com/i.test(a.img);
   const when=a.time?`${new Date(a.time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${timeAgo(a.time)}`:'';
   const head=a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="font-bold text-base leading-snug hover:underline break-words">${esc(a.title)}</a>`:`<span class="font-bold text-base leading-snug break-words">${esc(a.title)}</span>`;
   return `<article class="flex flex-col sm:flex-row gap-4 bg-surface border border-line rounded-2xl p-3 hover:shadow-lg transition-shadow">
-   <div class="sm:w-60 md:w-72 shrink-0"><img src="${esc(a.img||cch||getFallbackImage(tab,i,a.title))}" data-tab="${tab}" data-i="${i}" data-t="${esc(a.title)}" ${a.link?`data-article-url="${esc(a.link)}"`:''} data-stage="${a.img||cch?0:1}" ${cch?'data-wrapped="1" data-resolved="1"':''} ${!a.img&&!cch&&a.link?'data-need="1"':''} alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#1e3a8a" onerror="nwImgErr(this)"></div>
+   <div class="sm:w-60 md:w-72 shrink-0"><img src="${esc(rrw?nwWsrv(a.img):(a.img||cch||getFallbackImage(tab,i,a.title)))}" data-tab="${tab}" data-i="${i}" data-t="${esc(a.title)}" ${a.link?`data-article-url="${esc(a.link)}"`:''} data-stage="${a.img||cch?0:1}" ${cch?'data-wrapped="1" data-resolved="1"':rrw?'data-wrapped="1"':''} ${!a.img&&!cch&&a.link?'data-need="1"':''} alt="" loading="lazy" referrerpolicy="no-referrer" class="w-full rounded-xl object-cover" style="aspect-ratio:16/10;background:#1e3a8a" onerror="nwImgErr(this)"></div>
    <div class="min-w-0 flex-1 flex flex-col gap-1"><div class="text-xs text-mute">${a.sample?'<span class="font-bold px-2 py-0.5 rounded-full" style="background:rgba(100,116,139,.18)">DỮ LIỆU MẪU</span>':'<i class="fa-regular fa-clock mr-1"></i>'+esc(when)}</div>${head}
     ${a.summary?`<p class="text-sm text-mute" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(a.summary)}</p>`:''}
     ${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener noreferrer" class="mt-auto pt-1 text-xs font-extrabold tracking-wide text-brand hover:underline">ĐỌC BÀI TRÊN TRANG GỐC →</a>`:''}</div></article>`}
@@ -3051,21 +3052,64 @@ const NW_PF={};
 function nwPrefetch(){NW_TABS.forEach(([k])=>{if(k===NWS.tab)return;let key=k,urls=NW_FEEDS[k];if(k==='plastic'){const p=NW_PILLS.find(x=>x[0]===NWS.pill)||NW_PILLS[0];key='plastic:'+p[0];urls=p[2]}
   if(!urls||NW_PF[key]||(NW_CACHE[key]&&Date.now()-NW_CACHE[key].t<NW_TTL))return;NW_PF[key]=1;nwFeed(key,urls,true).catch(()=>{}).finally(()=>{NW_PF[key]=0})})}
 /* ---- Giá hạt nhựa (4 thẻ): ưu tiên market_news (realtime); thiếu / lỗi -> giá THAM CHIẾU chuẩn (gắn nhãn) ---- */
-const NW_REF={'PET Virgin':[1050,0.8],'HDPE Virgin':[1120,-0.4],'RPET Clear':[1450,1.2],'RHDPE Natural':[1600,-0.6]};
+/* ===== Giá nhựa 4 thẻ: prices.json (GitHub Actions 06:30 VN) || Supabase resin_prices || localStorage; sáng nào chưa đồng bộ thì client tự quét ngầm ===== */
+const RP_KEYS=[['pet_virgin','PET Virgin',['petvirgin']],['hdpe_virgin','HDPE Virgin',['hdpevirgin']],['rpet','PET Recycling',['petrecycling','rpet']],['rhdpe','HDPE Recycling',['hdperecycling','rhdpe']]];
+const RP_REF={pet_virgin:[1050,0.8],hdpe_virgin:[1120,-0.4],rpet:[1450,1.2],rhdpe:[1600,-0.6]};
+const RP_LS='resin_prices_cache',RP_SYNC='resin_sync_date',rpToday=()=>new Date().toLocaleDateString('en-GB');   // DD/MM/YYYY
+const rpD=d=>{const m=/(\d\d)\/(\d\d)\/(\d{4})/.exec(d||'');return m?m[3]+m[2]+m[1]:''};
+const rpNum=s=>parseFloat(String(s).replace(/,/g,'')),rpIn=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
+const rpTxt=h=>nwDec(String(h||'').replace(/<!\[CDATA\[|\]\]>/g,' ').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim();
+function rpSun(html,kw,fx){const t=rpTxt(html);if(!kw.test(t.slice(0,4000)))return null;
+  const p=[...t.matchAll(/(20\d\d-\d\d-\d\d)\s+([\d,]{4,9}(?:\.\d+)?)/g)].map(m=>[m[1],rpNum(m[2])]).filter(x=>rpIn(x[1],2000,30000)).sort((a,b)=>b[0].localeCompare(a[0]));let v=p[0]&&p[0][1];
+  if(!v){const m=/([\d,]{4,9}(?:\.\d+)?)\s*(?:Yuan|RMB|CNY)/i.exec(t);v=m&&rpNum(m[1])}return rpIn(v,2000,30000)&&fx?Math.round(v/fx):null}
+function rpBA(html,kw){const t=rpTxt(html);if(kw&&!kw.test(t.slice(0,6000)))return null;
+  const m=/(?:USD|US\$|\$)\s?([\d,]{3,6}(?:\.\d+)?)\s*(?:\/|per)\s*(?:MT|mt|ton|tonne|metric ton)/i.exec(t)||/([\d,]{3,6}(?:\.\d+)?)\s*(?:USD|US\$)\s*(?:\/|per)\s*(?:MT|ton|tonne)/i.exec(t),v=m&&rpNum(m[1]);return rpIn(v,400,6000)?Math.round(v):null}
+function rpRR(xml,kind){const re=kind==='pet'?/\b(?:rPET|recycled PET|PET (?:bales?|flakes?|clear)|clear PET)\b[^.]{0,160}?(\d{1,3}(?:\.\d+)?)\s*(?:cents?|¢)\s*(?:per|\/)\s*(?:lb|pound)/i:/\b(?:rHDPE|recycled HDPE|natural HDPE|HDPE (?:bales?|natural|flakes?))\b[^.]{0,160}?(\d{1,3}(?:\.\d+)?)\s*(?:cents?|¢)\s*(?:per|\/)\s*(?:lb|pound)/i;
+  for(const b of String(xml).split(/<item[\s>]/i).slice(1)){const m=re.exec(rpTxt(b));if(m){const v=Math.round(rpNum(m[1])*22.0462);if(rpIn(v,150,4500))return v}}return null}
+/* tải HTML/XML qua đua proxy: Supabase rss-proxy || corsproxy.io || allorigins */
+const rpGet=url=>Promise.any([nwiFetchTxt(SUPABASE_URL+'/functions/v1/rss-proxy?url='+encodeURIComponent(url),8000,{headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}}),nwiFetchTxt('https://corsproxy.io/?url='+encodeURIComponent(url),8000),nwiFetchTxt('https://api.allorigins.win/raw?url='+encodeURIComponent(url),8000)]);
+async function rpScan(){
+  let fx=null;try{fx=(await(await nwTimed('https://open.er-api.com/v6/latest/USD',6000)).json()).rates.CNY}catch(e){}
+  const pg={},P=u=>(pg[u]||(pg[u]=rpGet(u))),U='https://businessanalytiq.com/procurementanalytics/index/',RR=['https://resource-recycling.com/plastics/feed/','https://resource-recycling.com/recycling/feed/'];
+  const first=async l=>{for(const[n,f]of l){try{const v=await f();if(v)return{price:v,src:n}}catch(e){}}return null};
+  const rr=k=>async()=>{for(const u of RR){try{const v=rpRR(await P(u),k);if(v)return v}catch(e){}}return null};
+  const jobs={pet_virgin:[['SunSirs',async()=>rpSun(await P('https://www.sunsirs.com/uk/prodetail-235.html'),/PET|polyethylene terephthalate|polyester/i,fx)],['BusinessAnalytiq',async()=>rpBA(await P(U+'pet-price-index/'),/PET/i)]],
+    hdpe_virgin:[['SunSirs',async()=>rpSun(await P('https://www.sunsirs.com/uk/prodetail-199.html'),/HDPE|high[- ]density/i,fx)],['BusinessAnalytiq',async()=>rpBA(await P(U+'hdpe-price-index/'),/HDPE/i)]],
+    rpet:[['Resource Recycling',rr('pet')],['BusinessAnalytiq',async()=>rpBA(await P(U+'recycled-pet-price-index/'),/recycl/i)]],
+    rhdpe:[['Resource Recycling',rr('hdpe')],['BusinessAnalytiq',async()=>rpBA(await P(U+'recycled-hdpe-price-index/'),/recycl/i)]]};
+  const out={};await Promise.all(Object.entries(jobs).map(async([k,l])=>{const r=await first(l);if(r)out[k]=r}));return out}
+function rpMerge(cands){const out={};RP_KEYS.forEach(([k])=>{let b=null;cands.forEach(c=>{const x=c&&c[k];if(x&&Number.isFinite(+x.price)&&(!b||rpD(x.date)>rpD(b.date)))b=x});if(b)out[k]=b});return out}
+function rpSave(items){try{localStorage.setItem(RP_LS,JSON.stringify(items))}catch(e){}}
+async function rpAutoSync(force){
+  const today=rpToday();let ls='';try{ls=localStorage.getItem(RP_SYNC)||''}catch(e){}
+  if(!force&&ls===today)return false;
+  const got=await rpScan(),ks=Object.keys(got);if(!ks.length)return false;
+  const cur=NWS.rp||{},items={...cur},rows=[];
+  ks.forEach(k=>{const o=cur[k],prev=o?(o.date===today?o.prev:o.price):null,n=got[k];
+    items[k]={name:RP_KEYS.find(x=>x[0]===k)[1],price:n.price,unit:'USD/ton',prev,change:prev?Math.round((n.price-prev)/prev*10000)/100:null,src:n.src,date:today,stale:false};
+    rows.push({key:k,name:items[k].name,price:n.price,unit:'USD/ton',change:items[k].change,src:n.src,price_date:today,updated_at:new Date().toISOString()})});
+  NWS.rp=items;rpSave(items);try{localStorage.setItem(RP_SYNC,today)}catch(e){}
+  try{const{error}=await sb.from('resin_prices').upsert(rows,{onConflict:'key'});if(error)throw error}catch(e){console.warn('resin_prices',e&&e.message)}
+  return true}
+async function loadResinPrices(force){
+  nwPriceCards();let ls=null;try{ls=JSON.parse(localStorage.getItem(RP_LS)||'null')}catch(e){}
+  if(ls){NWS.rp=rpMerge([ls]);nwPriceCards()}
+  const ymd=rpToday().split('/').reverse().join('-');
+  const [pj,db_]=await Promise.allSettled([fetch('./prices.json?t='+ymd,{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),Promise.resolve(sb.from('resin_prices').select('*')).then(r=>{if(r.error)throw r.error;return r.data||[]})]);
+  const sbm={};if(db_.status==='fulfilled')db_.value.forEach(r=>{sbm[r.key]={name:r.name,price:+r.price,unit:r.unit||'USD/ton',change:r.change,src:r.src,date:r.price_date}});
+  const pjm=pj.status==='fulfilled'&&pj.value&&pj.value.items||{};
+  NWS.rp=rpMerge([pjm,sbm,ls,NWS.rp]);if(!Object.keys(NWS.rp).length)NWS.rp={};rpSave(NWS.rp);nwPriceCards();
+  const el=$('#nwPriceErr');
+  try{if(await rpAutoSync(force)){nwPriceCards();if(el)el.textContent=''}}catch(e){console.warn('rpAutoSync',e)}
+  if(el&&!Object.values(NWS.rp).some(x=>x.date&&x.date!=='—'))el.textContent='Chưa quét được giá thật — đang hiển thị giá tham chiếu (mẫu).'}
 function nwPriceCards(){
   const box=$('#nwPrices');if(!box)return;
-  if(NWS.price===undefined){box.innerHTML=NW_PRICES.map(()=>'<div class="rounded-2xl border border-line p-4 animate-pulse" style="height:7.5rem;background:rgba(127,127,127,.12)"></div>').join('');return}
-  const r=NWS.price,pr=r?nwPrices(r.extra_data):{rows:[],meta:{}},norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
-  box.innerHTML=NW_PRICES.map(([label,keys],i)=>{const live=pr.rows.find(x=>keys.includes(norm(x.name))),col=['#16a34a','#2563eb','#0d9488','#7c3aed'][i],ref=NW_REF[label],
-      row=live||{price:ref[0],chg:ref[1],src:'Tham chiếu (mẫu)'},isRef=!live;
+  if(NWS.rp===undefined){box.innerHTML=NW_PRICES.map(()=>'<div class="rounded-2xl border border-line p-4 animate-pulse" style="height:7.5rem;background:rgba(127,127,127,.12)"></div>').join('');return}
+  box.innerHTML=RP_KEYS.map(([k,label],i)=>{const x=NWS.rp[k],col=['#16a34a','#2563eb','#0d9488','#7c3aed'][i],ref=RP_REF[k],real=x&&x.date&&x.date!=='—',row=x?x:{price:ref[0],change:ref[1],src:'Tham chiếu (mẫu)',date:'—'};
     return `<div class="bg-surface border border-line rounded-2xl p-4 min-w-0" style="border-top:4px solid ${col}"><div class="text-xs font-extrabold tracking-wide uppercase" style="color:${col}">${label}</div>
-     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">$${typeof row.price==='number'?row.price.toLocaleString('en-US'):esc(row.price)}<span class="text-xs font-normal text-mute"> /ton</span></div>${nwChg(row.chg)}</div>
-     <div class="text-[11px] text-mute mt-2 truncate">Nguồn: ${esc(isRef?'Tham chiếu (mẫu)':(row.src||pr.meta.src||(r&&r.source_name)||'Realtime'))}</div></div>`}).join('')}
-async function nwLoadPrices(){
-  nwPriceCards();NWS.priceErr='';
-  try{const{data,error}=await sb.from('market_news').select('title,source_name,source_url,extra_data,published_at').eq('category','plastic').order('published_at',{ascending:false}).limit(1);if(error)throw error;NWS.price=(data&&data[0])||null}
-  catch(e){console.warn('market_news',e);NWS.price=null;NWS.priceErr='Chưa kết nối được dữ liệu giá realtime — đang hiển thị giá tham chiếu.'}
-  nwPriceCards();const el=$('#nwPriceErr');if(el)el.textContent=NWS.priceErr}
+     <div class="flex items-end justify-between gap-2 mt-1"><div class="mono text-2xl font-extrabold">$${Number(row.price).toLocaleString('en-US')}<span class="text-xs font-normal text-mute"> /ton</span></div>${nwChg(row.change)}</div>
+     <div class="text-[11px] text-mute mt-2 truncate" title="${esc(row.src||'')}">${real?`Cập nhật sáng: ${esc(row.date)} • Nguồn: ${esc(row.src||'—')}${row.stale?' (giá cũ)':''}`:'Nguồn: Tham chiếu (mẫu)'}</div></div>`}).join('')}
+const nwLoadPrices=()=>loadResinPrices(NW_FORCE_PRICE);let NW_FORCE_PRICE=false;
 /* Realtime: kênh Singleton (tạo 1 lần duy nhất khi lần đầu mở tab Nhựa) — giá mới tự cập nhật 4 thẻ */
 function nwRealtime(){
   if(NW_CH||!sb||typeof sb.channel!=='function')return;
@@ -3080,7 +3124,7 @@ function nwTab(){
     body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3 flex-wrap"><button id="nwLive" type="button" class="btn" style="background:#16a34a;color:#fff"><i class="fa-solid fa-rotate nw-ic mr-2"></i>Cập nhật Live</button><span id="nwLiveAt" class="text-xs text-mute">${NWS.live?'Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN'):''}</span></div>
      <div id="nwPrices" class="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-2"></div><div id="nwPriceErr" class="text-xs mb-2 text-mute">${esc(NWS.priceErr)}</div>
      <div class="flex gap-2 flex-wrap my-3" id="nwPills">${NW_PILLS.map(([k,l])=>`<button type="button" data-nwp="${k}" class="px-3.5 py-1.5 rounded-full text-xs font-extrabold tracking-wide border ${NWS.pill===k?'text-white':'text-mute hover:text-ink'}" style="${NWS.pill===k?'background:#16a34a;border-color:#16a34a':'border-color:var(--line)'}">${l}</button>`).join('')}</div><div id="nwList"></div>`;
-    nwPriceCards();if(NWS.price===undefined)nwLoadPrices();nwRealtime();
+    nwPriceCards();if(NWS.rp===undefined)nwLoadPrices();
     const p=NW_PILLS.find(x=>x[0]===NWS.pill);nwLoadList($('#nwList'),'plastic:'+p[0],p[2]).then(()=>setTimeout(nwPrefetch,1000));
   }else{body.innerHTML=`<div class="flex items-center justify-between gap-2 mb-3"><span class="text-xs text-mute">10 bài mới nhất · nguồn RSS online</span><button id="nwLive" type="button" class="btn-ghost"><i class="fa-solid fa-rotate nw-ic mr-1"></i>Làm mới</button></div><div id="nwList"></div>`;
     nwLoadList($('#nwList'),t,NW_FEEDS[t]).then(()=>setTimeout(nwPrefetch,1000))}}
@@ -3091,7 +3135,7 @@ async function nwRefresh(){
   Object.keys(NW_CACHE).forEach(k=>{if(k===t||k.startsWith(t+':'))delete NW_CACHE[k]});
   if(btn){btn.disabled=true;btn.classList.add('nw-spin')}
   try{const jobs=[];
-    if(t==='plastic'){jobs.push(nwLoadPrices());const p=NW_PILLS.find(x=>x[0]===NWS.pill);jobs.push(nwLoadList($('#nwList'),'plastic:'+p[0],p[2],true))}else jobs.push(nwLoadList($('#nwList'),t,NW_FEEDS[t],true));
+    if(t==='plastic'){NW_FORCE_PRICE=true;jobs.push(nwLoadPrices().finally(()=>{NW_FORCE_PRICE=false}));const p=NW_PILLS.find(x=>x[0]===NWS.pill);jobs.push(nwLoadList($('#nwList'),'plastic:'+p[0],p[2],true))}else jobs.push(nwLoadList($('#nwList'),t,NW_FEEDS[t],true));
     await Promise.all([...jobs,new Promise(r=>setTimeout(r,700))]);NWS.live=new Date();const l=$('#nwLiveAt');if(l)l.textContent='Cập nhật lúc '+NWS.live.toLocaleTimeString('vi-VN')}
   finally{NW_BUSY=false;const b2=$('#nwLive');if(b2){b2.disabled=false;b2.classList.remove('nw-spin')}}}
 function viewNews(){
