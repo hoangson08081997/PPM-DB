@@ -1,0 +1,11 @@
+{
+  "updated_at": "2026-10-28T00:00:00.000Z",
+  "date": "—",
+  "fx": {},
+  "items": {
+    "pet_virgin":  { "name": "PET Virgin",     "price": 1050, "unit": "USD/ton", "prev": null, "change": null, "src": "Tham chiếu (chưa quét)", "date": "—", "stale": true },
+    "hdpe_virgin": { "name": "HDPE Virgin",    "price": 1120, "unit": "USD/ton", "prev": null, "change": null, "src": "Tham chiếu (chưa quét)", "date": "—", "stale": true },
+    "rpet":        { "name": "PET Recycling",  "price": 1450, "unit": "USD/ton", "prev": null, "change": null, "src": "Tham chiếu (chưa quét)", "date": "—", "stale": true },
+    "rhdpe":       { "name": "HDPE Recycling", "price": 1600, "unit": "USD/ton", "prev": null, "change": null, "src": "Tham chiếu (chưa quét)", "date": "—", "stale": true }
+  }
+}
