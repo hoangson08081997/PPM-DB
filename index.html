@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.10.27-1600</title>
+<title>Technical PM · v26.11.12-1400</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -254,7 +254,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.10.27-1600</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.12-1400</span>
     <div class="flex-1"></div>
 
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
@@ -294,6 +294,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
         <a class="nav-item" data-route="projects" href="#/projects"><i class="fa-solid fa-folder-tree w-5"></i>📁 Danh sách dự án</a>
         <a class="nav-item" data-route="todos" href="#/todos"><i class="fa-solid fa-list-check w-5"></i>✅ Việc cần làm</a>
         <a class="nav-item hidden" id="navUsers" data-route="users" href="#/users"><i class="fa-solid fa-users w-5"></i>👥 Nhân sự &amp; PMS</a>
+        <a class="nav-item" data-route="machines" href="#/machines"><i class="fa-solid fa-industry w-5"></i>🏭 Máy móc &amp; Nhà máy</a>
         <a class="nav-item" data-route="news" href="#/news"><i class="fa-solid fa-newspaper w-5"></i>📰 Tin tức thị trường</a>
       </nav>
     </aside>
@@ -754,6 +755,7 @@ function card(p){
     ${adm?stat('Thực chi',spent[0],spent[1],over?'text-red-600':''):stat('Thực chi','<i class="fa-solid fa-lock text-sm text-mute"></i>','')}
     ${stat('Đầu việc',done,'/'+s.leaf.length)}</div>
    <div><div class="flex justify-between text-xs text-mute"><span>Tiến độ tổng thể</span><b class="mono text-ink">${s.pct}%</b></div>${bar(s.pct)}</div>
+   ${s.pct>=100||p.status==='completed'?`<button type="button" data-handover="${p.id}" class="text-xs font-semibold text-left" style="color:#d97706">⚡ Bàn giao sang Nhà máy</button>`:''}
    <button type="button" data-cprep="${p.id}" class="text-xs font-semibold text-brand hover:underline text-left">📋 Copy báo cáo dự án</button>
    <div class="text-xs text-mute truncate" title="${nxt?esc(nxt.name):''}">📌 Việc tiếp theo: ${nxt?`<b class="text-ink">${esc(nxt.name)}</b>${nxt.due_date?' · '+fmtD(nxt.due_date):''}`:'<span>Không còn việc tồn đọng</span>'}</div>
    <div class="flex items-center justify-between gap-2 min-h-[1.75rem]">
@@ -927,6 +929,7 @@ function viewProjects(){
     const g=sel=>e.target.closest(sel);let el;
     if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
     if(el=g('#pjView')){PJV=PJV==='table'?'grid':'table';try{localStorage.setItem('pjv',PJV)}catch(x){}el.innerHTML=`<i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span>`;pjList();return}
+    if(el=g('[data-handover]')){e.stopPropagation();const hp=el.dataset.handover;go('#/machines');setTimeout(()=>mcHandoverModal(hp),400);return}
     if(el=g('[data-cprep]')){e.stopPropagation();pjCopyOne(el.dataset.cprep);return}
     if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
     if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
@@ -948,7 +951,7 @@ function viewProjects(){
   qi.onblur=()=>setTimeout(()=>qb.classList.add('hidden'),120);
   if(!window.__qsKey){window.__qsKey=1;document.addEventListener('keydown',e=>{if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const q=$('#pjQ');if(q){e.preventDefault();q.focus()}})}
   if(adm){$('#newBtn').onclick=()=>projectForm()}
-  $('#pptBtn').onclick=()=>exportPortfolioPPTX(ps,db.list('tasks'),db.list('budget_items'));
+  $('#pptBtn').onclick=()=>pptPickModal(ps);
   $('#cpBtn').onclick=()=>pjCopyReport(st);
   charts.forEach(c=>c.destroy());charts=[];   // trang chủ không còn biểu đồ
 }
@@ -1131,7 +1134,7 @@ function applyFont(n){
   patchSession({font:n});
 }
 
-const SIDE_ROUTES=['users','todos','news'];
+const SIDE_ROUTES=['users','todos','news','machines'];
 function sideRouteName(){const m=curHash.replace(/^#\/?/,'').split('/')[0];return SIDE_ROUTES.includes(m)?m:'projects'}
 function renderSide(pid){
   const cur=sideRouteName();
@@ -1166,7 +1169,7 @@ function route(keep){
   $('#bnav').classList.toggle('off',!inP);$('#view').classList.toggle('has-bnav',inP);
   if(inP)document.querySelectorAll('#bnav .bn-tab').forEach(a=>{a.href=`#/p/${pid}/${a.dataset.tab}`;a.classList.toggle('active',a.dataset.tab===name)});
   const tl=Object.fromEntries(TABS);
-  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+({users:' / Nhân sự &amp; PMS',todos:' / Việc cần làm',news:' / Tin tức thị trường'}[name]||'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
+  $('#crumb').innerHTML='<a href="#/projects" class="hover:text-brand">Dự án</a>'+({users:' / Nhân sự &amp; PMS',todos:' / Việc cần làm',news:' / Tin tức thị trường',machines:' / Máy móc &amp; Nhà máy'}[name]||'')+(inP?` / <select id="projSw" class="cell q" style="width:auto;display:inline-block;font-weight:600">${myProjects().map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.name)}</option>`).join('')}</select> / ${tl[name]}`:'');
   if(inP)$('#projSw').onchange=e=>go(`#/p/${e.target.value}/${name}`);
   const v=$('#view'),sc=v.scrollTop;
   renderView(name,pid,target);
@@ -1701,7 +1704,7 @@ const pptFmt={
 function pptCollect(projects,allTasks,allBudgets){
   const info=projects.map(p=>{
     const tk=(allTasks||[]).filter(t=>t.project_id===p.id),bd=(allBudgets||[]).filter(b=>b.project_id===p.id);
-    const par=new Set(tk.map(t=>t.parent_id).filter(Boolean)),leaf=tk.filter(t=>!par.has(t.id));
+    const par=new Set(tk.map(t=>t.parent_id).filter(Boolean)),leaf0=tk.filter(t=>!par.has(t.id)),clf=leaf0.filter(t=>srcOf(t)==='PMP'),leaf=(clf.length?clf:leaf0).map(t=>({...t,name:cleanTaskTitle(t.name)}));   // 100% từ Checklist, bỏ số thứ tự
     const w=t=>t.duration_days||1,tw=leaf.reduce((s,t)=>s+w(t),0),pct=tw?Math.round(leaf.reduce((s,t)=>s+w(t)*(t.progress||0),0)/tw):0;
     const overdue=leaf.filter(t=>t.status!=='done'&&t.due_date&&t.due_date<today());
     const T=bTotals(bd),planned=T.all.planned,actual=T.all.actual;
@@ -3147,6 +3150,223 @@ function viewNews(){
     else if(b=e.target.closest('[data-nwp]')){NWS.pill=b.dataset.nwp;nwTab()}
     else if(e.target.closest('#nwLive')||e.target.closest('[data-nwretry]'))nwRefresh()};
   nwTab()}
+/* ===== XUẤT PPTX CHUẨN FORM DUY TÂN: chọn dự án -> bìa / tổng quan (sidebar) / 1 slide mỗi dự án / cảm ơn ===== */
+const DT={G:'16A34A',DG:'00843D',INK:'1F2937',MUTE:'6B7280',LINE:'E5E7EB',SOFT:'F3F4F6',RED:'DC2626',REDS:'FEE2E2',GS:'F0FDF4',GL:'86EFAC',AMB:'B45309'};
+/* Xóa sạch số thứ tự / mã bước ở đầu tên việc: "1.", "01 -", "Bước 2:", "#12", "1.1", "[05]", "MILESTONE 1ST:" */
+function cleanTaskTitle(raw){
+  let s=String(raw==null?'':raw).trim();
+  for(let i=0;i<5;i++){
+    const p=s.replace(/^\s*(?:milestone\s*\d+\s*(?:st|nd|rd|th)?|(?:bước|buoc|step|phase|giai\s*đoạn|gđ)\s*\d+(?:[.\-]\d+)*)\s*[:.\-–—)]*\s*/i,'')
+      .replace(/^\s*[\[(#]\s*\d+(?:[.\-]\d+)*\s*[\])]?\s*[:.\-–—)]*\s*/,'')
+      .replace(/^\s*\d+(?:\.\d+)+\.?\s*[:\-–—)]?\s*/,'')
+      .replace(/^\s*\d+\s*[.:)\-–—]+\s*/,'');
+    if(p===s)break;s=p.trim()}
+  return s||String(raw||'').trim()}
+function pptPickModal(ps){
+  if(!ps||!ps.length){toast('Chưa có dự án nào để xuất báo cáo');return}
+  const st=ps.map(p=>({p,pct:projStats(p.id).pct}));
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-xl p-5 max-h-[90vh] flex flex-col">
+   <h3 class="font-bold text-lg">📊 Chọn dự án để xuất báo cáo PowerPoint</h3>
+   <div class="flex items-center justify-between my-2"><button id="ppAll" type="button" class="btn-ghost text-sm"></button><span id="ppCnt" class="text-xs text-mute"></span></div>
+   <div id="ppList" class="overflow-auto border border-line rounded-lg divide-y divide-line" style="max-height:52vh">${st.map(x=>`<label class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-black/5"><input type="checkbox" value="${x.p.id}" checked>
+     <span class="mono text-xs text-mute shrink-0" style="min-width:5.5rem">${esc(x.p.code||'—')}</span><span class="flex-1 min-w-0 break-words text-sm font-medium">${esc(x.p.name)}</span><span class="mono text-xs font-bold shrink-0">${x.pct}%</span></label>`).join('')}</div>
+   <div class="flex justify-end gap-2 mt-3"><button id="ppNo" class="btn-ghost" type="button">Hủy</button><button id="ppGo" class="btn" type="button">Xuất file PPTX ngay</button></div></div></div>`;
+  const L=$('#ppList'),boxes=()=>[...L.querySelectorAll('input')],upd=()=>{const n=boxes().filter(b=>b.checked).length;$('#ppAll').textContent=n===boxes().length?'[✓] Bỏ chọn tất cả':'[  ] Chọn tất cả';$('#ppCnt').textContent=`Đã chọn ${n}/${boxes().length} dự án`;$('#ppGo').disabled=!n};
+  L.onchange=upd;upd();
+  $('#ppAll').onclick=()=>{const all=boxes().every(b=>b.checked);boxes().forEach(b=>b.checked=!all);upd()};
+  $('#ppNo').onclick=closeModal;
+  $('#ppGo').onclick=()=>{const ids=new Set(boxes().filter(b=>b.checked).map(b=>b.value));closeModal();exportDuyTanPPTX(ps.filter(p=>ids.has(p.id)))}}
+async function exportDuyTanPPTX(projects){
+  try{
+    if(!window.PptxGenJS)await loadJS('https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js');
+    if(!projects||!projects.length){toast('Chưa chọn dự án nào');return}
+    const TH=PPT_THEME,A=PPT_ASSETS,W=TH.W,FONT=TH.FONT,H=TH.Hh,{info}=pptCollect(projects,db.list('tasks'),db.list('budget_items'));
+    const dmy=d=>d?String(d).split('-').reverse().join('/'):'—',dd=(a,b)=>Math.round((new Date(a+'T00:00:00')-new Date(b+'T00:00:00'))/864e5);
+    const tri=n=>Math.round((n||0)/1e6).toLocaleString('vi-VN')+' Triệu VNĐ',ty=n=>((n||0)/1e9).toFixed(2).replace('.',',')+' Tỷ VNĐ';
+    const D=info.map(x=>{
+      const open=x.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100).sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))||((b.status==='in_progress')-(a.status==='in_progress')));
+      const cur=open.find(t=>t.status==='in_progress')||open[0]||null,nxt=open.find(t=>t!==cur)||null;
+      const late=x.late,od=x.overdue.slice().sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)));
+      return{...x,cur,nxt,plan:nxt||cur,late,od,show:canBudget(x.p.id),rate2:late?'TRỄ TIẾN ĐỘ':'ĐÚNG TIẾN ĐỘ'}});
+    const cnt={all:D.length,ok:D.filter(x=>!x.late).length,late:D.filter(x=>x.late).length,help:D.filter(x=>x.rate==='CẦN HỖ TRỢ').length};
+    const pptx=new PptxGenJS();pptx.layout=TH.layout;pptx.title='Báo cáo hoạt động dự án — Duy Tân Recycling';pptx.company='Duy Tân Recycling';
+    const SW=2.93,X0=3.15,MW=W-X0-0.22,lr=TH.logo.h/TH.logo.w,user=currentUser()||{};
+    const trunc=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
+    const bar=(s,x,y,w,txt,right)=>{s.addShape(pptx.ShapeType.rect,{x,y,w,h:0.4,fill:{color:'111111'},line:{color:'111111',width:0}});s.addText(txt,{x:x+0.1,y,w:w-0.2,h:0.4,fontFace:FONT,fontSize:10,bold:true,color:'FFFFFF',align:right?'right':'left',valign:'middle'})};
+    const side=(s,active)=>{
+      s.addShape(pptx.ShapeType.rect,{x:0,y:0,w:SW,h:H,fill:{color:'F8FAFC'},line:{color:DT.LINE,width:0.5}});
+      s.addImage({data:A.logo,x:0.2,y:0.25,w:2.5,h:2.5*lr});
+      const items=['1. TỔNG QUAN',...D.map((x,i)=>`${i+2}. ${trunc(x.p.name||'',27)}`)],rh=Math.min(0.5,5.3/items.length),fs=items.length>10?9:11;
+      items.forEach((t,i)=>{const y=1.3+i*rh,on=i===active;
+        if(on)s.addShape(pptx.ShapeType.roundRect,{x:0.15,y,w:SW-0.3,h:rh-0.06,fill:{color:DT.G},line:{color:DT.G,width:0},rectRadius:0.06});
+        s.addText(t,{x:0.25,y,w:SW-0.5,h:rh-0.06,fontFace:FONT,fontSize:fs,bold:on,color:on?'FFFFFF':DT.INK,valign:'middle',fit:'shrink'})});
+      bar(s,0,H-0.55,SW,'DUYTAN Recycling | duytanrecycling.com')};
+    /* SLIDE 1: bìa 2 nửa */
+    {const s=pptx.addSlide();s.background={color:'FFFFFF'};
+      s.addShape(pptx.ShapeType.rect,{x:0,y:0,w:W/2,h:H,fill:{color:DT.DG},line:{color:DT.DG,width:0}});
+      s.addShape(pptx.ShapeType.ellipse,{x:-1.6,y:3.9,w:6.6,h:6.6,fill:{color:'FFFFFF',transparency:90},line:{color:'FFFFFF',width:0}});
+      s.addShape(pptx.ShapeType.ellipse,{x:2.6,y:-1.8,w:5.2,h:5.2,fill:{color:DT.G},line:{color:DT.G,width:0}});
+      s.addShape(pptx.ShapeType.rect,{x:0,y:H-1.1,w:W/2,h:1.1,fill:{color:DT.G,transparency:25},line:{color:DT.G,width:0}});
+      s.addText('Tái chế xanh · Phát triển bền vững',{x:0.6,y:H-0.95,w:W/2-1.2,h:0.8,fontFace:FONT,fontSize:18,italic:true,color:'FFFFFF',valign:'middle'});
+      s.addImage({data:A.logo,x:7.4,y:0.9,w:4.8,h:4.8*lr});
+      s.addText('BÁO CÁO',{x:7.4,y:2.3,w:5.5,h:0.6,fontFace:FONT,fontSize:22,bold:true,color:DT.G,valign:'middle'});
+      s.addText('HOẠT ĐỘNG DỰ ÁN THÁNG '+(new Date().getMonth()+1),{x:7.4,y:2.9,w:5.5,h:1.6,fontFace:FONT,fontSize:34,bold:true,color:DT.INK,valign:'top',fit:'shrink'});
+      s.addShape(pptx.ShapeType.rect,{x:7.4,y:4.7,w:1.6,h:0.06,fill:{color:DT.G},line:{color:DT.G,width:0}});
+      s.addText([{text:'Trình bày: ',options:{bold:true,color:DT.MUTE}},{text:'Sơn Lê Hoàng',options:{bold:true,color:DT.INK,breakLine:true}},{text:'Ngày: ',options:{bold:true,color:DT.MUTE}},{text:dmy(today()),options:{color:DT.INK}}],{x:7.4,y:4.95,w:5.5,h:1.0,fontFace:FONT,fontSize:16,valign:'top',paraSpaceAfter:6})}
+    /* SLIDE 2: 1. TỔNG QUAN (tự chia trang nếu nhiều dự án) */
+    const PER=6,chunks=[];for(let i=0;i<Math.max(1,D.length);i+=PER)chunks.push(D.slice(i,i+PER));
+    chunks.forEach((rows,ci)=>{const s=pptx.addSlide();s.background={color:'FFFFFF'};side(s,0);
+      const cw=(MW-3*0.15)/4,cards=[['TỔNG DANH MỤC',cnt.all,DT.SOFT,DT.LINE,DT.INK,'≡'],['✓ ĐÚNG TIẾN ĐỘ',cnt.ok,DT.GS,'BBF7D0',DT.G,'✓'],['Δ TRỄ TIẾN ĐỘ',cnt.late,'FEF9C3','FEF08A',DT.AMB,'Δ'],['! CẦN HỖ TRỢ',cnt.help,'FEF2F2','FECACA',DT.RED,'!']];
+      cards.forEach((c,i)=>{const x=X0+i*(cw+0.15);s.addShape(pptx.ShapeType.roundRect,{x,y:0.3,w:cw,h:1.05,fill:{color:c[2]},line:{color:c[3],width:0.75},rectRadius:0.1});
+        s.addText(c[0],{x:x+0.12,y:0.36,w:cw-0.24,h:0.34,fontFace:FONT,fontSize:12,bold:true,color:c[4],valign:'middle',fit:'shrink'});
+        s.addText([{text:String(c[1]).padStart(2,'0'),options:{fontSize:26,bold:true,color:DT.INK}},{text:' Dự án',options:{fontSize:13,color:DT.MUTE}}],{x:x+0.12,y:0.72,w:cw-0.24,h:0.55,fontFace:FONT,valign:'middle'})});
+      const hd=t=>({text:t,options:{bold:true,color:'FFFFFF',fill:{color:DT.G},align:'center',fontFace:FONT,fontSize:13}}),tb=[[hd('STT'),hd('Tên Dự án'),hd('Hiện trạng'),hd('Kế hoạch tiếp theo'),hd('Đánh giá')]];
+      rows.forEach((x,i)=>{const n=ci*PER+i+1,fill=i%2?'FFFFFF':'F8FAFC',o={fill:{color:fill},fontFace:FONT,fontSize:11,color:DT.INK,align:'center',valign:'middle'};
+        const cur=`Tiến độ ${x.pct}%`+(x.show&&x.planned?` · Chi ${tri(x.actual)} / ${ty(x.planned)}`:''),pl=x.plan?`${x.plan.name}${x.plan.due_date?' (hạn '+dmy(x.plan.due_date).slice(0,5)+')':''}`:'Không còn đầu việc tồn đọng';
+        tb.push([{text:String(n).padStart(2,'0'),options:{...o,bold:true}},{text:x.p.name||'',options:{...o,bold:true}},{text:cur,options:o},{text:pl,options:o},{text:x.rate2,options:{...o,bold:true,color:x.late?DT.RED:DT.G}}])});
+      s.addTable(tb,{x:X0,y:1.6,w:MW,colW:[0.6,2.1,2.7,2.9,MW-8.3],rowH:[0.4,...rows.map(()=>0.78)],border:{type:'solid',pt:0.75,color:'CBD5E1'},margin:[0.03,0.07,0.03,0.07]})});
+    /* SLIDE CHI TIẾT: 1 dự án / slide */
+    D.forEach((x,i)=>{const s=pptx.addSlide();s.background={color:'FFFFFF'};side(s,i+1);
+      s.addText(x.p.name||'',{x:X0,y:0.3,w:MW-2.5,h:0.8,fontFace:FONT,fontSize:26,bold:true,color:DT.INK,valign:'middle',fit:'shrink'});
+      s.addShape(pptx.ShapeType.roundRect,{x:W-0.22-2.3,y:0.43,w:2.3,h:0.52,fill:{color:x.late?DT.RED:DT.G},line:{color:x.late?DT.RED:DT.G,width:0},rectRadius:0.26});
+      s.addText(x.rate2,{x:W-0.22-2.3,y:0.43,w:2.3,h:0.52,fontFace:FONT,fontSize:14,bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      /* khung phân tích tiến độ tự động */
+      s.addShape(pptx.ShapeType.roundRect,{x:X0,y:1.3,w:MW,h:3.25,fill:{color:DT.GS},line:{color:DT.GL,width:1.25},rectRadius:0.1});
+      s.addText('PHÂN TÍCH TIẾN ĐỘ TỰ ĐỘNG',{x:X0+0.2,y:1.36,w:MW-0.4,h:0.34,fontFace:FONT,fontSize:12,bold:true,color:DT.DG,valign:'middle'});
+      const days=t=>{if(!t.due_date)return 'chưa đặt hạn';const n=dd(t.due_date,today());return n>=0?n+' ngày':'đã quá hạn '+(-n)+' ngày'};
+      const b=(h,t,rest)=>[{text:'• '+h,options:{bold:true,color:DT.DG}},{text:t,options:{color:DT.INK,breakLine:!!rest}}];
+      const p1=(x.pct>=100||!x.cur)?[{text:'• Đã hoàn thành 100% toàn bộ hạng mục công việc',options:{bold:true,color:DT.DG,breakLine:true}}]
+        :[{text:'• Tiến độ tổng thể: ',options:{bold:true,color:DT.DG}},{text:`${x.pct}% — Đang thực hiện: ${x.cur.name}. Thời gian còn lại ở bước này: ${days(x.cur)}.`,options:{color:DT.INK,breakLine:true}}];
+      const p2=[{text:'• Chuẩn bị bước tiếp theo: ',options:{bold:true,color:DT.DG}},{text:(x.nxt?`${x.nxt.name}${x.nxt.due_date?' (Hạn: '+dmy(x.nxt.due_date)+')':''}`:'Không còn bước kế tiếp trong checklist')+' — Nhận định: Chủ động rà soát hồ sơ/vật tư và phối hợp nhà cung cấp để bám sát mốc tiến độ.',options:{color:DT.INK,breakLine:true}}];
+      const lst=x.od.slice(0,3).map(t=>`${t.name} (trễ ${dd(today(),t.due_date)} ngày)`).join('; ')+(x.od.length>3?` và ${x.od.length-3} việc khác`:'');
+      const p3=[{text:'• Các công việc trễ hạn: ',options:{bold:true,color:x.od.length?DT.RED:DT.DG}},{text:x.od.length?`${lst}. Đề xuất: Đôn đốc bộ phận phụ trách & nhà thầu xử lý dứt điểm.`:'Không có đầu việc trễ hạn, tiến độ đang được kiểm soát tốt.',options:{color:DT.INK}}];
+      s.addText([...p1,...p2,...p3],{x:X0+0.2,y:1.75,w:MW-0.4,h:2.7,fontFace:FONT,fontSize:14,valign:'top',paraSpaceAfter:10,fit:'shrink'});
+      /* 2 thẻ ngang bằng */
+      const cw2=(MW-0.2)/2,y2=4.75,h2=1.95,disb=x.planned?x.actual/x.planned*100:0,bc=disb>100?DT.RED:DT.G;
+      s.addShape(pptx.ShapeType.roundRect,{x:X0,y:y2,w:cw2,h:h2,fill:{color:'F0F9FF'},line:{color:'BAE6FD',width:0.75},rectRadius:0.1});
+      s.addText(`NGÂN SÁCH CAPEX · Giải ngân ${disb.toFixed(1)}%`,{x:X0+0.2,y:y2+0.1,w:cw2-0.4,h:0.4,fontFace:FONT,fontSize:13,bold:true,color:'0369A1',valign:'middle',fit:'shrink'});
+      s.addShape(pptx.ShapeType.roundRect,{x:X0+0.2,y:y2+0.62,w:cw2-0.4,h:0.16,fill:{color:'E2E8F0'},line:{color:'E2E8F0',width:0},rectRadius:0.08});
+      if(x.show&&disb>0)s.addShape(pptx.ShapeType.roundRect,{x:X0+0.2,y:y2+0.62,w:Math.max(0.1,(cw2-0.4)*Math.min(100,disb)/100),h:0.16,fill:{color:bc},line:{color:bc,width:0},rectRadius:0.08});
+      s.addText(x.show?[{text:'Thực chi: '+tri(x.actual),options:{bold:true,breakLine:true}},{text:'Ngân sách: '+tri(x.planned)+(x.planned>=1e9?' ('+ty(x.planned)+')':''),options:{color:DT.MUTE}}]:'Bạn không có quyền xem ngân sách dự án này.',{x:X0+0.2,y:y2+0.9,w:cw2-0.4,h:0.95,fontFace:FONT,fontSize:13,color:DT.INK,valign:'top',paraSpaceAfter:4});
+      const nx=X0+cw2+0.2;
+      s.addShape(pptx.ShapeType.roundRect,{x:nx,y:y2,w:cw2,h:h2,fill:{color:'F8FAFC'},line:{color:DT.LINE,width:0.75},rectRadius:0.1});
+      s.addShape(pptx.ShapeType.rect,{x:nx,y:y2+0.1,w:0.06,h:h2-0.2,fill:{color:x.late?DT.RED:DT.G},line:{color:x.late?DT.RED:DT.G,width:0}});
+      s.addText('KẾ HOẠCH TIẾP THEO',{x:nx+0.25,y:y2+0.1,w:cw2-0.4,h:0.4,fontFace:FONT,fontSize:13,bold:true,color:x.late?DT.RED:DT.DG,valign:'middle'});
+      const pl=x.plan;s.addText(pl?[{text:pl.name,options:{bold:true,fontSize:15,breakLine:true}},{text:'Hạn chót: '+dmy(pl.due_date),options:{color:DT.MUTE,fontSize:13}}]:'Không còn đầu việc tồn đọng.',{x:nx+0.25,y:y2+0.6,w:cw2-0.45,h:1.2,fontFace:FONT,fontSize:14,color:DT.INK,valign:'top',paraSpaceAfter:6,fit:'shrink'})});
+    /* SLIDE CUỐI */
+    {const s=pptx.addSlide();s.background={color:'FFFFFF'};
+      s.addImage({data:A.logo,x:W/2-2.4,y:1.6,w:4.8,h:4.8*lr});
+      s.addText('Xin cảm ơn!',{x:0.5,y:2.9,w:W-1,h:1.4,fontFace:FONT,fontSize:54,bold:true,color:DT.G,align:'center',valign:'middle'});
+      s.addText('Duy Tân Recycling · Báo cáo kỹ thuật',{x:0.5,y:4.3,w:W-1,h:0.6,fontFace:FONT,fontSize:20,color:DT.MUTE,align:'center',valign:'middle'});
+      bar(s,W-3.6,H-0.5,3.6,'duytanrecycling.com',true)}
+    await pptx.writeFile({fileName:`Bao_cao_du_an_DuyTan_${today()}.pptx`});
+    toast('Đã xuất báo cáo PowerPoint',false);
+  }catch(e){console.error(e);toast('Xuất PowerPoint lỗi: '+(e.message||e),true)}}
+/* ===== 🏭 MÁY MÓC & NHÀ MÁY — 3 tầng: Nhà máy -> Phân xưởng -> Máy/Dây chuyền. Lưu localStorage + đồng bộ Supabase (plants / workshops / machines, xem supabase_machines.sql) ===== */
+const MC_LS='mc_data_v1',MC={plants:[],workshops:[],machines:[],loaded:false,sb:null,syncing:false,plant:'all',shop:'all'};
+const MC_ST={running:['🟢 Đang chạy','bg-green-100 text-green-700'],maint:['🟡 Bảo trì','bg-amber-100 text-amber-700'],spare:['⚪ Dự phòng','bg-slate-200 text-slate-700']};
+const mcCan=()=>isAdmin()||myProjects().some(p=>isMgr(p.id));
+const mcN=v=>Number(v||0).toLocaleString('vi-VN',{maximumFractionDigits:1});
+const mcPersist=()=>{try{localStorage.setItem(MC_LS,JSON.stringify({plants:MC.plants,workshops:MC.workshops,machines:MC.machines}))}catch(e){}};
+function mcLoad(){if(MC.loaded)return;let d=null;try{d=JSON.parse(localStorage.getItem(MC_LS)||'null')}catch(e){}
+  if(!d||!d.plants||!d.plants.length)d={plants:[{id:'pl-dailoc',name:'DTR - Đại Lộc',trafo_kva:0},{id:'pl-tandaiphat',name:'Tân Đại Phát',trafo_kva:0},{id:'pl-longan',name:'DTR - Long An',trafo_kva:0}],
+    workshops:[{id:'ws-pet',plant_id:'pl-dailoc',name:'Xưởng Dây đai PET'},{id:'ws-bamrua',plant_id:'pl-dailoc',name:'Xưởng Băm rửa FS'},{id:'ws-f5',plant_id:'pl-dailoc',name:'Xưởng F5 - Tạo màng'}],machines:[]};
+  MC.plants=d.plants;MC.workshops=d.workshops||[];MC.machines=d.machines||[];MC.loaded=true;mcPersist()}
+async function mcRemote(op,tbl,x){if(!MC.sb)return;try{const q=op==='upsert'?sb.from(tbl).upsert(x,{onConflict:'id'}):sb.from(tbl).delete().eq('id',x);const{error}=await q;if(error)throw error}catch(e){console.warn('mc',tbl,e&&e.message);toast('Chưa lưu được lên Supabase (đã lưu trên máy): '+((e&&e.message)||''),true)}}
+function mcUpsert(tbl,row){const a=MC[tbl],i=a.findIndex(r=>r.id===row.id);if(i>=0)a[i]=row;else a.push(row);mcPersist();mcRemote('upsert',tbl,row)}
+function mcRemove(tbl,id){MC[tbl]=MC[tbl].filter(r=>r.id!==id);mcPersist();mcRemote('delete',tbl,id)}
+async function mcSync(){
+  if(MC.syncing||MC.sb===false)return false;MC.syncing=true;
+  try{const r=await Promise.all(['plants','workshops','machines'].map(t=>sb.from(t).select('*'))),bad=r.find(x=>x.error);if(bad)throw bad.error;MC.sb=true;
+    if(r[0].data.length){MC.plants=r[0].data;MC.workshops=r[1].data;MC.machines=r[2].data;mcPersist();return true}
+    for(const t of['plants','workshops','machines'])if(MC[t].length){const{error}=await sb.from(t).upsert(MC[t],{onConflict:'id'});if(error)throw error}
+    return false}
+  catch(e){MC.sb=false;console.warn('mc sync',e&&e.message);return false}finally{MC.syncing=false}}
+function mcForm(title,fields,onSave){
+  const inp=f=>`<label class="text-xs text-mute block ${f.full?'sm:col-span-2':''}">${f.l}${f.t==='select'?`<select id="mf_${f.k}" class="inp">${f.opts.map(o=>`<option value="${esc(o[0])}" ${String(f.v)===String(o[0])?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`
+    :`<input id="mf_${f.k}" type="${f.t||'text'}" ${f.t==='number'?'step="any" min="0"':''} class="inp" value="${esc(f.v==null?'':f.v)}" placeholder="${esc(f.ph||'')}">`}</label>`;
+  $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-2xl p-5 max-h-[92vh] overflow-auto"><h3 class="font-bold text-lg mb-3">${title}</h3>
+   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${fields.map(inp).join('')}</div><div id="mcErr" class="text-red-600 text-xs h-4 mt-1"></div>
+   <div class="flex justify-end gap-2 mt-2"><button id="mcNo" class="btn-ghost" type="button">Hủy</button><button id="mcOk" class="btn" type="button">Lưu</button></div></div></div>`;
+  const get=()=>{const v={};fields.forEach(f=>{const e=$('#mf_'+f.k);v[f.k]=f.t==='number'?(e.value===''?0:+e.value):e.value.trim()});return v};
+  fields.forEach(f=>{if(f.on)$('#mf_'+f.k).onchange=()=>f.on(get())});
+  $('#mcNo').onclick=closeModal;$('#mcOk').onclick=()=>{const v=get(),err=onSave(v);if(err){$('#mcErr').textContent=err;return}closeModal();if(curTab==='machines')mcDraw()}}
+const mcShopOpts=pid=>{const o=MC.workshops.filter(w=>w.plant_id===pid).map(w=>[w.id,w.name]);return o.length?o:[['','(chưa có phân xưởng)']]};
+const mcFillShops=pid=>{const e=$('#mf_workshop_id');if(e)e.innerHTML=mcShopOpts(pid).map(o=>`<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')};
+const mcPlantOpts=()=>MC.plants.map(p=>[p.id,p.name]);
+function mcMachineModal(id,pre){
+  mcLoad();const m=id?MC.machines.find(x=>x.id===id):null,d={...(pre||{}),...(m||{})},pl=d.plant_id||(MC.plant!=='all'?MC.plant:MC.plants[0].id);
+  const sh=d.workshop_id||(MC.shop!=='all'?MC.shop:'');
+  mcForm((m?'✏️ Sửa':'➕ Thêm')+' máy / dây chuyền',[
+    {k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:pl,on:v=>mcFillShops(v.plant_id)},
+    {k:'workshop_id',l:'Phân xưởng',t:'select',opts:mcShopOpts(pl),v:sh},
+    {k:'name',l:'Tên dây chuyền / máy',v:d.name,full:true,ph:'VD: Dây chuyền đùn dây đai PET #1'},
+    {k:'status',l:'Trạng thái',t:'select',opts:Object.entries(MC_ST).map(([k,v])=>[k,v[0]]),v:d.status||'running'},
+    {k:'cabinet',l:'Tủ cấp nguồn',v:d.cabinet,ph:'DB-Strap-01'},{k:'cb',l:'CB bảo vệ',v:d.cb,ph:'MCCB 400A'},
+    {k:'cable',l:'Dây dẫn (tiết diện cáp)',v:d.cable,full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
+    {k:'kw_run',l:'Công suất thực chạy (kW)',t:'number',v:d.kw_run},{k:'kw_rated',l:'Công suất định mức (kW)',t:'number',v:d.kw_rated},
+    {k:'kgh_actual',l:'Năng suất thực tế (kg/h)',t:'number',v:d.kgh_actual},{k:'kgh_design',l:'Năng suất thiết kế (kg/h)',t:'number',v:d.kgh_design},
+    {k:'eff',l:'Hiệu suất (%)',t:'number',v:d.eff},{k:'scrap',l:'Phế phẩm (%)',t:'number',v:d.scrap},
+    {k:'note',l:'Ghi chú kỹ thuật (vận hành, cải tạo, nhà cung cấp)',v:d.note,full:true}],
+    v=>{if(!v.name)return'Nhập tên dây chuyền / máy';if(!v.plant_id)return'Chọn nhà máy';
+      mcUpsert('machines',{...(m||{}),id:m?m.id:uid(),project_id:d.project_id||null,...v,workshop_id:v.workshop_id||null});return''})}
+function mcPlantModal(id){mcLoad();const p=id?MC.plants.find(x=>x.id===id):null;
+  mcForm(p?'✏️ Sửa nhà máy':'➕ Thêm nhà máy',[{k:'name',l:'Tên nhà máy',v:p&&p.name,full:true},{k:'trafo_kva',l:'Công suất trạm biến áp (kVA) — để tính % tải',t:'number',v:p&&p.trafo_kva,full:true}],
+    v=>{if(!v.name)return'Nhập tên nhà máy';mcUpsert('plants',{id:p?p.id:uid(),name:v.name,trafo_kva:v.trafo_kva||0});return''})}
+function mcShopModal(){mcLoad();mcForm('➕ Thêm phân xưởng',[{k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:MC.plant!=='all'?MC.plant:MC.plants[0].id},{k:'name',l:'Tên phân xưởng / khu vực',full:true,ph:'VD: Xưởng F5 - Tạo màng'}],
+    v=>{if(!v.name)return'Nhập tên phân xưởng';mcUpsert('workshops',{id:uid(),plant_id:v.plant_id,name:v.name});return''})}
+/* Bàn giao dự án hoàn thành -> thiết bị nhà máy */
+function mcHandoverModal(pid){
+  mcLoad();const all=myProjects(),done=all.filter(p=>projStats(p.id).pct>=100||p.status==='completed'),list=done.length?done:all,pl=MC.plant!=='all'?MC.plant:MC.plants[0].id;
+  mcForm('⚡ Bàn giao từ Dự án hoàn thành'+(done.length?'':' (chưa có dự án 100% — hiện tất cả)'),[
+    {k:'project_id',l:'Dự án',t:'select',opts:list.map(p=>[p.id,(p.code?p.code+' · ':'')+p.name]),v:pid||list[0]&&list[0].id,full:true},
+    {k:'plant_id',l:'Nhà máy đích',t:'select',opts:mcPlantOpts(),v:pl,on:v=>mcFillShops(v.plant_id)},{k:'workshop_id',l:'Phân xưởng đích',t:'select',opts:mcShopOpts(pl),v:''},
+    {k:'cabinet',l:'Tủ điện cấp nguồn',ph:'DB-Strap-01'},{k:'cb',l:'CB bảo vệ',ph:'MCCB 400A'},
+    {k:'cable',l:'Tiết diện cáp',full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
+    {k:'kw_rated',l:'Công suất (kW)',t:'number'},{k:'kgh_design',l:'Năng suất (kg/h)',t:'number'}],
+    v=>{const p=all.find(x=>x.id===v.project_id);if(!p)return'Chọn dự án';
+      mcUpsert('machines',{id:uid(),project_id:p.id,plant_id:v.plant_id,workshop_id:v.workshop_id||null,name:(p.code?p.code+' · ':'')+p.name,status:'running',cabinet:v.cabinet,cb:v.cb,cable:v.cable,kw_run:0,kw_rated:v.kw_rated,kgh_actual:0,kgh_design:v.kgh_design,eff:0,scrap:0,note:'Bàn giao từ dự án '+(p.code||p.name)+' ngày '+new Date().toLocaleDateString('en-GB')});
+      toast('Đã bàn giao dự án vào danh mục thiết bị nhà máy',false);return''})}
+function mcDraw(){
+  mcLoad();const v=$('#view');if(!v||curTab!=='machines')return;const can=mcCan(),pa=MC.plant==='all'?null:MC.plants.find(p=>p.id===MC.plant);if(MC.plant!=='all'&&!pa)MC.plant='all';
+  const inPlant=m=>MC.plant==='all'||m.plant_id===MC.plant,M=MC.machines.filter(inPlant),run=M.filter(m=>m.status==='running'),sum=(a,k)=>a.reduce((s,m)=>s+(+m[k]||0),0);
+  const kwRun=sum(run,'kw_run'),kwRated=sum(M,'kw_rated'),kgA=sum(run,'kgh_actual'),kgD=sum(M,'kgh_design');
+  const kva=MC.plants.filter(p=>MC.plant==='all'||p.id===MC.plant).reduce((s,p)=>s+(+p.trafo_kva||0),0),tai=kva?kwRun/(kva*0.85)*100:null;
+  const avg=(a,k)=>{const x=a.filter(m=>+m[k]>0);return x.length?x.reduce((s,m)=>s+(+m[k]),0)/x.length:null};
+  const oee=avg(M.filter(m=>m.status!=='spare'),'eff'),scr=avg(M.filter(m=>m.status!=='spare'),'scrap'),td=k=>mcN(k*24/1000);
+  const kpi=(t,main,sub,ex)=>`<div class="bg-surface border border-line rounded-2xl p-4 min-w-0"><div class="text-xs font-extrabold tracking-wide">${t}</div><div class="mono text-xl font-extrabold mt-1 ${ex||''}">${main}</div><div class="text-[11px] text-mute mt-1">${sub}</div></div>`;
+  const shops=MC.workshops.filter(w=>MC.plant==='all'||w.plant_id===MC.plant);if(MC.shop!=='all'&&!shops.some(w=>w.id===MC.shop))MC.shop='all';
+  const rows=M.filter(m=>MC.shop==='all'||m.workshop_id===MC.shop),pname=id=>(MC.plants.find(p=>p.id===id)||{}).name||'—',sname=id=>(MC.workshops.find(w=>w.id===id)||{}).name||'—';
+  const pill=(on,attr,txt)=>`<button type="button" ${attr} class="px-3 py-1.5 rounded-full text-xs font-bold border ${on?'text-white border-transparent':'border-line bg-surface'}" style="${on?'background:#16a34a':''}">${txt}</button>`;
+  const ec=e=>e>=85?'#16a34a':e>=70?'#d97706':'#dc2626';
+  v.innerHTML=`<div class="p-4 sm:p-6 max-w-[1600px] mx-auto">
+   <div class="flex flex-wrap items-center gap-2 mb-3"><h1 class="text-xl font-bold mr-auto">🏭 Quản lý Máy móc &amp; Nhà máy</h1>${can?`<button data-mcact="handover" class="btn-ghost" type="button">⚡ Bàn giao từ Dự án hoàn thành</button>`:''}</div>
+   ${MC.sb===false?'<div class="text-xs text-mute mb-2">⚠️ Đang lưu trên máy này — chạy <b>supabase_machines.sql</b> trong Supabase để đồng bộ giữa các thiết bị.</div>':''}
+   <div class="flex flex-wrap gap-2 mb-3">${pill(MC.plant==='all','data-mcplant="all"','Tất cả nhà máy')}${MC.plants.map(p=>pill(MC.plant===p.id,`data-mcplant="${p.id}"`,esc(p.name))).join('')}${can?`<button data-mcact="addplant" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Thêm Nhà máy</button>`:''}${can&&pa?`<button data-mcact="editplant" class="px-3 py-1.5 rounded-full text-xs border border-line" type="button">✎ Sửa ${esc(pa.name)}</button>`:''}</div>
+   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+    ${kpi('⚡ TỔNG CÔNG SUẤT ĐIỆN',`${mcN(kwRun)} <span class="text-xs font-normal text-mute">/ ${mcN(kwRated)} kW</span>`,`Thực chạy / Định mức · ${tai==null?'chưa nhập kVA trạm (bấm ✎ Sửa nhà máy)':'tải trạm biến áp '+mcN(tai)+'% ('+mcN(kva)+' kVA)'}`,tai>90?'text-red-600':'')}
+    ${kpi('⚙️ TỔNG NĂNG SUẤT THIẾT KẾ',`${mcN(kgA)} <span class="text-xs font-normal text-mute">/ ${mcN(kgD)} kg/h</span>`,`Thực đạt / Thiết kế · ≈ ${td(kgA)} / ${td(kgD)} Tấn/ngày`)}
+    ${kpi('📈 HIỆU SUẤT VẬN HÀNH (OEE)',oee==null?'—':mcN(oee)+'%','Trung bình toàn '+(pa?'nhà máy':'hệ thống'),oee==null?'':oee>=85?'text-green-600':oee>=70?'text-amber-600':'text-red-600')}
+    ${kpi('♻️ TỶ LỆ PHẾ PHẨM TB',scr==null?'—':mcN(scr)+'%',scr>2?'⚠️ Vượt ngưỡng 2%':'Trung bình, ngưỡng cảnh báo 2%',scr>2?'text-red-600':'')}</div>
+   <div class="flex flex-wrap items-center gap-2 mb-3">${pill(MC.shop==='all','data-mcshop="all"','Tất cả xưởng')}${shops.map(w=>pill(MC.shop===w.id,`data-mcshop="${w.id}"`,esc((MC.plant==='all'?pname(w.plant_id)+' · ':'')+w.name))).join('')}
+    ${can?`<button data-mcact="addshop" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Thêm Phân xưởng</button><button data-mcact="addmachine" class="btn" type="button">+ Thêm Máy / Dây chuyền</button>`:''}</div>
+   <div class="bg-surface border border-line rounded-2xl overflow-x-auto"><table class="w-full text-sm" style="min-width:1100px"><thead class="text-xs uppercase text-mute"><tr>
+    <th class="px-3 py-2 text-left">Dây chuyền / Máy &amp; Xưởng</th><th class="px-3 py-2 text-left">Tủ cấp nguồn &amp; CB</th><th class="px-3 py-2 text-left">Dây dẫn</th><th class="px-3 py-2 text-left">Công suất (kW)</th><th class="px-3 py-2 text-left">Năng suất (kg/h)</th><th class="px-3 py-2 text-left">Hiệu suất / Phế phẩm</th><th class="px-3 py-2 text-left">Ghi chú kỹ thuật</th><th></th></tr></thead><tbody>
+    ${rows.map(m=>{const ld=+m.kw_rated?Math.min(150,(+m.kw_run||0)/(+m.kw_rated)*100):0,st=MC_ST[m.status]||MC_ST.running,lc=ld>90?'#dc2626':ld>75?'#d97706':'#16a34a';
+      return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="font-semibold break-words">${esc(m.name)}</div><div class="text-xs text-mute">${esc(pname(m.plant_id))} · ${esc(sname(m.workshop_id))}</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${st[1]}">${st[0]}</span></td>
+      <td class="px-3 py-2 mono text-xs">${esc(m.cabinet||'—')}<br>${esc(m.cb||'—')}</td><td class="px-3 py-2 text-xs">${esc(m.cable||'—')}</td>
+      <td class="px-3 py-2 mono"><div>${mcN(m.kw_run)} / ${mcN(m.kw_rated)}</div><div style="height:6px;width:110px;background:rgba(127,127,127,.25);border-radius:3px;margin-top:4px"><div style="height:6px;width:${Math.min(100,ld)}%;background:${lc};border-radius:3px"></div></div><div class="text-[10px] text-mute">${mcN(ld)}% tải</div></td>
+      <td class="px-3 py-2 mono">${mcN(m.kgh_actual)} / ${mcN(m.kgh_design)}</td>
+      <td class="px-3 py-2 mono"><div style="color:${+m.eff?ec(+m.eff):'inherit'};font-weight:700">${+m.eff?mcN(m.eff)+'%':'—'}</div><div style="color:${+m.scrap>2?'#dc2626':'inherit'};font-weight:${+m.scrap>2?700:400}">${m.scrap!=null&&m.scrap!==''?mcN(m.scrap)+'% PP':'—'}</div></td>
+      <td class="px-3 py-2 text-xs break-words" style="max-width:260px">${esc(m.note||'')}</td>
+      <td class="px-3 py-2" style="white-space:nowrap">${can?`<button data-mcedit="${m.id}" class="btn-ghost text-xs" type="button">Sửa</button> <button data-mcdel="${m.id}" class="btn-ghost text-xs text-red-600" type="button">Xóa</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="8" class="p-6 text-center text-mute">Chưa có máy / dây chuyền nào${can?' — bấm "+ Thêm Máy / Dây chuyền" hoặc "⚡ Bàn giao từ Dự án hoàn thành".':'.'}</td></tr>`}</tbody></table></div></div>`;
+  v.onclick=e=>{const g=s=>e.target.closest(s);let b;
+    if(b=g('[data-mcplant]')){MC.plant=b.dataset.mcplant;MC.shop='all';mcDraw()}
+    else if(b=g('[data-mcshop]')){MC.shop=b.dataset.mcshop;mcDraw()}
+    else if(b=g('[data-mcact]')){if(!mcCan())return;const a=b.dataset.mcact;({addplant:()=>mcPlantModal(),editplant:()=>mcPlantModal(MC.plant),addshop:mcShopModal,addmachine:()=>mcMachineModal(),handover:()=>mcHandoverModal()})[a]()}
+    else if(b=g('[data-mcedit]')){if(mcCan())mcMachineModal(b.dataset.mcedit)}
+    else if(b=g('[data-mcdel]')){if(!mcCan())return;const m=MC.machines.find(x=>x.id===b.dataset.mcdel);if(m&&confirm('Xóa "'+m.name+'"?')){mcRemove('machines',m.id);mcDraw()}}}}
+function viewMachines(){mcLoad();mcDraw();mcSync().then(ok=>{if(ok&&curTab==='machines')mcDraw()})}
 function renderView(name,pid,target){
   {const v_=$('#view');v_.onclick=v_.onchange=v_.ondragstart=v_.ondragend=v_.ondragover=v_.ondrop=null}   // gỡ listener ủy quyền của view trước
   renderBell();
@@ -3154,6 +3374,7 @@ function renderView(name,pid,target){
   if(name==='users')return viewUsers();
   if(name==='todos')return viewTodos();
   if(name==='news')return viewNews();
+  if(name==='machines')return viewMachines();
   const p=myProjects().find(x=>x.id===pid);
   if(!p){go('#/projects');return}
   ({overview:viewDashboard,progress:viewProgress,gantt:viewGantt,budget:viewBudget,todo:viewTodo,notes:viewNotes})[name](p,target);
