@@ -3228,11 +3228,17 @@ function mcLoad(){if(MC.loaded)return;let d=null;try{d=JSON.parse(localStorage.g
 const MCT={plants:'plants',workshops:'workshops',machines:'machines'};
 /* chỉ gửi đúng các cột có trong schema Supabase */
 const MC_COLS={plants:['id','name','location','transformer_capacity_kva','note'],workshops:['id','plant_id','name','main_panel','note'],
-  machines:['id','plant_id','workshop_id','project_id','name','power_panel','cable_spec','breaker_spec','rated_power_kw','actual_power_kw','design_capacity_kgh','actual_capacity_kgh','efficiency_pct','scrap_rate_pct','status','note']};
+  machines:['id','plant_id','workshop_id','project_id','name','power_panel','cable_spec','breaker_spec','rated_power_kw','actual_power_kw','design_capacity_kgh','actual_capacity_kgh','efficiency_pct','scrap_rate_pct','status','note','crew_worker','crew_tech','crew_operator','crew_other']};
 const mcPick=(t,r)=>{const o={};MC_COLS[t].forEach(k=>{if(r[k]!==undefined)o[k]=r[k]});return o};
 async function mcRemote(op,tbl,x){if(!MC.sb)return;try{const q=op==='upsert'?sb.from(MCT[tbl]).upsert(mcPick(tbl,x),{onConflict:'id'}):sb.from(MCT[tbl]).delete().eq('id',x);const{error}=await q;if(error)throw error}catch(e){console.warn('mc',tbl,e&&e.message);MC.dirty=true;try{localStorage.setItem('mc_dirty','1')}catch(x){}toast('Chưa lưu được lên Supabase (đã lưu trên máy): '+((e&&e.message)||''),true)}}
 function mcUpsert(tbl,row){const a=MC[tbl],i=a.findIndex(r=>r.id===row.id);if(i>=0)a[i]=row;else a.push(row);mcPersist();mcRemote('upsert',tbl,row)}
-function mcRemove(tbl,id){MC[tbl]=MC[tbl].filter(r=>r.id!==id);mcPersist();mcRemote('delete',tbl,id)}
+function mcRemove(tbl,id){MC[tbl]=MC[tbl].filter(r=>r.id!==id);mcPersist();return mcRemote('delete',tbl,id)}
+async function mcDelPlant(id){const p=MC.plants.find(x=>x.id===id);if(!p)return;const ws=MC.workshops.filter(w=>w.plant_id===id),ms=MC.machines.filter(m=>m.plant_id===id);
+  if(!confirm(`Sẽ xóa ${ws.length} phân xưởng, ${ms.length} máy móc thuộc nhà máy "${p.name}". Đồng ý?`))return;
+  for(const m of ms)await mcRemove('machines',m.id);for(const w of ws)await mcRemove('workshops',w.id);await mcRemove('plants',id);MC.plant='all';MC.shop='all';mcDraw()}
+async function mcDelShop(id){const w=MC.workshops.find(x=>x.id===id);if(!w)return;const ms=MC.machines.filter(m=>m.workshop_id===id);
+  if(!confirm(`Xóa phân xưởng "${w.name}"? ${ms.length} máy thuộc xưởng này được giữ lại (không gán xưởng).`))return;
+  for(const m of ms)await mcUpsert('machines',{...m,workshop_id:null});await mcRemove('workshops',id);MC.shop='all';mcDraw()}
 async function mcSync(){
   if(MC.syncing||MC.sb===false)return false;MC.syncing=true;
   try{const r=await Promise.all(['plants','workshops','machines'].map(t=>sb.from(MCT[t]).select('*'))),bad=r.find(x=>x.error);if(bad)throw bad.error;MC.sb=true;
@@ -3270,14 +3276,15 @@ function mcMachineModal(id,pre){
     {k:'actual_power_kw',l:'Công suất thực chạy (kW)',t:'number',v:d.actual_power_kw},{k:'rated_power_kw',l:'Công suất định mức (kW)',t:'number',v:d.rated_power_kw},
     {k:'actual_capacity_kgh',l:'Năng suất thực tế (kg/h)',t:'number',v:d.actual_capacity_kgh},{k:'design_capacity_kgh',l:'Năng suất thiết kế (kg/h)',t:'number',v:d.design_capacity_kgh},
     {k:'efficiency_pct',l:'Hiệu suất (%)',t:'number',v:d.efficiency_pct},{k:'scrap_rate_pct',l:'Phế phẩm (%)',t:'number',v:d.scrap_rate_pct},
+    {k:'crew_worker',l:'👷 Định biên: Công nhân',t:'number',v:d.crew_worker},{k:'crew_tech',l:'Kỹ thuật',t:'number',v:d.crew_tech},{k:'crew_operator',l:'Vận hành',t:'number',v:d.crew_operator},{k:'crew_other',l:'Khác',t:'number',v:d.crew_other},
     {k:'note',l:'Ghi chú kỹ thuật (vận hành, cải tạo, nhà cung cấp)',v:d.note,full:true}],
     v=>{if(!v.name)return'Nhập tên dây chuyền / máy';if(!v.plant_id)return'Chọn nhà máy';
       mcUpsert('machines',{...(m||{}),id:m?m.id:uid(),project_id:d.project_id||null,...v,workshop_id:v.workshop_id||null});return''})}
 function mcPlantModal(id){mcLoad();const p=id?MC.plants.find(x=>x.id===id):null;
   mcForm(p?'✏️ Sửa nhà máy':'➕ Thêm nhà máy',[{k:'name',l:'Tên nhà máy',v:p&&p.name,full:true},{k:'location',l:'Địa điểm',v:p&&p.location,full:true},{k:'transformer_capacity_kva',l:'Công suất trạm biến áp (kVA) — để tính % tải',t:'number',v:p&&p.transformer_capacity_kva,full:true},{k:'note',l:'Ghi chú',v:p&&p.note,full:true}],
     v=>{if(!v.name)return'Nhập tên nhà máy';mcUpsert('plants',{...(p||{}),id:p?p.id:uid(),name:v.name,location:v.location,transformer_capacity_kva:v.transformer_capacity_kva||0,note:v.note});return''})}
-function mcShopModal(){mcLoad();mcForm('➕ Thêm phân xưởng',[{k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:MC.plant!=='all'?MC.plant:MC.plants[0].id},{k:'name',l:'Tên phân xưởng / khu vực',full:true,ph:'VD: Xưởng F5 - Tạo màng'},{k:'main_panel',l:'Tủ phân phối chính',ph:'MDB-01'},{k:'note',l:'Ghi chú'}],
-    v=>{if(!v.name)return'Nhập tên phân xưởng';mcUpsert('workshops',{id:uid(),plant_id:v.plant_id,name:v.name,main_panel:v.main_panel,note:v.note});return''})}
+function mcShopModal(id){mcLoad();const w=id?MC.workshops.find(x=>x.id===id):null;mcForm(w?'✏️ Sửa phân xưởng':'➕ Thêm phân xưởng',[{k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:w?w.plant_id:(MC.plant!=='all'?MC.plant:MC.plants[0].id)},{k:'name',l:'Tên phân xưởng / khu vực',full:true,ph:'VD: Xưởng F5 - Tạo màng',v:w&&w.name},{k:'main_panel',l:'Tủ phân phối chính',ph:'MDB-01',v:w&&w.main_panel},{k:'note',l:'Ghi chú',v:w&&w.note}],
+    v=>{if(!v.name)return'Nhập tên phân xưởng';mcUpsert('workshops',{...(w||{}),id:w?w.id:uid(),plant_id:v.plant_id,name:v.name,main_panel:v.main_panel,note:v.note});return''})}
 /* Bàn giao dự án hoàn thành -> thiết bị nhà máy */
 function mcHandoverModal(pid){
   mcLoad();const all=myProjects(),done=all.filter(p=>projStats(p.id).pct>=100||p.status==='completed'),list=done.length?done:all,pl=MC.plant!=='all'?MC.plant:MC.plants[0].id;
@@ -3292,6 +3299,7 @@ function mcHandoverModal(pid){
       toast('Đã bàn giao dự án vào danh mục thiết bị nhà máy',false);return''})}
 const mcPct=(a,b)=>+b?Math.min(100,Math.max(0,(+a||0)/(+b)*100)):0,mcCol=p=>p>90?'#dc2626':p>=75?'#d97706':'#16a34a';
 const mcBar=(p,c,w)=>`<div style="height:6px;${w?'width:'+w+'px;':''}background:rgba(127,127,127,.25);border-radius:3px;margin-top:4px"><div style="height:6px;width:${p}%;background:${c};border-radius:3px"></div></div>`;
+const mcCrew=m=>({w:+m.crew_worker||0,t:+m.crew_tech||0,o:+m.crew_operator||0,x:+m.crew_other||0}),mcCrewN=m=>{const c=mcCrew(m);return c.w+c.t+c.o+c.x},mcCrewTxt=m=>{const c=mcCrew(m);return[c.w&&c.w+' CN',c.t&&c.t+' KT',c.o&&c.o+' VH',c.x&&c.x+' Khác'].filter(Boolean).join(' · ')};
 const mcKwhKg=m=>{const k=+m.actual_power_kw||+m.rated_power_kw||0,g=+m.actual_capacity_kgh||+m.design_capacity_kgh||0;return k&&g?k/g:0};
 function mcSpecModal(id){
   const m=MC.machines.find(x=>x.id===id);if(!m)return;const can=mcCan(),pl=MC.plants.find(p=>p.id===m.plant_id),ws=MC.workshops.find(w=>w.id===m.workshop_id),pj=m.project_id?db.list('projects').find(p=>p.id===m.project_id):null,kk=mcKwhKg(m),kw=+m.actual_power_kw||+m.rated_power_kw||0,amp=kw?kw*1000/(1.732*380*0.85):0;
@@ -3300,6 +3308,7 @@ function mcSpecModal(id){
   $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-xl p-5 max-h-[92vh] overflow-auto"><h3 class="font-bold text-lg">📋 Hồ sơ kỹ thuật MEP (Spec Sheet)</h3><div class="mb-3"><b>${esc(m.name)}</b> <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${st[1]}">${st[0]}</span></div>
    ${blk('⚡ HẠ TẦNG ĐIỆN - MEP',[['Tủ cấp nguồn',esc(m.power_panel)],['Thiết bị bảo vệ',esc(m.breaker_spec)],['Quy cách & tiết diện cáp',esc(m.cable_spec)],['Công suất thực chạy / định mức',mcN(m.actual_power_kw)+' / '+mcN(m.rated_power_kw)+' kW'],['Dòng điện ước tính',amp?'≈ '+mcN(amp)+' A (380V, cosφ 0.85)':'']])}
    ${blk('⚙️ THÔNG SỐ VẬN HÀNH',[['Năng suất thực tế / thiết kế',mcN(m.actual_capacity_kgh)+' / '+mcN(m.design_capacity_kgh)+' kg/h'],['Suất tiêu hao điện',kk?kk.toFixed(2)+' kWh/kg':''],['Hiệu suất OEE',+m.efficiency_pct?mcN(m.efficiency_pct)+' %':''],['Tỷ lệ phế phẩm',m.scrap_rate_pct!=null&&m.scrap_rate_pct!==''?mcN(m.scrap_rate_pct)+' %':'']])}
+   ${blk('👷 ĐỊNH BIÊN',[['Công nhân',mcCrew(m).w],['Kỹ thuật',mcCrew(m).t],['Vận hành',mcCrew(m).o],['Khác',mcCrew(m).x],['Tổng',mcCrewN(m)+' người']])}
    ${blk('🗂️ LÝ LỊCH & GHI CHÚ',[['Nhà máy / Phân xưởng',esc((pl?pl.name:'—')+' / '+(ws?ws.name:'—'))],['Bàn giao từ dự án',pj?esc((pj.code?pj.code+' · ':'')+pj.name):esc(m.project_id||'')],['Ghi chú kỹ thuật',esc(m.note)]])}
    <div class="flex justify-end gap-2 mt-2"><button id="spX" class="btn-ghost" type="button">Đóng</button>${can?'<button id="spE" class="btn" type="button">✏️ Chỉnh sửa thông số</button>':''}</div></div></div>`;
   $('#spX').onclick=closeModal;if(can)$('#spE').onclick=()=>mcMachineModal(id)}
@@ -3308,7 +3317,7 @@ function mcDraw(){
   const M=MC.machines.filter(m=>MC.plant==='all'||m.plant_id===MC.plant),sum=(a,k)=>a.reduce((s,m)=>s+(+m[k]||0),0);
   const kwRated=sum(M,'rated_power_kw'),kwAct=sum(M,'actual_power_kw'),kgA=sum(M,'actual_capacity_kgh'),kgD=sum(M,'design_capacity_kgh');
   const kva=MC.plants.filter(p=>MC.plant==='all'||p.id===MC.plant).reduce((s,p)=>s+(+p.transformer_capacity_kva||0),0),avail=kva*0.85,ld=avail?kwRated/avail*100:0;
-  const sp=kwAct&&kgA?kwAct/kgA:(kwRated&&kgD?kwRated/kgD:0),cn=s=>M.filter(m=>(m.status||'running')===s).length;
+  const cr=M.reduce((a,m)=>{const c=mcCrew(m);a.w+=c.w;a.t+=c.t;a.o+=c.o;a.x+=c.x;return a},{w:0,t:0,o:0,x:0}),crN=cr.w+cr.t+cr.o+cr.x,sp=kwAct&&kgA?kwAct/kgA:(kwRated&&kgD?kwRated/kgD:0),cn=s=>M.filter(m=>(m.status||'running')===s).length;
   const kpi=(t,main,bar,sub,ex)=>`<div class="bg-surface border border-line rounded-2xl p-4 min-w-0"><div class="text-xs font-extrabold tracking-wide">${t}</div><div class="mono text-xl font-extrabold mt-1 ${ex||''}">${main}</div>${bar||''}<div class="text-[11px] text-mute mt-1.5">${sub}</div></div>`;
   const shops=MC.workshops.filter(w=>MC.plant==='all'||w.plant_id===MC.plant);if(MC.shop!=='all'&&!shops.some(w=>w.id===MC.shop))MC.shop='all';
   const rows=M.filter(m=>MC.shop==='all'||m.workshop_id===MC.shop),pname=id=>(MC.plants.find(p=>p.id===id)||{}).name||'—',sname=id=>(MC.workshops.find(w=>w.id===id)||{}).name||'—';
@@ -3319,25 +3328,28 @@ function mcDraw(){
    <div class="flex flex-wrap items-center gap-2 mb-3"><h1 class="text-xl font-bold mr-auto">🏭 Máy móc &amp; Nhà máy</h1>${can?`<button data-mcact="handover" class="btn-ghost" type="button">⚡ Bàn giao từ Dự án</button>`:''}</div>
    ${MC.sb===false?'<div class="text-xs text-mute mb-2">⚠️ Đang lưu trên máy này — kiểm tra bảng plants / workshops / machines trên Supabase (chạy supabase_machines.sql).</div>':''}
    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-    ${kpi(`⚡ PHỤ TẢI ĐIỆN &amp; DƯ ĐỊA TRẠM ${can&&pa?`<button data-mcact="editplant" type="button" title="Sửa kVA trạm — ${esc(pa.name)}" class="ml-1">✏️</button>`:''}`,`${mcN(kwRated)} <span class="text-xs font-normal text-mute">kW / ${kva?mcN(avail)+' kW khả dụng':'— kW khả dụng'}</span>${kva?` <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-line">${mcN(kva)} kVA</span>`:''}`,kva?mcBar(Math.min(100,ld),mcCol(ld)):'',kva?`Thực chạy: ${mcN(kwAct)} kW • Còn trống tải: ${mcN(avail-kwRated)} kW`:`Thực chạy: ${mcN(kwAct)} kW • ${pa?'bấm ✏️ nhập kVA trạm':'chọn nhà máy để nhập kVA'}`,ld>90?'text-red-600':'')}
+    ${kpi(`⚡ PHỤ TẢI ĐIỆN &amp; DƯ ĐỊA TRẠM ${can&&pa?`<button data-mcact="editplant" type="button" title="Sửa kVA trạm — ${esc(pa.name)}" class="ml-1">✏️</button>`:''}`,`${mcN(kwRated)} <span class="text-xs font-normal text-mute">kW / ${kva?mcN(avail)+' kW khả dụng':'— kW khả dụng'}</span>${kva?` <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-line">${mcN(kva)} kVA</span>`:''}`,kva?mcBar(Math.min(100,ld),mcCol(ld)):'',(kva?`Thực chạy: ${mcN(kwAct)} kW • Còn trống tải: ${mcN(avail-kwRated)} kW`:`Thực chạy: ${mcN(kwAct)} kW • ${pa?'bấm ✏️ nhập kVA trạm':''}`)+(pa?'':'<br><span style="opacity:.7">Chọn 1 nhà máy để sửa kVA</span>'),ld>90?'text-red-600':'')}
     ${kpi('🏭 TỔNG NĂNG SUẤT DÂY CHUYỀN',`${mcN(kgA)} / ${mcN(kgD)} <span class="text-xs font-normal text-mute">kg/h</span>`,kgD?mcBar(mcPct(kgA,kgD),'#2563eb'):'',`Quy đổi thiết kế: ≈ ${mcN(kgD*24/1000)} Tấn/ngày`)}
-    ${kpi('🔋 SUẤT TIÊU HAO &amp; TRẠNG THÁI',`${sp?sp.toFixed(2):'—'} <span class="text-xs font-normal text-mute">kWh/kg</span>`,'',`🟢 ${cn('running')} Chạy · 🟡 ${cn('maintenance')} Bảo trì · ⚪ ${cn('standby')} Dự phòng`)}</div>
-   <div class="flex flex-wrap gap-2 mb-2">${pill(MC.plant==='all','data-mcplant="all"','Tất cả nhà máy')}${MC.plants.map(p=>pill(MC.plant===p.id,`data-mcplant="${p.id}"`,esc(p.name))).join('')}${can?`<button data-mcact="addplant" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Nhà máy</button>`:''}</div>
+    ${kpi('🔋 SUẤT TIÊU HAO &amp; TRẠNG THÁI',`${sp?sp.toFixed(2):'—'} <span class="text-xs font-normal text-mute">kWh/kg</span>`,'',`🟢 ${cn('running')} Chạy · 🟡 ${cn('maintenance')} Bảo trì · ⚪ ${cn('standby')} Dự phòng<br>👷 Tổng nhân sự: <b>${crN}</b> người${crN?` • Năng suất BQ: <b>${Math.round(kgA/crN)}</b> kg/h/người`:''}`)}</div>
+   <div class="flex flex-wrap gap-2 mb-2">${pill(MC.plant==='all','data-mcplant="all"','Tất cả nhà máy')}${MC.plants.map(p=>pill(MC.plant===p.id,`data-mcplant="${p.id}"`,esc(p.name))).join('')}${can&&pa?`<button data-mcact="editplant" class="px-2.5 py-1.5 rounded-full text-xs border border-line" type="button">✏️ Sửa</button><button data-mcact="delplant" class="px-2.5 py-1.5 rounded-full text-xs border border-line" type="button">🗑️ Xóa</button>`:''}${can?`<button data-mcact="addplant" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Nhà máy</button>`:''}</div>
    <div class="flex flex-wrap items-center gap-2 mb-3">${pill(MC.shop==='all','data-mcshop="all"','Tất cả xưởng')}${shops.map(w=>pill(MC.shop===w.id,`data-mcshop="${w.id}"`,esc(MC.plant==='all'?pname(w.plant_id)+' · '+short(w):short(w)))).join('')}
+    ${can&&MC.shop!=='all'?`<button data-mcact="editshop" class="px-2.5 py-1.5 rounded-full text-xs border border-line" type="button">✏️ Sửa</button><button data-mcact="delshop" class="px-2.5 py-1.5 rounded-full text-xs border border-line" type="button">🗑️ Xóa</button>`:''}
     ${can?`<span class="ml-auto flex gap-2"><button data-mcact="addshop" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Phân xưởng</button><button data-mcact="addmachine" class="btn" type="button">+ Thêm Máy</button></span>`:''}</div>
-   <div class="bg-surface border border-line rounded-2xl overflow-x-auto"><table class="w-full text-sm" style="min-width:900px"><thead class="text-xs uppercase text-mute"><tr>
-    <th ${th}>Thiết bị / Dây chuyền</th><th ${th}>Tủ nguồn &amp; CB</th><th ${th}>Công suất (kW)</th><th ${th}>Năng suất (kg/h)</th><th ${th}>Tiêu hao (kWh/kg)</th><th></th></tr></thead><tbody>
+   <div class="text-xs text-mute mb-2">👷 Tổng nhân sự: <b>${rows.reduce((a,m)=>a+mcCrewN(m),0)}</b> · CN ${rows.reduce((a,m)=>a+mcCrew(m).w,0)} · KT ${rows.reduce((a,m)=>a+mcCrew(m).t,0)} · VH ${rows.reduce((a,m)=>a+mcCrew(m).o,0)} · Khác ${rows.reduce((a,m)=>a+mcCrew(m).x,0)}</div>
+   <div class="bg-surface border border-line rounded-2xl overflow-x-auto"><table class="w-full text-sm" style="min-width:980px"><thead class="text-xs uppercase text-mute"><tr>
+    <th ${th}>Thiết bị / Dây chuyền</th><th ${th}>Tủ nguồn &amp; CB</th><th ${th}>Công suất (kW)</th><th ${th}>Năng suất (kg/h)</th><th ${th}>Tiêu hao (kWh/kg)</th><th ${th}>Nhân sự</th><th></th></tr></thead><tbody>
     ${rows.map(m=>{const k=mcKwhKg(m),pw=mcPct(m.actual_power_kw,m.rated_power_kw),cp=mcPct(m.actual_capacity_kgh,m.design_capacity_kgh);
       return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="font-bold break-words cursor-pointer" data-mcspec="${m.id}">${dot[m.status]||dot.running} ${esc(m.name)}${m.project_id?` <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-line mono">${esc((db.list('projects').find(p=>p.id===m.project_id)||{}).code||m.project_id)}</span>`:''}</div><div class="text-xs text-mute">${esc(sname(m.workshop_id))}</div></td>
       <td class="px-3 py-2 text-xs"><span class="mono px-1.5 py-0.5 rounded border border-line">${esc(m.power_panel||'—')}</span> <span class="mono px-1.5 py-0.5 rounded border border-line">${esc(m.breaker_spec||'—')}</span></td>
       <td class="px-3 py-2 mono"><div>${mcN(m.actual_power_kw)} / ${mcN(m.rated_power_kw)} kW</div>${mcBar(pw,mcCol(pw),110)}</td>
       <td class="px-3 py-2 mono"><div>${mcN(m.actual_capacity_kgh)} / ${mcN(m.design_capacity_kgh)} kg/h</div>${mcBar(cp,'#2563eb',110)}</td>
       <td class="px-3 py-2"><span class="mono text-xs font-bold px-2 py-0.5 rounded-full border border-line">${k?k.toFixed(2)+' kWh/kg':'—'}</span></td>
-      <td class="px-3 py-2" style="white-space:nowrap"><button data-mcspec="${m.id}" class="btn-ghost text-xs" type="button">📋 Hồ sơ</button>${can?` <button data-mcedit="${m.id}" class="btn-ghost text-xs" type="button" title="Sửa">✏️</button> <button data-mcdel="${m.id}" class="btn-ghost text-xs" type="button" title="Xóa">🗑️</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="6" class="p-6 text-center text-mute">Chưa có máy nào${can?' — bấm "+ Thêm Máy" hoặc "⚡ Bàn giao từ Dự án".':'.'}</td></tr>`}</tbody></table></div></div>`;
+      <td class="px-3 py-2"><div class="font-bold mono">${mcCrewN(m)} người</div><div class="text-xs text-mute">${esc(mcCrewTxt(m))}</div></td>
+      <td class="px-3 py-2" style="white-space:nowrap"><button data-mcspec="${m.id}" class="btn-ghost text-xs" type="button">📋 Hồ sơ</button>${can?` <button data-mcedit="${m.id}" class="btn-ghost text-xs" type="button" title="Sửa">✏️</button> <button data-mcdel="${m.id}" class="btn-ghost text-xs" type="button" title="Xóa">🗑️</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="7" class="p-6 text-center text-mute">Chưa có máy nào${can?' — bấm "+ Thêm Máy" hoặc "⚡ Bàn giao từ Dự án".':'.'}</td></tr>`}</tbody></table></div></div>`;
   v.onclick=e=>{const g=s=>e.target.closest(s);let b;
     if(b=g('[data-mcplant]')){MC.plant=b.dataset.mcplant;MC.shop='all';mcDraw()}
     else if(b=g('[data-mcshop]')){MC.shop=b.dataset.mcshop;mcDraw()}
-    else if(b=g('[data-mcact]')){if(!mcCan())return;const a=b.dataset.mcact;({addplant:()=>mcPlantModal(),editplant:()=>mcPlantModal(MC.plant),addshop:mcShopModal,addmachine:()=>mcMachineModal(),handover:()=>mcHandoverModal()})[a]()}
+    else if(b=g('[data-mcact]')){if(!mcCan())return;const a=b.dataset.mcact;({addplant:()=>mcPlantModal(),editplant:()=>mcPlantModal(MC.plant),addshop:()=>mcShopModal(),editshop:()=>mcShopModal(MC.shop),delplant:()=>mcDelPlant(MC.plant),delshop:()=>mcDelShop(MC.shop),addmachine:()=>mcMachineModal(),handover:()=>mcHandoverModal()})[a]()}
     else if(b=g('[data-mcspec]'))mcSpecModal(b.dataset.mcspec)
     else if(b=g('[data-mcedit]')){if(mcCan())mcMachineModal(b.dataset.mcedit)}
     else if(b=g('[data-mcdel]')){if(!mcCan())return;const m=MC.machines.find(x=>x.id===b.dataset.mcdel);if(m&&confirm('Xóa "'+m.name+'"?')){mcRemove('machines',m.id);mcDraw()}}}}
