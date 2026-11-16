@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.11.12-1400</title>
+<title>Technical PM · v26.11.13-0930</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -254,7 +254,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.12-1400</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.13-0930</span>
     <div class="flex-1"></div>
 
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
@@ -3204,23 +3204,33 @@ async function exportDuyTanPPTX(projects){
     toast('Đã xuất báo cáo PowerPoint',false);
   }catch(e){console.error(e);toast('Xuất PowerPoint lỗi: '+(e.message||e),true)}}
 /* ===== 🏭 MÁY MÓC & NHÀ MÁY — 3 tầng: Nhà máy -> Phân xưởng -> Máy/Dây chuyền. Lưu localStorage + đồng bộ Supabase (plants / workshops / machines, xem supabase_machines.sql) ===== */
-const MC_LS='mc_data_v1',MC={plants:[],workshops:[],machines:[],loaded:false,sb:null,syncing:false,plant:'all',shop:'all'};
-const MC_ST={running:['🟢 Đang chạy','bg-green-100 text-green-700'],maint:['🟡 Bảo trì','bg-amber-100 text-amber-700'],spare:['⚪ Dự phòng','bg-slate-200 text-slate-700']};
+const MC_LS='mc_data_v2',MC={plants:[],workshops:[],machines:[],loaded:false,sb:null,syncing:false,plant:'all',shop:'all',dirty:(()=>{try{return localStorage.getItem('mc_dirty')==='1'}catch(e){return false}})()};
+const MC_ST={running:['🟢 Đang chạy','bg-green-100 text-green-700'],maintenance:['🟡 Bảo trì','bg-amber-100 text-amber-700'],standby:['⚪ Dự phòng','bg-slate-200 text-slate-700']};
 const mcCan=()=>isAdmin()||myProjects().some(p=>isMgr(p.id));
 const mcN=v=>Number(v||0).toLocaleString('vi-VN',{maximumFractionDigits:1});
 const mcPersist=()=>{try{localStorage.setItem(MC_LS,JSON.stringify({plants:MC.plants,workshops:MC.workshops,machines:MC.machines}))}catch(e){}};
 function mcLoad(){if(MC.loaded)return;let d=null;try{d=JSON.parse(localStorage.getItem(MC_LS)||'null')}catch(e){}
-  if(!d||!d.plants||!d.plants.length)d={plants:[{id:'pl-dailoc',name:'DTR - Đại Lộc',trafo_kva:0},{id:'pl-tandaiphat',name:'Tân Đại Phát',trafo_kva:0},{id:'pl-longan',name:'DTR - Long An',trafo_kva:0}],
-    workshops:[{id:'ws-pet',plant_id:'pl-dailoc',name:'Xưởng Dây đai PET'},{id:'ws-bamrua',plant_id:'pl-dailoc',name:'Xưởng Băm rửa FS'},{id:'ws-f5',plant_id:'pl-dailoc',name:'Xưởng F5 - Tạo màng'}],machines:[]};
+  if(!d||!d.plants||!d.plants.length)d=(MC.dirty=false,(()=>{try{localStorage.removeItem('mc_dirty');localStorage.removeItem('mc_data_v1')}catch(e){}})(),{plants:[{id:'pl-dailoc',name:'DTR - Đại Lộc',location:'',transformer_capacity_kva:0,note:''},{id:'pl-tandaiphat',name:'Tân Đại Phát',location:'',transformer_capacity_kva:0,note:''},{id:'pl-longan',name:'DTR - Long An',location:'',transformer_capacity_kva:0,note:''}],
+    workshops:[{id:'ws-pet',plant_id:'pl-dailoc',name:'Xưởng Dây đai PET'},{id:'ws-bamrua',plant_id:'pl-dailoc',name:'Xưởng Băm rửa FS'},{id:'ws-f5',plant_id:'pl-dailoc',name:'Xưởng F5 - Tạo màng'}],machines:[]});
   MC.plants=d.plants;MC.workshops=d.workshops||[];MC.machines=d.machines||[];MC.loaded=true;mcPersist()}
-async function mcRemote(op,tbl,x){if(!MC.sb)return;try{const q=op==='upsert'?sb.from(tbl).upsert(x,{onConflict:'id'}):sb.from(tbl).delete().eq('id',x);const{error}=await q;if(error)throw error}catch(e){console.warn('mc',tbl,e&&e.message);toast('Chưa lưu được lên Supabase (đã lưu trên máy): '+((e&&e.message)||''),true)}}
+const MCT={plants:'plants',workshops:'workshops',machines:'machines'};
+/* chỉ gửi đúng các cột có trong schema Supabase */
+const MC_COLS={plants:['id','name','location','transformer_capacity_kva','note'],workshops:['id','plant_id','name','main_panel','note'],
+  machines:['id','plant_id','workshop_id','project_id','name','power_panel','cable_spec','breaker_spec','rated_power_kw','actual_power_kw','design_capacity_kgh','actual_capacity_kgh','efficiency_pct','scrap_rate_pct','status','note']};
+const mcPick=(t,r)=>{const o={};MC_COLS[t].forEach(k=>{if(r[k]!==undefined)o[k]=r[k]});return o};
+async function mcRemote(op,tbl,x){if(!MC.sb)return;try{const q=op==='upsert'?sb.from(MCT[tbl]).upsert(mcPick(tbl,x),{onConflict:'id'}):sb.from(MCT[tbl]).delete().eq('id',x);const{error}=await q;if(error)throw error}catch(e){console.warn('mc',tbl,e&&e.message);MC.dirty=true;try{localStorage.setItem('mc_dirty','1')}catch(x){}toast('Chưa lưu được lên Supabase (đã lưu trên máy): '+((e&&e.message)||''),true)}}
 function mcUpsert(tbl,row){const a=MC[tbl],i=a.findIndex(r=>r.id===row.id);if(i>=0)a[i]=row;else a.push(row);mcPersist();mcRemote('upsert',tbl,row)}
 function mcRemove(tbl,id){MC[tbl]=MC[tbl].filter(r=>r.id!==id);mcPersist();mcRemote('delete',tbl,id)}
 async function mcSync(){
   if(MC.syncing||MC.sb===false)return false;MC.syncing=true;
-  try{const r=await Promise.all(['plants','workshops','machines'].map(t=>sb.from(t).select('*'))),bad=r.find(x=>x.error);if(bad)throw bad.error;MC.sb=true;
-    if(r[0].data.length){MC.plants=r[0].data;MC.workshops=r[1].data;MC.machines=r[2].data;mcPersist();return true}
-    for(const t of['plants','workshops','machines'])if(MC[t].length){const{error}=await sb.from(t).upsert(MC[t],{onConflict:'id'});if(error)throw error}
+  try{const r=await Promise.all(['plants','workshops','machines'].map(t=>sb.from(MCT[t]).select('*'))),bad=r.find(x=>x.error);if(bad)throw bad.error;MC.sb=true;
+    if(r.some(x=>x.data.length)){
+      /* có dữ liệu chưa lên được Supabase (lần lưu trước bị lỗi) -> gộp rồi đẩy phần còn thiếu lên, không ghi đè mất */
+      ['plants','workshops','machines'].forEach((t,i)=>{const rem=r[i].data.map(row=>mcPick(t,row));if(MC.dirty){const ids=new Set(rem.map(x=>x.id)),only=MC[t].filter(x=>!ids.has(x.id));if(only.length)MC['_up_'+t]=only;MC[t]=[...rem,...only]}else MC[t]=rem});
+      for(const t of['plants','workshops','machines']){const up=MC['_up_'+t];if(up){const{error}=await sb.from(MCT[t]).upsert(up.map(row=>mcPick(t,row)),{onConflict:'id'});if(error)throw error;delete MC['_up_'+t]}}
+      if(MC.dirty){MC.dirty=false;try{localStorage.removeItem('mc_dirty')}catch(e){}}
+      mcPersist();return true}
+    for(const t of['plants','workshops','machines'])if(MC[t].length){const{error}=await sb.from(MCT[t]).upsert(MC[t].map(r=>mcPick(t,r)),{onConflict:'id'});if(error)throw error}
     return false}
   catch(e){MC.sb=false;console.warn('mc sync',e&&e.message);return false}finally{MC.syncing=false}}
 function mcForm(title,fields,onSave){
@@ -3243,38 +3253,38 @@ function mcMachineModal(id,pre){
     {k:'workshop_id',l:'Phân xưởng',t:'select',opts:mcShopOpts(pl),v:sh},
     {k:'name',l:'Tên dây chuyền / máy',v:d.name,full:true,ph:'VD: Dây chuyền đùn dây đai PET #1'},
     {k:'status',l:'Trạng thái',t:'select',opts:Object.entries(MC_ST).map(([k,v])=>[k,v[0]]),v:d.status||'running'},
-    {k:'cabinet',l:'Tủ cấp nguồn',v:d.cabinet,ph:'DB-Strap-01'},{k:'cb',l:'CB bảo vệ',v:d.cb,ph:'MCCB 400A'},
-    {k:'cable',l:'Dây dẫn (tiết diện cáp)',v:d.cable,full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
-    {k:'kw_run',l:'Công suất thực chạy (kW)',t:'number',v:d.kw_run},{k:'kw_rated',l:'Công suất định mức (kW)',t:'number',v:d.kw_rated},
-    {k:'kgh_actual',l:'Năng suất thực tế (kg/h)',t:'number',v:d.kgh_actual},{k:'kgh_design',l:'Năng suất thiết kế (kg/h)',t:'number',v:d.kgh_design},
-    {k:'eff',l:'Hiệu suất (%)',t:'number',v:d.eff},{k:'scrap',l:'Phế phẩm (%)',t:'number',v:d.scrap},
+    {k:'power_panel',l:'Tủ cấp nguồn',v:d.power_panel,ph:'DB-Strap-01'},{k:'breaker_spec',l:'CB bảo vệ',v:d.breaker_spec,ph:'MCCB 400A'},
+    {k:'cable_spec',l:'Dây dẫn (tiết diện cáp)',v:d.cable_spec,full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
+    {k:'actual_power_kw',l:'Công suất thực chạy (kW)',t:'number',v:d.actual_power_kw},{k:'rated_power_kw',l:'Công suất định mức (kW)',t:'number',v:d.rated_power_kw},
+    {k:'actual_capacity_kgh',l:'Năng suất thực tế (kg/h)',t:'number',v:d.actual_capacity_kgh},{k:'design_capacity_kgh',l:'Năng suất thiết kế (kg/h)',t:'number',v:d.design_capacity_kgh},
+    {k:'efficiency_pct',l:'Hiệu suất (%)',t:'number',v:d.efficiency_pct},{k:'scrap_rate_pct',l:'Phế phẩm (%)',t:'number',v:d.scrap_rate_pct},
     {k:'note',l:'Ghi chú kỹ thuật (vận hành, cải tạo, nhà cung cấp)',v:d.note,full:true}],
     v=>{if(!v.name)return'Nhập tên dây chuyền / máy';if(!v.plant_id)return'Chọn nhà máy';
       mcUpsert('machines',{...(m||{}),id:m?m.id:uid(),project_id:d.project_id||null,...v,workshop_id:v.workshop_id||null});return''})}
 function mcPlantModal(id){mcLoad();const p=id?MC.plants.find(x=>x.id===id):null;
-  mcForm(p?'✏️ Sửa nhà máy':'➕ Thêm nhà máy',[{k:'name',l:'Tên nhà máy',v:p&&p.name,full:true},{k:'trafo_kva',l:'Công suất trạm biến áp (kVA) — để tính % tải',t:'number',v:p&&p.trafo_kva,full:true}],
-    v=>{if(!v.name)return'Nhập tên nhà máy';mcUpsert('plants',{id:p?p.id:uid(),name:v.name,trafo_kva:v.trafo_kva||0});return''})}
-function mcShopModal(){mcLoad();mcForm('➕ Thêm phân xưởng',[{k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:MC.plant!=='all'?MC.plant:MC.plants[0].id},{k:'name',l:'Tên phân xưởng / khu vực',full:true,ph:'VD: Xưởng F5 - Tạo màng'}],
-    v=>{if(!v.name)return'Nhập tên phân xưởng';mcUpsert('workshops',{id:uid(),plant_id:v.plant_id,name:v.name});return''})}
+  mcForm(p?'✏️ Sửa nhà máy':'➕ Thêm nhà máy',[{k:'name',l:'Tên nhà máy',v:p&&p.name,full:true},{k:'location',l:'Địa điểm',v:p&&p.location,full:true},{k:'transformer_capacity_kva',l:'Công suất trạm biến áp (kVA) — để tính % tải',t:'number',v:p&&p.transformer_capacity_kva,full:true},{k:'note',l:'Ghi chú',v:p&&p.note,full:true}],
+    v=>{if(!v.name)return'Nhập tên nhà máy';mcUpsert('plants',{...(p||{}),id:p?p.id:uid(),name:v.name,location:v.location,transformer_capacity_kva:v.transformer_capacity_kva||0,note:v.note});return''})}
+function mcShopModal(){mcLoad();mcForm('➕ Thêm phân xưởng',[{k:'plant_id',l:'Nhà máy',t:'select',opts:mcPlantOpts(),v:MC.plant!=='all'?MC.plant:MC.plants[0].id},{k:'name',l:'Tên phân xưởng / khu vực',full:true,ph:'VD: Xưởng F5 - Tạo màng'},{k:'main_panel',l:'Tủ phân phối chính',ph:'MDB-01'},{k:'note',l:'Ghi chú'}],
+    v=>{if(!v.name)return'Nhập tên phân xưởng';mcUpsert('workshops',{id:uid(),plant_id:v.plant_id,name:v.name,main_panel:v.main_panel,note:v.note});return''})}
 /* Bàn giao dự án hoàn thành -> thiết bị nhà máy */
 function mcHandoverModal(pid){
   mcLoad();const all=myProjects(),done=all.filter(p=>projStats(p.id).pct>=100||p.status==='completed'),list=done.length?done:all,pl=MC.plant!=='all'?MC.plant:MC.plants[0].id;
   mcForm('⚡ Bàn giao từ Dự án hoàn thành'+(done.length?'':' (chưa có dự án 100% — hiện tất cả)'),[
     {k:'project_id',l:'Dự án',t:'select',opts:list.map(p=>[p.id,(p.code?p.code+' · ':'')+p.name]),v:pid||list[0]&&list[0].id,full:true},
     {k:'plant_id',l:'Nhà máy đích',t:'select',opts:mcPlantOpts(),v:pl,on:v=>mcFillShops(v.plant_id)},{k:'workshop_id',l:'Phân xưởng đích',t:'select',opts:mcShopOpts(pl),v:''},
-    {k:'cabinet',l:'Tủ điện cấp nguồn',ph:'DB-Strap-01'},{k:'cb',l:'CB bảo vệ',ph:'MCCB 400A'},
-    {k:'cable',l:'Tiết diện cáp',full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
-    {k:'kw_rated',l:'Công suất (kW)',t:'number'},{k:'kgh_design',l:'Năng suất (kg/h)',t:'number'}],
+    {k:'power_panel',l:'Tủ điện cấp nguồn',ph:'DB-Strap-01'},{k:'breaker_spec',l:'CB bảo vệ',ph:'MCCB 400A'},
+    {k:'cable_spec',l:'Tiết diện cáp',full:true,ph:'Cu/XLPE/PVC 3x185+1x95 mm²'},
+    {k:'rated_power_kw',l:'Công suất (kW)',t:'number'},{k:'design_capacity_kgh',l:'Năng suất (kg/h)',t:'number'}],
     v=>{const p=all.find(x=>x.id===v.project_id);if(!p)return'Chọn dự án';
-      mcUpsert('machines',{id:uid(),project_id:p.id,plant_id:v.plant_id,workshop_id:v.workshop_id||null,name:(p.code?p.code+' · ':'')+p.name,status:'running',cabinet:v.cabinet,cb:v.cb,cable:v.cable,kw_run:0,kw_rated:v.kw_rated,kgh_actual:0,kgh_design:v.kgh_design,eff:0,scrap:0,note:'Bàn giao từ dự án '+(p.code||p.name)+' ngày '+new Date().toLocaleDateString('en-GB')});
+      mcUpsert('machines',{id:uid(),project_id:p.id,plant_id:v.plant_id,workshop_id:v.workshop_id||null,name:(p.code?p.code+' · ':'')+p.name,status:'running',power_panel:v.power_panel,breaker_spec:v.breaker_spec,cable_spec:v.cable_spec,actual_power_kw:0,rated_power_kw:v.rated_power_kw,actual_capacity_kgh:0,design_capacity_kgh:v.design_capacity_kgh,efficiency_pct:0,scrap_rate_pct:0,note:'Bàn giao từ dự án '+(p.code||p.name)+' ngày '+new Date().toLocaleDateString('en-GB')});
       toast('Đã bàn giao dự án vào danh mục thiết bị nhà máy',false);return''})}
 function mcDraw(){
   mcLoad();const v=$('#view');if(!v||curTab!=='machines')return;const can=mcCan(),pa=MC.plant==='all'?null:MC.plants.find(p=>p.id===MC.plant);if(MC.plant!=='all'&&!pa)MC.plant='all';
   const inPlant=m=>MC.plant==='all'||m.plant_id===MC.plant,M=MC.machines.filter(inPlant),run=M.filter(m=>m.status==='running'),sum=(a,k)=>a.reduce((s,m)=>s+(+m[k]||0),0);
-  const kwRun=sum(run,'kw_run'),kwRated=sum(M,'kw_rated'),kgA=sum(run,'kgh_actual'),kgD=sum(M,'kgh_design');
-  const kva=MC.plants.filter(p=>MC.plant==='all'||p.id===MC.plant).reduce((s,p)=>s+(+p.trafo_kva||0),0),tai=kva?kwRun/(kva*0.85)*100:null;
+  const kwRun=sum(run,'actual_power_kw'),kwRated=sum(M,'rated_power_kw'),kgA=sum(run,'actual_capacity_kgh'),kgD=sum(M,'design_capacity_kgh');
+  const kva=MC.plants.filter(p=>MC.plant==='all'||p.id===MC.plant).reduce((s,p)=>s+(+p.transformer_capacity_kva||0),0),tai=kva?kwRun/(kva*0.85)*100:null;
   const avg=(a,k)=>{const x=a.filter(m=>+m[k]>0);return x.length?x.reduce((s,m)=>s+(+m[k]),0)/x.length:null};
-  const oee=avg(M.filter(m=>m.status!=='spare'),'eff'),scr=avg(M.filter(m=>m.status!=='spare'),'scrap'),td=k=>mcN(k*24/1000);
+  const oee=avg(M.filter(m=>m.status!=='standby'),'efficiency_pct'),scr=avg(M.filter(m=>m.status!=='standby'),'scrap_rate_pct'),td=k=>mcN(k*24/1000);
   const kpi=(t,main,sub,ex)=>`<div class="bg-surface border border-line rounded-2xl p-4 min-w-0"><div class="text-xs font-extrabold tracking-wide">${t}</div><div class="mono text-xl font-extrabold mt-1 ${ex||''}">${main}</div><div class="text-[11px] text-mute mt-1">${sub}</div></div>`;
   const shops=MC.workshops.filter(w=>MC.plant==='all'||w.plant_id===MC.plant);if(MC.shop!=='all'&&!shops.some(w=>w.id===MC.shop))MC.shop='all';
   const rows=M.filter(m=>MC.shop==='all'||m.workshop_id===MC.shop),pname=id=>(MC.plants.find(p=>p.id===id)||{}).name||'—',sname=id=>(MC.workshops.find(w=>w.id===id)||{}).name||'—';
@@ -3282,7 +3292,7 @@ function mcDraw(){
   const ec=e=>e>=85?'#16a34a':e>=70?'#d97706':'#dc2626';
   v.innerHTML=`<div class="p-4 sm:p-6 max-w-[1600px] mx-auto">
    <div class="flex flex-wrap items-center gap-2 mb-3"><h1 class="text-xl font-bold mr-auto">🏭 Quản lý Máy móc &amp; Nhà máy</h1>${can?`<button data-mcact="handover" class="btn-ghost" type="button">⚡ Bàn giao từ Dự án hoàn thành</button>`:''}</div>
-   ${MC.sb===false?'<div class="text-xs text-mute mb-2">⚠️ Đang lưu trên máy này — chạy <b>supabase_machines.sql</b> trong Supabase để đồng bộ giữa các thiết bị.</div>':''}
+   ${MC.sb===false?'<div class="text-xs text-mute mb-2">⚠️ Đang lưu trên máy này — chạy <b>supabase_machines.sql</b> (bản mới, bảng mc_*) trong Supabase để đồng bộ giữa các thiết bị.</div>':''}
    <div class="flex flex-wrap gap-2 mb-3">${pill(MC.plant==='all','data-mcplant="all"','Tất cả nhà máy')}${MC.plants.map(p=>pill(MC.plant===p.id,`data-mcplant="${p.id}"`,esc(p.name))).join('')}${can?`<button data-mcact="addplant" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Thêm Nhà máy</button>`:''}${can&&pa?`<button data-mcact="editplant" class="px-3 py-1.5 rounded-full text-xs border border-line" type="button">✎ Sửa ${esc(pa.name)}</button>`:''}</div>
    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
     ${kpi('⚡ TỔNG CÔNG SUẤT ĐIỆN',`${mcN(kwRun)} <span class="text-xs font-normal text-mute">/ ${mcN(kwRated)} kW</span>`,`Thực chạy / Định mức · ${tai==null?'chưa nhập kVA trạm (bấm ✎ Sửa nhà máy)':'tải trạm biến áp '+mcN(tai)+'% ('+mcN(kva)+' kVA)'}`,tai>90?'text-red-600':'')}
@@ -3293,12 +3303,12 @@ function mcDraw(){
     ${can?`<button data-mcact="addshop" class="px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-line" type="button">+ Thêm Phân xưởng</button><button data-mcact="addmachine" class="btn" type="button">+ Thêm Máy / Dây chuyền</button>`:''}</div>
    <div class="bg-surface border border-line rounded-2xl overflow-x-auto"><table class="w-full text-sm" style="min-width:1100px"><thead class="text-xs uppercase text-mute"><tr>
     <th class="px-3 py-2 text-left">Dây chuyền / Máy &amp; Xưởng</th><th class="px-3 py-2 text-left">Tủ cấp nguồn &amp; CB</th><th class="px-3 py-2 text-left">Dây dẫn</th><th class="px-3 py-2 text-left">Công suất (kW)</th><th class="px-3 py-2 text-left">Năng suất (kg/h)</th><th class="px-3 py-2 text-left">Hiệu suất / Phế phẩm</th><th class="px-3 py-2 text-left">Ghi chú kỹ thuật</th><th></th></tr></thead><tbody>
-    ${rows.map(m=>{const ld=+m.kw_rated?Math.min(150,(+m.kw_run||0)/(+m.kw_rated)*100):0,st=MC_ST[m.status]||MC_ST.running,lc=ld>90?'#dc2626':ld>75?'#d97706':'#16a34a';
+    ${rows.map(m=>{const ld=+m.rated_power_kw?Math.min(150,(+m.actual_power_kw||0)/(+m.rated_power_kw)*100):0,st=MC_ST[m.status]||MC_ST.running,lc=ld>90?'#dc2626':ld>75?'#d97706':'#16a34a';
       return `<tr class="border-t border-line align-top"><td class="px-3 py-2"><div class="font-semibold break-words">${esc(m.name)}</div><div class="text-xs text-mute">${esc(pname(m.plant_id))} · ${esc(sname(m.workshop_id))}</div><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${st[1]}">${st[0]}</span></td>
-      <td class="px-3 py-2 mono text-xs">${esc(m.cabinet||'—')}<br>${esc(m.cb||'—')}</td><td class="px-3 py-2 text-xs">${esc(m.cable||'—')}</td>
-      <td class="px-3 py-2 mono"><div>${mcN(m.kw_run)} / ${mcN(m.kw_rated)}</div><div style="height:6px;width:110px;background:rgba(127,127,127,.25);border-radius:3px;margin-top:4px"><div style="height:6px;width:${Math.min(100,ld)}%;background:${lc};border-radius:3px"></div></div><div class="text-[10px] text-mute">${mcN(ld)}% tải</div></td>
-      <td class="px-3 py-2 mono">${mcN(m.kgh_actual)} / ${mcN(m.kgh_design)}</td>
-      <td class="px-3 py-2 mono"><div style="color:${+m.eff?ec(+m.eff):'inherit'};font-weight:700">${+m.eff?mcN(m.eff)+'%':'—'}</div><div style="color:${+m.scrap>2?'#dc2626':'inherit'};font-weight:${+m.scrap>2?700:400}">${m.scrap!=null&&m.scrap!==''?mcN(m.scrap)+'% PP':'—'}</div></td>
+      <td class="px-3 py-2 mono text-xs">${esc(m.power_panel||'—')}<br>${esc(m.breaker_spec||'—')}</td><td class="px-3 py-2 text-xs">${esc(m.cable_spec||'—')}</td>
+      <td class="px-3 py-2 mono"><div>${mcN(m.actual_power_kw)} / ${mcN(m.rated_power_kw)}</div><div style="height:6px;width:110px;background:rgba(127,127,127,.25);border-radius:3px;margin-top:4px"><div style="height:6px;width:${Math.min(100,ld)}%;background:${lc};border-radius:3px"></div></div><div class="text-[10px] text-mute">${mcN(ld)}% tải</div></td>
+      <td class="px-3 py-2 mono">${mcN(m.actual_capacity_kgh)} / ${mcN(m.design_capacity_kgh)}</td>
+      <td class="px-3 py-2 mono"><div style="color:${+m.efficiency_pct?ec(+m.efficiency_pct):'inherit'};font-weight:700">${+m.efficiency_pct?mcN(m.efficiency_pct)+'%':'—'}</div><div style="color:${+m.scrap_rate_pct>2?'#dc2626':'inherit'};font-weight:${+m.scrap_rate_pct>2?700:400}">${m.scrap_rate_pct!=null&&m.scrap_rate_pct!==''?mcN(m.scrap_rate_pct)+'% PP':'—'}</div></td>
       <td class="px-3 py-2 text-xs break-words" style="max-width:260px">${esc(m.note||'')}</td>
       <td class="px-3 py-2" style="white-space:nowrap">${can?`<button data-mcedit="${m.id}" class="btn-ghost text-xs" type="button">Sửa</button> <button data-mcdel="${m.id}" class="btn-ghost text-xs text-red-600" type="button">Xóa</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="8" class="p-6 text-center text-mute">Chưa có máy / dây chuyền nào${can?' — bấm "+ Thêm Máy / Dây chuyền" hoặc "⚡ Bàn giao từ Dự án hoàn thành".':'.'}</td></tr>`}</tbody></table></div></div>`;
   v.onclick=e=>{const g=s=>e.target.closest(s);let b;
