@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.11.13-0930</title>
+<title>Technical PM · v26.11.27-1400</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -258,7 +258,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.13-0930</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.27-1400</span>
     <div class="flex-1"></div>
 
     <button id="gsBtn" class="p-2" title="Tìm kiếm toàn bộ (/ hoặc Ctrl+K)" aria-label="Tìm kiếm toàn bộ"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -2302,7 +2302,7 @@ function drawProgress(p,only){
      <div class="c-name flex flex-wrap items-center gap-1.5 min-w-0" style="padding-left:${flat?0:d*1.3}rem">
       ${!leaf&&!flat?`<button data-act="tg" class="ibtn" aria-label="Mở hoặc thu gọn"><i class="fa-solid fa-chevron-${open?'down':'right'} text-xs"></i></button>`:'<span class="inline-block" style="width:1.55rem"></span>'}
       <span class="mono text-xs" style="color:#f59e0b">${esc(t.wbs_code)}</span>
-      ${ed?`<button data-act="star" class="ibtn" title="${t.is_milestone?'Bỏ mốc chính':'Đánh dấu mốc chính'}" aria-label="Đánh dấu mốc chính"><i class="fa-${t.is_milestone?'solid':'regular'} fa-star" style="${t.is_milestone?'color:#f59e0b':''}"></i></button>`:(t.is_milestone?'<i class="fa-solid fa-star" style="color:#f59e0b" title="Mốc chính"></i>':'')}
+      ${ed?`<button data-act="star" class="ibtn" title="${t.is_milestone?'Bỏ mốc chính':'Đánh dấu mốc chính'}" aria-label="Đánh dấu mốc chính"><i class="fa-${t.is_milestone?'solid':'regular'} fa-star" style="${t.is_milestone?'color:#f59e0b':''}"></i></button>`:`<i class="fa-${t.is_milestone?'solid':'regular'} fa-star" style="${t.is_milestone?'color:#f59e0b':'color:#d1d5db'}" title="${t.is_milestone?'Mốc chính':'Chưa đánh dấu mốc'}"></i>`}
       <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>${(leaf?aheadOf(t):(r.s&&r.s>today()&&r.pg>0))?'<span class="chip-ahead bg-indigo-100 text-indigo-700" title="Đã làm trước ngày bắt đầu kế hoạch">⚡ Vượt tiến độ</span>':''}
       ${ed?`<button data-act="add" class="add-mini" aria-label="Thêm việc con"><i class="fa-solid fa-plus"></i></button>`:''}
       ${priSel(t,!ed)}
