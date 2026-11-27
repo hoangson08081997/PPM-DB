@@ -50,7 +50,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font),system-ui,-ap
 .pjgrid{display:grid;gap:1.25rem;grid-template-columns:minmax(0,1fr)}
 @container (min-width:600px){.pjgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @container (min-width:940px){.pjgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.bwrap{container-type:inline-size;container-name:bw;overflow:hidden}
+.bwrap{container-type:inline-size;container-name:bw;overflow-x:auto;position:relative}
+.bwrap .tbl th:nth-child(1),.bwrap .tbl td:nth-child(1){position:sticky;left:0;z-index:2;background:var(--surface)}
+.bwrap .tbl th:nth-child(2),.bwrap .tbl td:nth-child(2){position:sticky;left:5.6rem;z-index:2;background:var(--surface);box-shadow:2px 0 4px -2px rgba(0,0,0,.12)}
+.bwrap .tbl thead th:nth-child(1),.bwrap .tbl thead th:nth-child(2){z-index:3}
+.bwrap .tbl tr.b-add td:nth-child(1),.bwrap .tbl tr.b-add td:nth-child(2){background:color-mix(in srgb,var(--brand) 7%,var(--surface))}
 @container bw (max-width:900px){.c-ven,.c-quo{display:none}}
 @container bw (max-width:640px){.c-unit,.c-qty,.c-price{display:none}}
 .bwrap tfoot .mono{font-size:clamp(.6rem,1.6cqw,1rem)}
@@ -257,6 +261,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.13-0930</span>
     <div class="flex-1"></div>
 
+    <button id="gsBtn" class="p-2" title="Tìm kiếm toàn bộ (/ hoặc Ctrl+K)" aria-label="Tìm kiếm toàn bộ"><i class="fa-solid fa-magnifying-glass"></i></button>
     <button id="palBtn" class="p-2" title="Tùy chỉnh màu và phông chữ" aria-label="Tùy chỉnh màu và phông chữ"><i class="fa-solid fa-palette"></i></button>
     <div class="flex rounded-lg border border-line overflow-hidden text-sm" role="group" aria-label="Giao diện">
       <button class="theme-btn px-2.5 py-1.5" data-theme-set="light" title="Sáng"><i class="fa-solid fa-sun"></i></button>
@@ -313,6 +318,12 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
 </div>
 
 <div id="modal"></div>
+<div id="gsOverlay" class="hidden fixed inset-0 z-[60] bg-black/50 flex items-start justify-center pt-20 p-4">
+ <div class="bg-surface border border-line rounded-xl w-full max-w-xl max-h-[70vh] flex flex-col overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
+  <div class="p-2 border-b border-line"><input id="gsInput" class="inp" style="margin:0" placeholder="Tìm dự án, công việc, chi phí / NCC... (Esc để đóng)" aria-label="Tìm kiếm toàn bộ"></div>
+  <div id="gsList" class="overflow-auto flex-1 text-sm"></div>
+ </div>
+</div>
 
 <script>
 /* ===== Icon SVG nội tuyến (không phụ thuộc font / CDN, không bao giờ bị ô vuông) ===== */
@@ -396,7 +407,7 @@ const TB={
   users:{t:'users',pk:['id'],cols:['id','email','full_name','avatar_url','avatar_color','pending','role','prefs'],ord:['email'],txt:['full_name'],obj:['prefs']},
   projects:{t:'projects',pk:['id'],cols:['id','code','name','client','description','status','start_date','end_date','currency','exchange_rate','created_by','created_at','updated_at','approved','approved_by','approved_at'],ord:['created_at','id'],txt:['code','name','client','description']},
   project_members:{t:'project_members',pk:['project_id','user_id'],cols:['project_id','user_id','role'],ren:{role:'access_level'},ord:['project_id']},
-  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start_date','actual_end_date','planned_days','actual_days','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
+  tasks:{t:'tasks',pk:['id'],cols:['id','project_id','parent_id','wbs_code','name','owner_depts','collab_depts','duration_days','start_date','due_date','actual_start_date','actual_end_date','planned_days','actual_days','status','priority','progress','notes','depends_on','checklist','sort_order','task_source','created_at','updated_at','is_milestone'],ord:['sort_order','id'],txt:['wbs_code','name','notes'],arr:['owner_depts','collab_depts','depends_on','checklist']},
   budget_items:{t:'budgets',pk:['id'],cols:['id','project_id','parent_id','code','name','unit','quantity','unit_price','planned_amount','actual_amount','vendor','note','sort_order','section','price_usd','price_ccy','has_docs'],ord:['sort_order','id'],txt:['code','name','unit','vendor','note','has_docs']},
   attachments:{t:'attachments',pk:['id'],cols:['id','task_id','file_name','file_type','size_bytes','storage_path','uploaded_by','created_at'],ord:['created_at','id']},
   notes:{t:'notes',pk:['id'],cols:['id','project_id','delta','html','text','updated_by','updated_at'],ord:['id']},
@@ -759,6 +770,7 @@ function card(p){
     ${stat('Đầu việc',done,'/'+s.leaf.length)}</div>
    <div><div class="flex justify-between text-xs text-mute gap-2"><span class="truncate">Tiến độ tổng thể: <b class="mono text-ink">${s.pct}%</b>${tp!==null?` • Thời gian trôi qua: <b class="mono text-ink">${tp}%</b>`:''}</span>${slow?'<span class="font-semibold whitespace-nowrap" style="color:#ea580c">● Chậm nhịp KH</span>':''}</div><div class="relative">${bar(s.pct)}${tp!==null?`<span class="absolute top-0 bottom-0" style="left:${tp}%;width:2px;background:#ea580c" title="Thời gian đã trôi qua ${tp}%"></span>`:''}</div>${extra>0?`<div class="text-xs font-semibold mt-1" style="color:#ea580c">+ Phát sinh ngoài dự toán: ${fmtVND(extra)}</div>`:''}</div>
    ${s.pct>=100||p.status==='completed'?`<button type="button" data-handover="${p.id}" class="text-xs font-semibold text-left" style="color:#d97706">⚡ Bàn giao sang Nhà máy</button>`:''}
+   <button type="button" data-qv="${p.id}" class="text-xs font-semibold text-brand hover:underline text-left">👁️ Xem nhanh</button>
    <button type="button" data-cprep="${p.id}" class="text-xs font-semibold text-brand hover:underline text-left">📋 Copy báo cáo dự án</button>
    <div class="text-xs text-mute truncate" title="${nxt?esc(nxt.name):''}">📌 Việc tiếp theo: ${nxt?`<b class="text-ink">${esc(nxt.name)}</b>${nxt.due_date?' · '+fmtD(nxt.due_date):''}`:'<span>Không còn việc tồn đọng</span>'}</div>
    <div class="flex items-center justify-between gap-2 min-h-[1.75rem]">
@@ -861,7 +873,7 @@ function effStatus(p,s){
   return p.status}
 function autoSyncStatus(ps){
   const nx=new Map();
-  ps.filter(p=>(p.status==='planning'||p.status==='active')&&!AUTOST.has(p.id)&&isMgr(p.id)).forEach(p=>{const s=projStats(p.id),e=effStatus(p,s);if(e!==p.status&&(e==='completed'||e==='active'))nx.set(p.id,e)});
+  ps.filter(p=>(p.status==='planning'||p.status==='active')&&!AUTOST.has(p.id)&&isMgr(p.id)).forEach(p=>{const s=projStats(p.id),e=effStatus(p,s);if(e!==p.status&&e==='completed')nx.set(p.id,e);else if(e!==p.status&&e==='active'&&p.approved)nx.set(p.id,e)});
   if(!nx.size)return false;
   nx.forEach((v,k)=>AUTOST.add(k));const now=new Date().toISOString();
   db.save('projects',db.list('projects').map(p=>nx.has(p.id)?{...p,status:nx.get(p.id),updated_at:now}:p)).catch(console.error);
@@ -941,6 +953,7 @@ function viewProjects(){
     if(el=g('[data-pjf]')){PJF=el.dataset.pjf;viewProjects();return}
     if(el=g('#pjView')){PJV=PJV==='table'?'grid':'table';try{localStorage.setItem('pjv',PJV)}catch(x){}el.innerHTML=`<i class="fa-solid ${PJV==='table'?'fa-table-cells-large':'fa-table-list'} mr-1"></i><span>${PJV==='table'?'Thẻ':'Bảng'}</span>`;pjList();return}
     if(el=g('[data-handover]')){e.stopPropagation();const hp=el.dataset.handover;go('#/machines');setTimeout(()=>mcHandoverModal(hp),400);return}
+    if(el=g('[data-qv]')){e.stopPropagation();qvModal(el.dataset.qv);return}
     if(el=g('[data-cprep]')){e.stopPropagation();pjCopyOne(el.dataset.cprep);return}
     if(el=g('[data-edit]')){e.stopPropagation();projectForm(el.dataset.edit);return}
     if(el=g('[data-del]')){e.stopPropagation();delProject(el.dataset.del);return}
@@ -1039,6 +1052,17 @@ async function pjCopyOne(pid){
   if(s.overdue.length)L.push(`• ⚠️ ${s.overdue.length} việc trễ hạn`);
   L.push('• Việc trọng tâm:');tk.forEach((t,i)=>L.push(`   ${i+1}. ${t.name} — hạn ${fmtD(t.due_date)} (${t.progress||0}%)`));if(!tk.length)L.push('   (Không còn việc tồn đọng)');
   if(await copyText(L.join('\n')))toast('Đã copy báo cáo để gửi Zalo/Teams!',false);else toast('Không copy được — trình duyệt chặn clipboard')}
+/* ===== 👁️ Xem nhanh: mốc chính + ngân sách + 3 việc sắp/trễ hạn, không cần mở hẳn dự án ===== */
+function qvModal(pid){
+  const p=db.list('projects').find(x=>x.id===pid);if(!p)return;const s=projStats(pid),adm=canBudget(pid),MS=msOf(s),FT=factGet(p);
+  const up=s.leaf.filter(t=>t.status!=='done').sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')).slice(0,3);
+  modal(`<h3 class="font-bold text-lg mb-0.5">👁️ ${esc(p.name)}</h3><div class="text-xs text-mute mb-3">${esc(p.code||'')}</div>
+   <div class="mb-3"><div class="text-xs font-bold mb-1">⭐ Mốc chính</div>${MS.length?MS.map(t=>{const[st,col]=msStat(t);return`<div class="flex flex-wrap items-center gap-2 border-t border-line py-1 text-sm"><span class="flex-1 min-w-0 truncate">${esc(t.name)}</span><span class="mono text-xs text-mute whitespace-nowrap">KH ${fmtD(t.due_date)} · TT ${t.actual_end_date?fmtD(t.actual_end_date):'—'}</span><span class="text-xs font-semibold whitespace-nowrap" style="color:${col}">${st}</span></div>`}).join(''):'<div class="text-xs text-mute">Chưa có mốc chính.</div>'}</div>
+   ${adm?`<div class="mb-3"><div class="text-xs font-bold mb-1">💰 Ngân sách</div><div class="text-sm">Duyệt ${fmtVND(s.planned)} · Thực chi ${fmtVND(s.actual)}</div></div>`:''}
+   ${FT.contract||FT.vendor?`<div class="mb-3 text-xs text-mute">${FT.contract?`HĐ: ${esc(FT.contract)} · `:''}${FT.vendor?`NCC: ${esc(FT.vendor)}`:''}</div>`:''}
+   <div><div class="text-xs font-bold mb-1">⏰ Sắp đến hạn / trễ hạn</div>${up.length?up.map(t=>`<div class="flex justify-between gap-2 border-t border-line py-1 text-sm"><span class="truncate min-w-0">${esc(t.name)}</span><span class="mono text-xs ${dlClass(t)==='over'?'text-red-600':'text-mute'} whitespace-nowrap">${fmtD(t.due_date)}</span></div>`).join(''):'<div class="text-sm text-mute">Không còn việc tồn đọng.</div>'}</div>
+   <div class="flex justify-end gap-2 mt-3"><button id="qvGo" class="btn-ghost" type="button">Mở dự án →</button><button id="qvX" class="btn" type="button">Đóng</button></div>`);
+  $('#qvX').onclick=closeModal;$('#qvGo').onclick=()=>{closeModal();go(`#/p/${pid}/overview`)}}
 function pinModal(p){
   const s=projStats(p.id),open=s.leaf.filter(t=>t.status!=='done'&&(t.progress||0)<100).sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))),cur=new Set(pinGet(p.id));
   $('#modal').innerHTML=`<div class="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"><div class="bg-surface border border-line rounded-xl w-full max-w-lg p-5 max-h-[90vh] overflow-auto"><h3 class="font-bold text-lg">📌 Ghim 2–3 việc trọng tâm</h3><p class="text-xs text-mute mb-2">Không ghim: tự lấy 3 việc đang làm / sắp đến hạn nhất.</p>
@@ -1046,8 +1070,36 @@ function pinModal(p){
    <div class="flex justify-end gap-2 mt-3"><button id="pnNo" class="btn-ghost" type="button">Hủy</button><button id="pnOk" class="btn" type="button">Lưu</button></div></div></div>`;
   const L=$('#pnL');L.onchange=e=>{if(L.querySelectorAll('input:checked').length>3){e.target.checked=false;toast('Chỉ ghim tối đa 3 việc')}};
   $('#pnNo').onclick=closeModal;$('#pnOk').onclick=()=>{pinSet(p.id,[...L.querySelectorAll('input:checked')].map(i=>i.value));closeModal();toast('Đã lưu việc trọng tâm',false)}}
+/* ===== Hồ sơ cốt lõi (Fact Sheet) dự án: lưu gọn trong description bằng marker JSON ẩn, không hỏng dữ liệu cũ ===== */
+const FACT_RE=/\n?<!--FACT:(.*?)-->\s*$/s;
+const factGet=p=>{const m=(p.description||'').match(FACT_RE);if(!m)return{};try{return JSON.parse(m[1])}catch(e){return{}}};
+const descVisible=p=>(p.description||'').replace(FACT_RE,'').trim();
+function factSave(p,obj){
+  const has=obj.contract||obj.vendor||obj.spec||obj.plant||(obj.links&&obj.links.length),base=descVisible(p);
+  updateProject(p.id,{description:has?base+(base?'\n\n':'')+'<!--FACT:'+JSON.stringify(obj)+'-->':base})}
+function factModal(p){
+  const FT=factGet(p),links=(FT.links||[]).map(l=>`${l.name}=${l.url}`).join('\n');
+  modal(`<h3 class="font-bold text-lg mb-3">🗂️ Hồ sơ cốt lõi</h3>
+   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+    <label class="text-xs text-mute block">Số hợp đồng<input id="ftContract" class="inp" value="${esc(FT.contract||'')}"></label>
+    <label class="text-xs text-mute block">Nhà cung cấp chính<input id="ftVendor" class="inp" value="${esc(FT.vendor||'')}"></label>
+    <label class="text-xs text-mute block">Công suất / Quy cách<input id="ftSpec" class="inp" value="${esc(FT.spec||'')}"></label>
+    <label class="text-xs text-mute block">Nhà máy / Địa điểm<input id="ftPlant" class="inp" value="${esc(FT.plant||'')}"></label></div>
+   <label class="text-xs text-mute block mb-1">Link mở nhanh — mỗi dòng 1 link, dạng <code>Tên nút=URL</code></label>
+   <textarea id="ftLinks" class="inp" rows="4" placeholder="📄 Layout đã ký=https://...">${esc(links)}</textarea>
+   <div class="flex justify-end gap-2 mt-3"><button id="ftNo" class="btn-ghost" type="button">Hủy</button><button id="ftOk" class="btn" type="button">Lưu</button></div>`);
+  $('#ftNo').onclick=closeModal;
+  $('#ftOk').onclick=()=>{
+    const obj={contract:$('#ftContract').value.trim(),vendor:$('#ftVendor').value.trim(),spec:$('#ftSpec').value.trim(),plant:$('#ftPlant').value.trim(),
+      links:$('#ftLinks').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf('=');return i<0?null:{name:l.slice(0,i).trim(),url:l.slice(i+1).trim()}}).filter(Boolean)};
+    factSave(p,obj);closeModal();if(curTab==='overview')viewDashboard(db.list('projects').find(x=>x.id===p.id))}}
+/* ===== Mốc chính (Key Milestones): các việc gắn ⭐ ở tab Tiến độ, hiện gọn ở Tổng quan + Xem nhanh ===== */
+const msOf=s=>s.tk.filter(t=>t.is_milestone).sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999'));
+function msStat(t){
+  if(t.actual_end_date){if(!t.due_date)return['Đã xong','#16a34a'];const d=daysBetween(t.actual_end_date,t.due_date);return d>0?[`Sớm ${d} ngày`,'#16a34a']:d<0?[`Trễ ${-d} ngày`,'#dc2626']:['Đúng hạn','#16a34a']}
+  return t.due_date&&t.due_date<today()&&t.status!=='done'?[`Trễ ${-dlDays(t)} ngày`,'#dc2626']:['Chưa xong','#94a3b8']}
 function viewDashboard(p){
-  const adm=canBudget(p.id),s=projStats(p.id),st=STATUS[p.status],over=s.planned&&s.actual>s.planned,ob=adm?overBudget(s):[],isL=leafFn(s.tk);
+  const adm=canBudget(p.id),s=projStats(p.id),st=STATUS[p.status],over=s.planned&&s.actual>s.planned,ob=adm?overBudget(s):[],isL=leafFn(s.tk),MS=msOf(s),FT=factGet(p);
   const kpi=(l,v,sub,ic,bg,fg,cls='')=>`<div class="card p-4"><div class="kpi"><div class="min-w-0"><div class="lbl">${l}</div><div class="text-2xl font-bold mt-1 mono ${cls}">${v}</div></div><span class="kpi-ic" style="background:${bg};color:${fg}"><i class="fa-solid ${ic}"></i></span></div>${sub}</div>`;
   const PC={urgent:'#dc2626',high:'#dc2626',medium:'#eab308',low:'#16a34a'};
   const imp=s.tk.filter(t=>isL(t)&&t.status!=='done'&&(['high','urgent'].includes(t.priority)||['over','soon'].includes(dlClass(t))))
@@ -1065,7 +1117,16 @@ function viewDashboard(p){
   $('#view').innerHTML=`<div class="flex flex-wrap items-center gap-2 mb-4"><h2 class="text-2xl font-bold">${esc(p.name)}</h2><span class="pill ${st[1]}">${st[0]}</span><span class="pill ${p.approved?'bg-green-100 text-green-800':'bg-amber-100 text-amber-800'}">${p.approved?'✓ Đã duyệt':'Chờ duyệt'}</span><span class="text-xs text-mute mono">${esc(p.code)} · ${fmtD(p.start_date)} → ${fmtD(p.end_date)}</span>
    <span class="ml-auto flex gap-2"><button id="dCopy" class="btn-ghost" type="button">📋 Copy báo cáo dự án</button>${canTask(p.id)?'<button id="dPin" class="btn-ghost" type="button" title="Ghim 2-3 việc trọng tâm cho báo cáo">📌 Việc trọng tâm</button>':''}</span>
    ${isMgr(p.id)?`<span class="flex gap-2">${isAdmin()?`<button id="dApr" class="btn-ghost"><i class="fa-solid fa-circle-check mr-1"></i>${p.approved?'Bỏ duyệt':'Duyệt dự án'}</button>`:''}<button id="dPerm" class="btn"><i class="fa-solid fa-user-shield mr-1"></i>Phân quyền</button></span>`:''}</div>
-   ${p.description?`<p class="text-sm text-mute mb-4">${esc(p.description)}</p>`:''}
+   ${descVisible(p)?`<p class="text-sm text-mute mb-4">${esc(descVisible(p))}</p>`:''}
+   <div class="card p-4 mb-4"><div class="flex items-center justify-between mb-1"><div class="font-semibold">⭐ Mốc chính</div></div>
+    ${MS.length?MS.map(t=>{const[st,col]=msStat(t);return`<a href="#/p/${p.id}/progress/${t.id}" class="flex flex-wrap items-center gap-2 border-t border-line py-1.5 text-sm hover:bg-black/5"><span class="flex-1 min-w-0 truncate font-medium">${esc(t.name)}</span><span class="mono text-xs text-mute whitespace-nowrap">KH ${fmtD(t.due_date)} · TT ${t.actual_end_date?fmtD(t.actual_end_date):'—'}</span><span class="text-xs font-semibold whitespace-nowrap" style="color:${col}">${st}</span></a>`}).join(''):'<div class="text-xs text-mute pt-1">Chưa có mốc chính — bấm ⭐ cạnh tên việc ở tab Tiến độ để đánh dấu.</div>'}</div>
+   <div class="card p-4 mb-4"><div class="flex items-center justify-between mb-2"><div class="font-semibold">🗂️ Hồ sơ cốt lõi</div>${isMgr(p.id)?'<button id="dFact" class="btn-ghost text-xs" type="button">✏️ Sửa</button>':''}</div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-2">
+     <div><div class="text-mute">Số hợp đồng</div><div class="font-medium mono">${esc(FT.contract||'—')}</div></div>
+     <div><div class="text-mute">Nhà cung cấp chính</div><div class="font-medium">${esc(FT.vendor||'—')}</div></div>
+     <div><div class="text-mute">Công suất / Quy cách</div><div class="font-medium">${esc(FT.spec||'—')}</div></div>
+     <div><div class="text-mute">Nhà máy / Địa điểm</div><div class="font-medium">${esc(FT.plant||'—')}</div></div></div>
+    <div class="flex flex-wrap gap-2">${(FT.links||[]).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener" class="text-xs font-semibold px-2.5 py-1 rounded-full border border-line hover:bg-black/5">${esc(l.name)}</a>`).join('')||'<span class="text-xs text-mute">Chưa có link mở nhanh.</span>'}</div></div>
    <div class="grid grid-cols-2 ${adm?'lg:grid-cols-4':'lg:grid-cols-2'} gap-3 mb-4">
     ${kpi('Tiến độ tổng thể',s.pct+'%',bar(s.pct)+`<div class="text-xs text-mute mt-1">Đã xong ${s.leaf.filter(t=>t.status==='done').length}/${s.leaf.length} việc</div>`,'fa-bars-progress','rgba(37,99,235,.12)','#2563eb')}
     ${!adm?'':kpi('Ngân sách dự kiến',fmtVND(s.planned),`<div class="text-xs text-mute mt-1">${s.roots.length} hạng mục lớn</div>`,'fa-coins','rgba(22,163,74,.12)','#16a34a','tot-g')}
@@ -1084,7 +1145,7 @@ function viewDashboard(p){
     if(b=e.target.closest('[data-wadd]'))wModal(p,b.dataset.wadd);
     else if(b=e.target.closest('[data-wedit]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.wedit);if(x)wModal(p,x.note.slice(1,3),x.id)}
     else if(b=e.target.closest('[data-wdel]')){const x=db.list('extra_tasks').find(r=>r.id===b.dataset.wdel);if(x)ask(`Xóa "${x.title}"?`,()=>{db.save('extra_tasks',db.list('extra_tasks').filter(r=>r.id!==x.id));viewDashboard(p)})}};
-  if($('#dApr'))$('#dApr').onclick=()=>toggleApprove(p.id);if($('#dPerm'))$('#dPerm').onclick=()=>permModal(p.id)
+  if($('#dApr'))$('#dApr').onclick=()=>toggleApprove(p.id);if($('#dPerm'))$('#dPerm').onclick=()=>permModal(p.id);if($('#dFact'))$('#dFact').onclick=()=>factModal(p)
   drawCharts(s);
 }
 
@@ -1131,6 +1192,40 @@ let curHash=location.hash||'#/projects';
 function go(h){curHash=h;['bellMenu','userMenu'].forEach(x=>$('#'+x).classList.add('hidden'));try{if(location.hash!==h)location.hash=h}catch(e){}route()}
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#/"]');if(a){e.preventDefault();go(a.getAttribute('href'))}});
 window.addEventListener('hashchange',()=>{if(location.hash&&location.hash!==curHash){curHash=location.hash;currentUser()&&route()}});
+
+/* ===== Thanh tra cứu vạn năng (Global Search): / hoặc Ctrl+K, mọi màn hình ===== */
+let GS=-1,GSR=[];
+function gsResults(q){
+  q=lc(q);if(!q)return[];
+  const pj=db.list('projects'),byId=Object.fromEntries(pj.map(p=>[p.id,p])),out=[];
+  pj.forEach(p=>{if(lc(p.name).includes(q)||lc(p.code).includes(q)||lc(p.client).includes(q))out.push({h:`#/p/${p.id}/overview`,t:`📁 ${p.name}`,s:[p.code,p.client].filter(Boolean).join(' · ')})});
+  db.list('tasks').forEach(t=>{const p=byId[t.project_id];if(!p)return;if(lc(t.name).includes(q)||lc(t.wbs_code).includes(q))
+    out.push({h:`#/p/${t.project_id}/progress/${t.id}`,t:`[${p.name}] ${esc(t.name)}`,s:`KH: ${fmtD(t.due_date)} · Thực tế: ${t.actual_end_date?fmtD(t.actual_end_date):'—'} (${t.progress||0}%)`})});
+  db.list('budget_items').forEach(b=>{const p=byId[b.project_id];if(!p||!canBudget(p.id))return;if(lc(b.name).includes(q)||lc(b.vendor).includes(q)||lc(b.code).includes(q))
+    out.push({h:`#/p/${b.project_id}/budget/${b.id}`,t:`[${p.name}] ${esc(b.name)}`,s:`${b.vendor?esc(b.vendor)+' · ':''}${nfmt(b.planned_amount||0)} / ${nfmt(b.actual_amount||0)}`})});
+  return out.slice(0,30)}
+function gsDraw(){
+  GSR=gsResults($('#gsInput').value);GS=GSR.length?0:-1;
+  $('#gsList').innerHTML=GSR.length?GSR.map((r,i)=>`<a href="${r.h}" data-gi="${i}" class="flex flex-col gap-0.5 px-3 py-2 border-t border-line ${i===GS?'bg-black/5':''}">`+
+    `<span class="font-medium truncate">${r.t}</span><span class="text-xs text-mute truncate mono">${r.s}</span></a>`).join(''):
+    `<div class="p-4 text-mute text-center text-sm">${$('#gsInput').value?'Không tìm thấy.':'Gõ để tìm dự án, công việc, chi phí...'}</div>`}
+function gsOpen(){$('#gsOverlay').classList.remove('hidden');$('#gsInput').value='';gsDraw();setTimeout(()=>$('#gsInput').focus(),10)}
+function gsClose(){$('#gsOverlay').classList.add('hidden')}
+function gsGo(i){const r=GSR[i];if(!r)return;const id=r.h.split('/').pop();gsClose();go(r.h);setTimeout(()=>{const el=$(`#view [data-id="${id}"]`);if(el){el.classList.add('flash');el.scrollIntoView({block:'center'})}},300)}
+$('#gsBtn').onclick=gsOpen;
+$('#gsInput').oninput=gsDraw;
+$('#gsInput').onkeydown=e=>{
+  if(e.key==='ArrowDown'){e.preventDefault();if(GS<GSR.length-1)GS++;gsDraw()}
+  else if(e.key==='ArrowUp'){e.preventDefault();if(GS>0)GS--;gsDraw()}
+  else if(e.key==='Enter'){e.preventDefault();gsGo(GS)}
+  else if(e.key==='Escape')gsClose()};
+$('#gsList').onclick=e=>{const a=e.target.closest('[data-gi]');if(a){e.preventDefault();gsGo(+a.dataset.gi)}};
+$('#gsOverlay').onclick=e=>{if(e.target.id==='gsOverlay')gsClose()};
+document.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase(),edt=['input','textarea'].includes((e.target.tagName||'').toLowerCase())||e.target.isContentEditable;
+  if((e.ctrlKey||e.metaKey)&&k==='k'){e.preventDefault();gsOpen();return}
+  if(k==='/'&&!edt&&$('#gsOverlay').classList.contains('hidden')){e.preventDefault();gsOpen()}
+});
 const XLSX_URL='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',EXCELJS_URL='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
 const loadJS=u=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Không tải được thư viện (cần kết nối mạng)'));document.head.appendChild(s)});
 
@@ -2092,6 +2187,7 @@ function viewProgress(p,target){
       case 'add':PADD=id;PEXP.add(id);redraw();{const i=tree.querySelector(`[data-addrow="${id}"] [data-addname]`);if(i){i.focus();i.scrollIntoView({block:'nearest'})}}break;
       case 'add-ok':doAdd(row);break;
       case 'add-x':PADD=null;redraw();break;
+      case 'star':{const t=db.list('tasks').find(x=>x.id===id);patchTask(id,{is_milestone:!t.is_milestone});redraw(aff(id));break}
       case 'edit':EDIT={id};redraw();break;
       case 'del':{const t=db.list('tasks').find(x=>x.id===id),n=descIds(taskRows(p.id),id).size-1;
         ask(`Xóa "${t.name}"${n?` và ${n} việc con`:''}?`,()=>{delTaskTree(id);if(EDIT&&EDIT.id===id)EDIT=null;redraw();renderBell()});break}
@@ -2206,6 +2302,7 @@ function drawProgress(p,only){
      <div class="c-name flex flex-wrap items-center gap-1.5 min-w-0" style="padding-left:${flat?0:d*1.3}rem">
       ${!leaf&&!flat?`<button data-act="tg" class="ibtn" aria-label="Mở hoặc thu gọn"><i class="fa-solid fa-chevron-${open?'down':'right'} text-xs"></i></button>`:'<span class="inline-block" style="width:1.55rem"></span>'}
       <span class="mono text-xs" style="color:#f59e0b">${esc(t.wbs_code)}</span>
+      ${ed?`<button data-act="star" class="ibtn" title="${t.is_milestone?'Bỏ mốc chính':'Đánh dấu mốc chính'}" aria-label="Đánh dấu mốc chính"><i class="fa-${t.is_milestone?'solid':'regular'} fa-star" style="${t.is_milestone?'color:#f59e0b':''}"></i></button>`:(t.is_milestone?'<i class="fa-solid fa-star" style="color:#f59e0b" title="Mốc chính"></i>':'')}
       <span class="${leaf?(hot?'text-red-600 font-bold':'font-medium'):'font-bold'} min-w-0 break-words">${esc(t.name)}${leaf?ndWarn(t):''}</span>${(leaf?aheadOf(t):(r.s&&r.s>today()&&r.pg>0))?'<span class="chip-ahead bg-indigo-100 text-indigo-700" title="Đã làm trước ngày bắt đầu kế hoạch">⚡ Vượt tiến độ</span>':''}
       ${ed?`<button data-act="add" class="add-mini" aria-label="Thêm việc con"><i class="fa-solid fa-plus"></i></button>`:''}
       ${priSel(t,!ed)}
