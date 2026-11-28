@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Technical PM · v26.11.27-1400</title>
+<title>Technical PM · v26.11.28-0820</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -258,7 +258,7 @@ tr.b-par .cell{font-weight:700;font-size:14.5px}
     <button id="menuBtn" class="md:hidden p-2" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
     <a href="#/projects" class="font-bold whitespace-nowrap" title="Về danh sách dự án"><i class="fa-solid fa-gears text-brand mr-2"></i>Technical PM</a>
     <div id="crumb" class="hidden sm:block text-mute text-sm truncate">/ Dự án</div>
-    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.27-1400</span>
+    <span class="mono text-[10px] rounded px-1.5 py-0.5 shrink-0" style="background:rgba(22,163,74,.15);color:#15803d" title="Số phiên bản file đang chạy">v26.11.28-0820</span>
     <div class="flex-1"></div>
 
     <button id="gsBtn" class="p-2" title="Tìm kiếm toàn bộ (/ hoặc Ctrl+K)" aria-label="Tìm kiếm toàn bộ"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -372,7 +372,8 @@ const ICONS={
  'folder-open':'<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
  'lock':'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
  'triangle-exclamation':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
- 'user-shield':'<path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5Z"/><path d="m9 12 2 2 4-4"/>'
+ 'user-shield':'<path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5Z"/><path d="m9 12 2 2 4-4"/>',
+ 'star':'<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>'
 };
 function hydrateIcons(root){
   (root.querySelectorAll?root.querySelectorAll('i.fa-solid,i.fa-regular'):[]).forEach(el=>{
@@ -380,7 +381,10 @@ function hydrateIcons(root){
     const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
     s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');
     s.setAttribute('class',['ic',...[...el.classList].filter(c=>!c.startsWith('fa-'))].join(' '));
+    const st=el.getAttribute('style');if(st)s.setAttribute('style',st);
+    const ti=el.getAttribute('title');if(ti)s.setAttribute('title',ti);
     s.innerHTML=ICONS[n]||'<circle cx="12" cy="12" r="9"/>';
+    if(n==='star'&&el.classList.contains('fa-solid'))s.style.fill='currentColor';
     el.replaceWith(s);
   });
 }
@@ -504,19 +508,32 @@ let PMS_ERR=null;
 async function loadPms(){PMS_ERR=null;try{await(isAdmin()?fetchTable('pms_evaluations'):fetchTable('pms_evaluations','user_id',[CUR.id]))}catch(e){PMS_ERR=e;console.error('PMS',e)}}
 /* Tải ĐỒNG THỜI toàn bộ dữ liệu cốt lõi ngay sau khi đăng nhập (trước khi vẽ trang chủ) để mọi con số tiến độ / thực chi / % hiển thị đủ ngay.
    Admin: 1 lượt Promise.all cho mọi bảng. Thành viên: lấy project_members trước (cần để biết dự án nào / vai trò nào), rồi 1 lượt Promise.all cho phần còn lại. */
-async function fetchAll(){
+let CORE_PIDS=[];
+/* Bước 1: chỉ tải đủ để vẽ Trang chủ (users, project_members, projects) -> boot() hiện ngay, không chờ các bảng nặng */
+async function fetchCore(){
   const admin=isAdmin();
   if(admin){
-    await Promise.all([fetchTable('users'),fetchTable('project_members'),fetchTable('projects'),fetchTable('tasks'),fetchTable('budget_items'),fetchTable('extra_tasks'),fetchTable('notes'),fetchTable('master_gantt'),loadPms()]);
+    await Promise.all([fetchTable('users'),fetchTable('project_members'),fetchTable('projects')]);
   }else{
     await Promise.all([fetchTable('users'),fetchTable('project_members')]);
-    const pids=[...new Set(CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id))],bp=pids.filter(id=>roleOf(id)==='manager');
-    await Promise.all([fetchTable('projects','id',pids),fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids),loadPms()]);
+    CORE_PIDS=[...new Set(CACHE.project_members.filter(m=>m.user_id===CUR.id).map(m=>m.project_id))];
+    await fetchTable('projects','id',CORE_PIDS);
   }
   if(CUR){const me=CACHE.users.find(u=>u.id===CUR.id);if(me)CUR=me}
-  CACHE.projects.forEach(x=>LOADED.add(x.id));PF.state='done';syncCPD();
-  fetchTable('attachments','task_id',CACHE.tasks.map(t=>t.id)).catch(e=>console.error(e));   // file đính kèm không ảnh hưởng số liệu trang chủ -> tải nền, không chặn
 }
+/* Bước 2+3: tải nền các bảng còn lại (tasks/budget cho số liệu thẻ dự án; notes/master_gantt/extra_tasks/pms/attachments cho bên trong dự án) */
+async function fetchRest(){
+  const admin=isAdmin();
+  if(admin){
+    await Promise.all([fetchTable('tasks'),fetchTable('budget_items'),fetchTable('extra_tasks'),fetchTable('notes'),fetchTable('master_gantt'),loadPms()]);
+  }else{
+    const pids=CORE_PIDS,bp=pids.filter(id=>roleOf(id)==='manager');
+    await Promise.all([fetchTable('tasks','project_id',pids),bp.length?fetchTable('budget_items','project_id',bp):null,fetchTable('extra_tasks','project_id',pids),fetchTable('notes','project_id',pids),fetchTable('master_gantt','project_id',pids),loadPms()]);
+  }
+  CACHE.projects.forEach(x=>LOADED.add(x.id));PF.state='done';syncCPD();
+  fetchTable('attachments','task_id',CACHE.tasks.map(t=>t.id)).catch(e=>console.error(e));
+}
+async function fetchAll(){await fetchCore();await fetchRest()}   // giữ nguyên cho resync() và các chỗ gọi cũ
 /* window.appCache = bộ nhớ dùng chung (CACHE); window.projectCache[projectId] = { tasks, budgets, members } luôn đọc từ đó */
 window.appCache=CACHE;
 window.projectCache=new Proxy({},{get:(_,pid)=>typeof pid!=='string'?undefined:{tasks:CACHE.tasks.filter(x=>x.project_id===pid),budgets:CACHE.budget_items.filter(x=>x.project_id===pid),members:CACHE.project_members.filter(x=>x.project_id===pid)},has:(_,pid)=>LOADED.has(pid),ownKeys:()=>[...LOADED],getOwnPropertyDescriptor:(_,pid)=>LOADED.has(pid)?{enumerable:true,configurable:true,value:window.projectCache[pid]}:undefined});
@@ -670,17 +687,18 @@ async function ensureUser(su){
 }
 let SIGNING=false,LISTOK=false;const LOADED=new Set();
 async function onSignedIn(su){
-  if(SIGNING)return;SIGNING=true;loading(true,'Đang đăng nhập và tải dữ liệu...');
+  if(SIGNING)return;SIGNING=true;
   try{
     CUR=await ensureUser(su);SESS=(CUR.prefs&&typeof CUR.prefs==='object')?CUR.prefs:{};
-    LOADED.clear();PF.state='idle';PF.p=null;await fetchAll();LISTOK=true;
+    LOADED.clear();PF.state='idle';PF.p=null;await fetchCore();LISTOK=true;
     if(location.search.includes('code=')){try{history.replaceState(null,'',location.pathname+(location.hash||''))}catch(e){}}
-    boot();
+    boot();   // vẽ Trang chủ ngay, không chờ tasks/budget/notes...
+    fetchRest().then(()=>{if(!curPid)route(true)}).catch(e=>console.error('fetchRest',e));   // tải nền, chỉ vẽ lại nếu còn đang ở Trang chủ
   }catch(e){
     console.error(e);CUR=null;
     renderGate('<span class="text-red-600">Lỗi: '+esc(e.message||e)+'</span><br>Kiểm tra đã chạy file <b>supabase_setup.sql</b> chưa. <button id="gOut" class="underline">Đăng xuất</button>');
     const o=$('#gOut');if(o)o.onclick=()=>sb.auth.signOut();
-  }finally{SIGNING=false;loading(false)}
+  }finally{SIGNING=false}
 }
 /* chạy khi load trang: đã đăng nhập chưa? */
 async function checkSession(){
@@ -2187,7 +2205,7 @@ function viewProgress(p,target){
       case 'add':PADD=id;PEXP.add(id);redraw();{const i=tree.querySelector(`[data-addrow="${id}"] [data-addname]`);if(i){i.focus();i.scrollIntoView({block:'nearest'})}}break;
       case 'add-ok':doAdd(row);break;
       case 'add-x':PADD=null;redraw();break;
-      case 'star':{const t=db.list('tasks').find(x=>x.id===id);patchTask(id,{is_milestone:!t.is_milestone});redraw(aff(id));break}
+      case 'star':{const t=db.list('tasks').find(x=>x.id===id),nv=!t.is_milestone;patchTask(id,{is_milestone:nv});toast(nv?'Đã lưu mốc chính':'Đã bỏ mốc chính',false);redraw(aff(id));break}
       case 'edit':EDIT={id};redraw();break;
       case 'del':{const t=db.list('tasks').find(x=>x.id===id),n=descIds(taskRows(p.id),id).size-1;
         ask(`Xóa "${t.name}"${n?` và ${n} việc con`:''}?`,()=>{delTaskTree(id);if(EDIT&&EDIT.id===id)EDIT=null;redraw();renderBell()});break}
